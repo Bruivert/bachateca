@@ -440,8 +440,8 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.7";
-let probeB=null, probeI=null;
+const APP_VERSION = "1.8";
+let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
   try{
@@ -456,8 +456,12 @@ function fixBottom(){
     // lo corrige solo más tarde, así que se vuelve a medir tras cada cambio.
     const fixedBottom = probeB.getBoundingClientRect().bottom;
     const gap = Math.round(sh - fixedBottom);
-    if(isStandalone() && portrait && gap > 0 && gap < 140) shift = gap;
     const ins = probeI.getBoundingClientRect();
+    // Tope de seguridad: como mucho se baja lo que mide la zona del indicador de inicio,
+    // así los iconos y sus nombres nunca quedan fuera de la pantalla.
+    const cap = Math.round(ins.width);
+    if(isStandalone() && portrait && gap > 0 && gap < 140) shift = Math.min(gap, cap);
+    lastGap = gap;
     screenDiag = `v${APP_VERSION} · pantalla ${sh} · visible ${window.innerHeight} · borde ${Math.round(fixedBottom)} · márgenes ${Math.round(ins.height)}/${Math.round(ins.width)} · ajuste ${shift}${isStandalone()?" · instalada":" · Safari"}`;
   }catch{}
   const v = shift + "px";
@@ -1597,6 +1601,7 @@ function openSettings(){
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><div class="sheet" role="dialog" aria-label="Ajustes">
     <div class="sheet-head"><h2>Ajustes</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <p class="small muted" style="margin:-4px 2px 0">${esc(screenDiag)} · pestaña ${esc(tab)}</p>
     ${listHTML("pos")}
     ${listHTML("hold")}
     ${listHTML("cls")}

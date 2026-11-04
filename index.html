@@ -440,7 +440,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.6";
+const APP_VERSION = "1.7";
 let probeB=null, probeI=null;
 function fixBottom(){
   let shift = 0;
@@ -480,6 +480,8 @@ async function initStore(){
   mode="local"; assetsApi = idb ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
+  setTimeout(genMissingThumbs, 1200);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") setTimeout(genMissingThumbs, 800); });
 }
 function setSync(){} function updateSync(){} function doMigration(){}
 
@@ -1095,8 +1097,32 @@ async function makeThumb(v, t){
   if(Math.abs(v.currentTime-at)>0.05) await new Promise(res=>{ let d=false; const ok=()=>{ if(d) return; d=true; res(); }; v.addEventListener("seeked",ok,{once:true}); v.currentTime=at; setTimeout(ok,3000); });
   const W=v.videoWidth, H=v.videoHeight; if(!W||!H) return null;
   const side=Math.min(W,H), c=document.createElement("canvas"); c.width=c.height=160;
-  c.getContext("2d").drawImage(v,(W-side)/2,(H-side)/2,side,side,0,0,160,160);
+  const ctx=c.getContext("2d"); ctx.drawImage(v,(W-side)/2,(H-side)/2,side,side,0,0,160,160);
+  if(frameIsBlank(ctx)) return null;
   return c.toDataURL("image/jpeg",0.72);
+}
+function frameIsBlank(ctx){
+  try{ const d=ctx.getImageData(0,0,160,160).data; let sum=0, n=0; for(let i=0;i<d.length;i+=4*97){ sum+=d[i]+d[i+1]+d[i+2]; n++; } return sum/(n*3) < 6; }catch{ return false; }
+}
+// Crea las miniaturas que falten (figuras con vídeo guardadas antes de esta función) en segundo plano.
+let thumbsRunning=false;
+async function genMissingThumbs(){
+  if(thumbsRunning || !idb) return; thumbsRunning=true;
+  try{
+    for(const f of Object.values(S.figures).filter(x=>x.vid && !x.thumb)){
+      const url=await vidObjUrl(f.vid).catch(()=>null); if(!url) continue;
+      const v=document.createElement("video");
+      v.muted=true; v.defaultMuted=true; v.playsInline=true; v.setAttribute("playsinline",""); v.setAttribute("muted",""); v.preload="auto"; v.src=url;
+      v.style.cssText="position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1";
+      document.body.appendChild(v);
+      try{
+        try{ await v.play(); await new Promise(r=>{ const ok=()=>r(); v.addEventListener("timeupdate",ok,{once:true}); setTimeout(ok,2500); }); }catch{}
+        v.pause();
+        const th=await makeThumb(v,(f.vidTrim&&f.vidTrim.start)||0);
+        if(th && S.figures[f.id] && !S.figures[f.id].thumb){ S.figures[f.id].thumb=th; persist({t:"fig",id:f.id}); render(); }
+      }catch{} finally{ v.removeAttribute("src"); v.load(); v.remove(); }
+    }
+  } finally { thumbsRunning=false; }
 }
 function playerHTML(f){
   const t=f.vidTrim||{};
@@ -1108,7 +1134,8 @@ function backfillThumb(vidId, v){
   try{
     const W=v.videoWidth, H=v.videoHeight; if(!W||!H) return;
     const side=Math.min(W,H), c=document.createElement("canvas"); c.width=c.height=160;
-    c.getContext("2d").drawImage(v,(W-side)/2,(H-side)/2,side,side,0,0,160,160);
+    const ctx=c.getContext("2d"); ctx.drawImage(v,(W-side)/2,(H-side)/2,side,side,0,0,160,160);
+    if(frameIsBlank(ctx)) return;
     f.thumb=c.toDataURL("image/jpeg",0.72); persist({t:"fig",id:f.id});
     if(vstate && vstate.figId===f.id) vstate.thumb=f.thumb;
   }catch{}
@@ -1120,6 +1147,7 @@ function hydrateVideos(root){
     if(!url){ const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted">Este vídeo no está en este dispositivo.</p>`; return; }
     v.addEventListener("loadedmetadata",()=>{ if(s>0) try{ v.currentTime=s; }catch{} });
     v.addEventListener("seeked",()=>backfillThumb(id, v), {once:true});
+    v.addEventListener("playing",()=>setTimeout(()=>backfillThumb(id, v),300));
     v.addEventListener("loadeddata",()=>{ if(!(s>0)) backfillThumb(id, v); }, {once:true});
     v.addEventListener("timeupdate",()=>{ if(e>0 && v.currentTime>=e){ const loop=v.closest(".player")?.dataset.loop==="1"; v.currentTime=s; if(!loop) v.pause(); } });
     v.addEventListener("play",()=>{ if(v.currentTime<s-0.25 || (e>0 && v.currentTime>=e)) v.currentTime=s; });

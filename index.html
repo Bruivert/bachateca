@@ -423,17 +423,22 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
+const APP_VERSION = "1.4";
 function fixBottom(){
   let shift = 0;
   try{
     const portrait = window.innerHeight > window.innerWidth;
     const sh = Math.max(screen.width, screen.height);
-    const gap = Math.round(sh - window.innerHeight);
+    // Dónde acaba de verdad un elemento fijado abajo (en algunos iPhone, antes del borde físico).
+    const pb = document.createElement("div");
+    pb.style.cssText = "position:fixed;left:0;bottom:0;width:1px;height:1px;visibility:hidden;pointer-events:none";
+    document.body.appendChild(pb); const fixedBottom = pb.getBoundingClientRect().bottom; pb.remove();
+    const gap = Math.round(sh - fixedBottom);
     if(isStandalone() && portrait && gap > 0 && gap < 140) shift = gap;
     const pr = document.createElement("div");
     pr.style.cssText = "position:fixed;top:0;left:0;height:env(safe-area-inset-top,0px);width:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none";
     document.body.appendChild(pr); const ins = pr.getBoundingClientRect(); pr.remove();
-    screenDiag = `Pantalla ${sh} · visible ${window.innerHeight} · márgenes ${Math.round(ins.height)}/${Math.round(ins.width)} · ajuste ${shift}${isStandalone()?" · app instalada":""}`;
+    screenDiag = `v${APP_VERSION} · pantalla ${sh} · visible ${window.innerHeight} · borde ${Math.round(fixedBottom)} · márgenes ${Math.round(ins.height)}/${Math.round(ins.width)} · ajuste ${shift}${isStandalone()?" · instalada":" · Safari"}`;
   }catch{}
   document.documentElement.style.setProperty("--nav-shift", shift + "px");
 }
@@ -1654,7 +1659,13 @@ $("#btn-settings").onclick=()=>{ confirmKey=null; editKey=null; openSettings(); 
 const h=(location.hash||"").slice(1);
 go(TABS.includes(h)?h:"repertorio");
 initStore();
-if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){
+  // Busca actualizaciones al abrir y recarga una vez cuando llega una versión nueva.
+  const hadController = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(!hadController || reloaded) return; reloaded = true; location.reload(); });
+  navigator.serviceWorker.register("sw.js").then(r=>{ try{ r.update(); }catch{} }).catch(()=>{});
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") navigator.serviceWorker.getRegistration().then(r=>r && r.update()).catch(()=>{}); });
+}
 })();
 </script>
 </body>

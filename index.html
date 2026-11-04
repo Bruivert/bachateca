@@ -129,7 +129,7 @@ button.card:active{background:var(--surface2)}
 .route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:500}
 .route .arrow{color:var(--accent-fg);font-weight:700}
 .hold{opacity:.85}
-.fname{font-weight:600;font-size:17px;color:var(--fg)}
+.fname{font-weight:600;font-size:17px;color:var(--fg);line-height:1.25}
 .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600}
 .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
@@ -251,7 +251,12 @@ details .inner{display:flex;flex-direction:column;gap:12px}
 .poslist{display:flex;flex-direction:column;gap:0;border-radius:12px;overflow:hidden}
 .poslist>div{display:flex;align-items:center;gap:4px;background:var(--surface2);padding:6px 6px 6px 14px;position:relative;min-height:46px}
 .poslist>div+div::before{content:"";position:absolute;top:0;left:14px;right:0;border-top:.5px solid var(--line)}
-.poslist span.nm{margin-right:auto;min-width:0;overflow-wrap:anywhere}
+.poslist span.nm{margin-right:auto;min-width:0;overflow-wrap:break-word}
+.ib{width:36px;height:36px;flex:none;border:0;border-radius:10px;background:none;color:var(--accent-fg);display:grid;place-items:center}
+.ib:disabled{opacity:.3}.ib.danger{color:var(--warn)}.ib:active{background:var(--fill)}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips.scroll::-webkit-scrollbar{display:none}.chips.scroll .chip{flex:none}
+.sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
 .log{background:var(--surface);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:15px}
 .log .d{grid-column:1/-1;font-size:13px;color:var(--muted)}
 @media (max-width:420px){.grid2{grid-template-columns:1fr}.kv{grid-template-columns:96px 1fr}}
@@ -482,13 +487,18 @@ function routeHTML(f){
   return `<div class="route"><span>${esc(f.entrada||"¿Dónde empieza?")}${holdTxt(f.agarreIn)}</span><span class="arrow">→</span><span>${esc(f.salida||"¿Dónde acaba?")}${holdTxt(f.agarreOut)}</span></div>`;
 }
 function pill(k){ return `<span class="pill st-${k}">${esc(EST[k]?.t||k)}</span>`; }
-function figCard(f){
+function figCard(f, inGroup){
+  let sub;
+  if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
+  else if(f.entrada && f.salida){
+    const holds = (f.agarreIn||f.agarreOut) ? ` <span class="hold">· ${esc(f.agarreIn||"—")} → ${esc(f.agarreOut||"—")}</span>` : "";
+    sub = `${inGroup?"":esc(f.entrada)+" "}<span class="arrow">→</span> ${esc(f.salida)}${holds}`;
+  } else sub = `<span class="tag warn">sin posiciones</span>`;
   return `<button class="card" data-edit="${f.id}">
-    ${routeHTML(f)}
     <div class="fname">${esc(f.nombre)}</div>
+    <div class="route">${sub}</div>
     <div class="meta">${pill(f.estado)}
       ${tipoOf(f)==="transicion"?`<span class="tag">transición</span>`:""}
-      ${incomplete(f)?`<span class="tag warn">sin posiciones</span>`:""}
       ${f.sugerido?`<span class="tag">✦ sugerido por Claude</span>`:""}
       ${f.tiempos?`<span>${esc(f.tiempos)} t</span>`:""}
       ${f.baile && f.baile!=="Bachata" ? `<span class="tag">${esc(f.baile)}</span>`:""}
@@ -522,12 +532,12 @@ function renderRepertorio(){
     const inc = list.filter(incomplete); if(inc.length) groups.push(["Sin completar", inc]);
     allPositions().forEach(p=>{ const it=list.filter(f=>placed(f)&&f.entrada===p); if(it.length) groups.push(["Desde "+p, it]); });
     const fw = list.filter(f=>!isMove(f)); if(fw.length) groups.push(["Footwork y styling", fw]);
-    body = groups.map(([t,it])=>`<div class="group"><div class="group-h"><b>${esc(t)}</b><span>${it.length}</span></div>${it.map(figCard).join("")}</div>`).join("");
-  } else body = `<div class="list">${list.map(figCard).join("")}</div>`;
+    body = groups.map(([t,it])=>`<div class="group"><div class="group-h"><b>${esc(t)}</b><span>${it.length}</span></div>${it.map(f=>figCard(f, t.startsWith("Desde "))).join("")}</div>`).join("");
+  } else body = `<div class="list">${list.map(f=>figCard(f,false)).join("")}</div>`;
   const v=$("#v-repertorio");
   v.innerHTML = `
     <div class="stats">
-      <div><b>${all.length}</b><span>en el repertorio</span></div>
+      <div><b>${all.length}</b><span>figuras</span></div>
       <div><b>${dueN}</b><span>repasos hoy</span></div>
       <div><b>${consN}</b><span>consolidadas</span></div>
     </div>
@@ -537,9 +547,9 @@ function renderRepertorio(){
     ${incN && filt.estado!=="incompletas" ? `<div class="note">${incN===1?"1 captura sin completar":incN+" capturas sin completar"}. Añade dónde empiezan y acaban para que entren en el mapa y en los enlaces.<br><button class="btn sm" data-act="show-inc">Ver capturas</button></div>`:""}
     <div class="filters">
       <input type="search" class="full" id="f-q" placeholder="Buscar figura, posición, agarre, clase…" value="${esc(filt.q)}" aria-label="Buscar">
-      <select id="f-baile" aria-label="Baile"><option value="todos">Baile: todos</option>${bailes.map(b=>`<option ${filt.baile===b?"selected":""}>${esc(b)}</option>`).join("")}</select>
+      ${bailes.length>1?`<select id="f-baile" aria-label="Baile"><option value="todos">Baile: todos</option>${bailes.map(b=>`<option ${filt.baile===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
       <select id="f-estado" aria-label="Estado"><option value="todos">Estado: todos</option>${ESTADOS.map(e=>`<option value="${e.k}" ${filt.estado===e.k?"selected":""}>${e.t}</option>`).join("")}<option value="incompletas" ${filt.estado==="incompletas"?"selected":""}>Sin completar</option></select>
-      <div class="seg2 full" role="group" aria-label="Orden"><button data-vista="pos" aria-pressed="${filt.vista==="pos"}">Por posición</button><button data-vista="rec" aria-pressed="${filt.vista==="rec"}">Recientes</button></div>
+      <div class="seg2 ${bailes.length>1?"full":""}" role="group" aria-label="Orden"><button data-vista="pos" aria-pressed="${filt.vista==="pos"}">Posición</button><button data-vista="rec" aria-pressed="${filt.vista==="rec"}">Recientes</button></div>
     </div>
     ${list.length ? body : `<p class="muted">Ninguna figura coincide con el filtro.</p>`}
     ` : `
@@ -634,7 +644,7 @@ function renderRepasar(){
             ${f.senal?`<dt>Señal clave</dt><dd>${esc(f.senal)}</dd>`:""}
             ${f.tiempo?`<dt>Empieza en</dt><dd>el ${esc(f.tiempo)}</dd>`:""}
             ${f.tiempos?`<dt>Dura</dt><dd>${esc(f.tiempos)} tiempos</dd>`:""}
-            ${f.video?`<dt>Vídeo en Fotos</dt><dd>${esc(f.video)}</dd>`:""}
+            ${f.video && !f.vid?`<dt>Vídeo en Fotos</dt><dd>${esc(f.video)}</dd>`:""}
             ${safeUrl(f.enlace)?`<dt>Enlace</dt><dd><a href="${esc(safeUrl(f.enlace))}" target="_blank" rel="noopener">Abrir vídeo</a></dd>`:""}
             ${f.notas?`<dt>Notas</dt><dd>${esc(f.notas)}</dd>`:""}
           </dl>
@@ -839,11 +849,11 @@ function openFigure(id, opts={}){
   const optList=(list,sel,empty)=>`<option value="">${empty}</option>${[...new Set([...list, sel].filter(Boolean))].map(p=>`<option ${p===sel?"selected":""}>${esc(p)}</option>`).join("")}`;
   let tipo = tipoOf(f), estado = f.estado, prof = f.profesor||"", baile = f.baile||"Bachata";
   $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><form class="sheet" id="fig-form" novalidate>
-    <div class="sheet-head"><h2>${quick?"Captura rápida":(id?"Editar":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="sheet-head"><h2>${quick?"Captura rápida":(id?"Editar figura":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${quick?`<p class="small muted">Guarda el vídeo y un nombre al salir de clase. Se queda en lista de espera y completas el resto un día libre.</p>`:""}
     <label class="f" for="ff-nombre">Nombre fácil de recordar<input type="text" id="ff-nombre" value="${esc(f.nombre)}" placeholder="${quick?"Opcional: si lo dejas vacío, clase y fecha":"Ej.: vuelta con hammerlock"}"></label>
     <div class="f"><span>Tipo</span><div class="seg neutral" id="ff-tipo">${TIPOS.map(t=>`<button type="button" aria-pressed="${tipo===t.k}" data-tipo="${t.k}">${t.t}</button>`).join("")}</div></div>
-    ${S.classes.length?`<div class="f"><span>Clase</span><div class="chips" id="ff-cls">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}</div></div>`:""}
+    ${S.classes.length?`<div class="f"><span>Clase</span><div class="chips scroll" id="ff-cls">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}</div></div>`:""}
     ${quick?"":`
     <div class="grid2">
       <label class="f" for="ff-in"><span id="ff-in-l">Empieza en</span><select id="ff-in">${optList(S.positions,f.entrada,"Elige…")}</select></label>
@@ -868,7 +878,7 @@ function openFigure(id, opts={}){
       <label class="f" for="ff-notas">Notas<textarea id="ff-notas" placeholder="Correcciones del profe, errores típicos…">${esc(f.notas)}</textarea></label>
     </div></details>`}
     <p class="small" id="ff-err" style="color:var(--warn)" hidden></p>
-    <div class="row">
+    <div class="row sheet-foot">
       <button type="submit" class="btn pri" style="flex:1">Guardar</button>
       ${quick?`<button type="button" class="btn" data-act="to-full">Ficha completa</button>`:""}
       ${id?`<button type="button" class="btn danger" data-act="del-fig" data-id="${f.id}">Borrar</button>`:""}
@@ -1470,9 +1480,9 @@ function listHTML(kind){
       const k=kind+i, n=usage(kind,v);
       if(editKey===k) return `<div><input type="text" id="ren-${k}" value="${esc(v)}" aria-label="Nuevo nombre" style="flex:1"><button class="btn sm pri" data-lsave="${kind}" data-i="${i}">Guardar</button><button class="btn ghost sm" data-lcancel="1">Cancelar</button></div>`;
       return `<div><span class="nm">${esc(v)}${n?` <span class="muted small">· ${n}</span>`:""}</span>
-        <button class="btn ghost sm" data-lren="${kind}" data-i="${i}">Renombrar</button>
-        <button class="btn ghost sm" data-lmv="${kind}" data-i="${i}" aria-label="Subir" ${i===0?"disabled":""}>↑</button>
-        <button class="btn ghost sm" data-ldel="${kind}" data-i="${i}">${confirmKey==="del"+k?(n?`En ${n} · ¿Quitar?`:"¿Seguro?"):"Quitar"}</button></div>`;
+        <button class="ib" data-lren="${kind}" data-i="${i}" aria-label="Renombrar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>
+        <button class="ib" data-lmv="${kind}" data-i="${i}" aria-label="Subir" ${i===0?"disabled":""}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        ${confirmKey==="del"+k?`<button class="btn sm danger" data-ldel="${kind}" data-i="${i}">${n?`En ${n} · ¿Quitar?`:"¿Quitar?"}</button>`:`<button class="ib danger" data-ldel="${kind}" data-i="${i}" aria-label="Quitar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>`}</div>`;
     }).join("")}</div>
     <div class="row"><input type="text" id="new-${kind}" placeholder="${L.ph}" style="flex:1" aria-label="${L.ph}"><button class="btn" data-ladd="${kind}">Añadir</button></div>
     ${kind!=="cls"?`<p class="small muted">Quitar no cambia las figuras que lo usan. Para cambiarles el nombre a todas, usa Renombrar.</p>`:""}

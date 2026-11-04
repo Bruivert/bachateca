@@ -81,7 +81,7 @@ header.top{position:sticky;top:0;z-index:20;margin:0 calc(-1 * max(16px,env(safe
 .bar .btn.pri{border-radius:99px;min-height:34px;padding:6px 14px;font-size:15px}
 
 /* barra de pestañas translúcida */
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:25;display:grid;grid-template-columns:repeat(4,1fr);padding:4px max(8px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line)}
+nav.tabs{position:fixed;left:0;right:0;bottom:calc(-1 * var(--nav-shift, 0px));z-index:25;display:grid;grid-template-columns:repeat(4,1fr);padding:4px max(8px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line)}
 nav.tabs button{position:relative;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px 4px;color:var(--muted);font-size:10.5px;font-weight:600;min-height:50px}
 nav.tabs svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav.tabs button[aria-selected="true"]{color:var(--accent-fg)}
@@ -247,7 +247,7 @@ details .inner{display:flex;flex-direction:column;gap:12px}
 .dtab th,.dtab td{padding:6px 8px;border-bottom:.5px solid var(--line);text-align:right}
 .dtab th:first-child,.dtab td:first-child{text-align:left}
 .coach{white-space:pre-wrap;font-size:15px;line-height:1.5;background:var(--surface2);border-radius:12px;padding:12px 14px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:600;font-size:15px;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:60;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:600;font-size:15px;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .poslist{display:flex;flex-direction:column;gap:0;border-radius:12px;overflow:hidden}
 .poslist>div{display:flex;align-items:center;gap:4px;background:var(--surface2);padding:6px 6px 6px 14px;position:relative;min-height:46px}
 .poslist>div+div::before{content:"";position:absolute;top:0;left:14px;right:0;border-top:.5px solid var(--line)}
@@ -415,6 +415,27 @@ async function saveNow(){
 window.addEventListener("pagehide", ()=>{ if(saveT){ clearTimeout(saveT); saveNow(); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && saveT){ clearTimeout(saveT); saveNow(); } });
 const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true;
+// En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
+// de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
+let screenDiag = "";
+function fixBottom(){
+  let shift = 0;
+  try{
+    const portrait = window.innerHeight > window.innerWidth;
+    const sh = Math.max(screen.width, screen.height);
+    const gap = Math.round(sh - window.innerHeight);
+    if(isStandalone() && portrait && gap > 0 && gap < 140) shift = gap;
+    const pr = document.createElement("div");
+    pr.style.cssText = "position:fixed;top:0;left:0;height:env(safe-area-inset-top,0px);width:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none";
+    document.body.appendChild(pr); const ins = pr.getBoundingClientRect(); pr.remove();
+    screenDiag = `Pantalla ${sh} · visible ${window.innerHeight} · márgenes ${Math.round(ins.height)}/${Math.round(ins.width)} · ajuste ${shift}${isStandalone()?" · app instalada":""}`;
+  }catch{}
+  document.documentElement.style.setProperty("--nav-shift", shift + "px");
+}
+window.addEventListener("resize", fixBottom);
+window.addEventListener("orientationchange", ()=>setTimeout(fixBottom, 300));
+window.addEventListener("pageshow", fixBottom);
+fixBottom();
 async function initStore(){
   try{ idb = await idbOpen(); }catch{ idb = null; }
   let c=null; try{ if(idb) c = await kvGet("state"); }catch{}
@@ -1477,6 +1498,7 @@ function openSettings(){
     </div>
     <div class="panel">
       <h3>Espacio en este dispositivo</h3>
+      <p class="small muted" id="screen-diag">${esc(screenDiag)}</p>
       <p class="small muted" id="vid-usage">Calculando…</p>
       <p class="small muted" id="persist-st"></p>
       <button class="btn sm" data-act="persist">Proteger mis datos</button>

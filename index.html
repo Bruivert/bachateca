@@ -423,28 +423,37 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.4";
+const APP_VERSION = "1.5";
+let probeB=null, probeI=null;
 function fixBottom(){
   let shift = 0;
   try{
+    if(!probeB){
+      probeB=document.createElement("div"); probeB.style.cssText="position:fixed;left:0;bottom:0;width:1px;height:1px;visibility:hidden;pointer-events:none";
+      probeI=document.createElement("div"); probeI.style.cssText="position:fixed;top:0;left:0;height:env(safe-area-inset-top,0px);width:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none";
+      document.body.append(probeB, probeI);
+    }
     const portrait = window.innerHeight > window.innerWidth;
     const sh = Math.max(screen.width, screen.height);
-    // Dónde acaba de verdad un elemento fijado abajo (en algunos iPhone, antes del borde físico).
-    const pb = document.createElement("div");
-    pb.style.cssText = "position:fixed;left:0;bottom:0;width:1px;height:1px;visibility:hidden;pointer-events:none";
-    document.body.appendChild(pb); const fixedBottom = pb.getBoundingClientRect().bottom; pb.remove();
+    // Dónde acaba de verdad un elemento fijado abajo. iOS a veces lo deja antes del borde y
+    // lo corrige solo más tarde, así que se vuelve a medir tras cada cambio.
+    const fixedBottom = probeB.getBoundingClientRect().bottom;
     const gap = Math.round(sh - fixedBottom);
     if(isStandalone() && portrait && gap > 0 && gap < 140) shift = gap;
-    const pr = document.createElement("div");
-    pr.style.cssText = "position:fixed;top:0;left:0;height:env(safe-area-inset-top,0px);width:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none";
-    document.body.appendChild(pr); const ins = pr.getBoundingClientRect(); pr.remove();
+    const ins = probeI.getBoundingClientRect();
     screenDiag = `v${APP_VERSION} · pantalla ${sh} · visible ${window.innerHeight} · borde ${Math.round(fixedBottom)} · márgenes ${Math.round(ins.height)}/${Math.round(ins.width)} · ajuste ${shift}${isStandalone()?" · instalada":" · Safari"}`;
   }catch{}
-  document.documentElement.style.setProperty("--nav-shift", shift + "px");
+  const v = shift + "px";
+  if(document.documentElement.style.getPropertyValue("--nav-shift") !== v) document.documentElement.style.setProperty("--nav-shift", v);
 }
-window.addEventListener("resize", fixBottom);
+let fbT=null;
+function fixBottomSoon(){ if(fbT) return; fbT=setTimeout(()=>{ fbT=null; fixBottom(); }, 120); }
+window.addEventListener("resize", fixBottomSoon);
+window.addEventListener("scroll", fixBottomSoon, {passive:true});
 window.addEventListener("orientationchange", ()=>setTimeout(fixBottom, 300));
 window.addEventListener("pageshow", fixBottom);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") setTimeout(fixBottom, 200); });
+if(window.visualViewport){ visualViewport.addEventListener("resize", fixBottomSoon); visualViewport.addEventListener("scroll", fixBottomSoon); }
 fixBottom();
 async function initStore(){
   try{ idb = await idbOpen(); }catch{ idb = null; }
@@ -481,6 +490,7 @@ function go(t){
   try{ history.replaceState(null,"","#"+t); }catch{}
   if(t==="social") askWake(); else if(!busy) releaseWake();
   render(); window.scrollTo(0,0);
+  requestAnimationFrame(fixBottom); setTimeout(fixBottom, 350);
 }
 async function askWake(){ try{ if("wakeLock" in navigator && !wakeLock){ wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener?.("release",()=>wakeLock=null);} }catch{} }
 function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch{} wakeLock=null; }

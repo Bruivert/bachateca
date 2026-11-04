@@ -48,6 +48,18 @@
     color-scheme:dark;
   }
 }
+/* Social se usa en una sala oscura: siempre con la paleta de noche, aunque el sistema esté en claro. */
+:root.night{
+  --bg:#071330; --surface:#0f2150; --surface2:#18306b; --line:#264383; --fill:rgba(120,160,255,.16);
+  --fg:#ffffff; --muted:#a3b5dc;
+  --accent:#c4f838; --accent-ink:#071330; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.12);
+  --neon:#c4f838; --neon-ink:#071330; --chip-on:#ffffff; --chip-on-ink:#071330;
+  --st-espera:#8a9bbf; --st-practica:#6fb6ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
+  --warn:#ff6b7a;
+  --bar:rgba(7,19,48,.80);
+  --toast-act:#1e5eff;
+  color-scheme:dark;
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
@@ -191,13 +203,33 @@ button.card:active{background:var(--surface2)}
 .social-pos li{font-size:19px;display:flex;flex-direction:column}
 .social-pos li .to{font-size:14px;color:var(--muted)}
 .social-pos li.dim{opacity:.5}
-.block-btn{width:100%;padding:18px;font-size:19px;border-radius:18px;font-family:var(--f-display);font-weight:800}
-.overlay{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;justify-content:center;gap:22px;padding:calc(24px + env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));overflow-y:auto}
-.overlay ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:18px;counter-reset:s}
-.overlay li{font-family:var(--f-display);font-size:28px;font-weight:800;display:flex;gap:14px;align-items:baseline;counter-increment:s}
-.overlay li::before{content:counter(s);color:var(--accent-fg);font-size:20px;min-width:20px}
-.overlay li small{display:block;font-family:var(--f-body);font-weight:400;font-size:16px;color:var(--muted)}
-.overlay li small b{color:var(--fg);font-weight:600}
+.block-btn{width:100%;padding:18px;font-size:19px;border-radius:18px;font-family:var(--f-display);font-weight:800;position:sticky;bottom:calc(70px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:5}
+/* filas de Social: se tocan para marcar «salió» */
+.sf{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:4px 0;border:0;background:none;color:var(--fg);text-align:left}
+.sf .t{display:flex;flex-direction:column;flex:1;min-width:0}
+.sf .n{font-size:19px}
+.sf .to{font-size:14px;color:var(--muted)}
+.sf.dim .t{opacity:.5}
+.sf .ck{flex:none;width:28px;height:28px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line);display:grid;place-items:center}
+.sf .ck svg{width:14px;height:14px;fill:none;stroke:var(--accent-ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.sf[aria-pressed="true"] .ck{background:var(--accent);box-shadow:none}
+.sf[aria-pressed="true"] .ck svg{opacity:1}
+/* panel «Me he bloqueado» */
+.bk-head{display:flex;flex-direction:column;gap:6px}
+.bk-head h2{font-size:30px}
+.bk-head b{color:var(--fg);font-weight:600}
+.bk-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bk-tile{min-height:72px;border:0;border-radius:var(--r);background:var(--surface);color:var(--fg);font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.15;padding:12px 14px;text-align:left}
+.bk-tile:active{background:var(--surface2)}
+.bk-from{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;color:var(--muted)}
+.bk-from:focus{outline:none}
+.bk-exits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:20px}
+.bk-exits li{display:flex;flex-direction:column;gap:4px}
+.bk-exits b{font-family:var(--f-display);font-size:28px;font-weight:800;line-height:1.15}
+.bk-exits span{font-size:17px;color:var(--muted)}
+.bk-exits .sg{color:var(--fg)}
+.bk-body{margin-top:auto;display:flex;flex-direction:column;gap:16px}
+.overlay{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;justify-content:flex-start;gap:22px;padding:calc(24px + env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));overflow-y:auto}
 
 /* hojas */
 .sheet-bg{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s ease-out}
@@ -368,7 +400,11 @@ let loaded = false;
 let assetsApi = null;
 let busy = false;
 let vstate = null;
-let logSel = new Set();
+// Figuras marcadas como «salió» durante el social: se guardan 12 h por si se cierra la app a mitad de noche.
+const LS_SAL = "bachateca.salieron";
+let logSel = new Set((()=>{ const s=lsGet(LS_SAL); return s && Date.now()-s.t < 432e5 && Array.isArray(s.ids) ? s.ids : []; })());
+const saveSel = () => lsSet(LS_SAL, {t:Date.now(), ids:[...logSel]});
+let blockPos = null;
 let logSuggest = [];
 let editKey = null, confirmKey = null;
 let migrateN = 0, migrateData = null;
@@ -431,7 +467,7 @@ function askConfirm({title, msg="", ok, cancel="Cancelar"}){
   });
 }
 // ---------- cambios sin guardar en las hojas ----------
-const pressSig = () => [...document.querySelectorAll("#sheet-root [data-tipo],#sheet-root [data-est],#sheet-root [data-cls],#sheet-root [data-logfig]")].map(b=>b.getAttribute("aria-pressed")==="true"?1:0).join("");
+const pressSig = () => [...document.querySelectorAll("#sheet-root [data-tipo],#sheet-root [data-est],#sheet-root [data-cls]")].map(b=>b.getAttribute("aria-pressed")==="true"?1:0).join("");
 const vSig = () => vstate ? `${vstate.file?vstate.file.size:0}/${vstate.remove?1:0}` : "";
 const fieldDirty = el => {
   if(el.tagName==="SELECT"){ const i=[...el.options].findIndex(o=>o.defaultSelected); return el.selectedIndex !== (i<0?0:i); }
@@ -441,7 +477,7 @@ const fieldDirty = el => {
 function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!carried}; }
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
-  if(sheetBase.carried || ($("#lg-salio") && logSel.size)) return true;
+  if(sheetBase.carried) return true;
   if([...document.querySelectorAll("#sheet-root input:not([type=file]),#sheet-root select,#sheet-root textarea")].some(fieldDirty)) return true;
   return pressSig()!==sheetBase.press || vSig()!==sheetBase.v;
 }
@@ -525,7 +561,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.9";
+const APP_VERSION = "1.10";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -603,6 +639,7 @@ function go(t){
   const same = tab===t;
   tab=t;
   const lt=$("#ltitle"); if(lt) lt.textContent={repertorio:"Repertorio",repasar:"Repasar",enlazar:"Enlazar",social:"Social"}[t];
+  document.documentElement.classList.toggle("night", t==="social");
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
   TABS.forEach(k=> $("#v-"+k).hidden = k!==t);
   try{ history.replaceState(null,"","#"+t); }catch{}
@@ -886,39 +923,51 @@ function renderChain(){
 
 // ---------- vista: social ----------
 function socialFootwork(){ return figs().filter(f=>active(f) && !isMove(f) && (ready(f)||socialIncl)); }
+const socOk = f => ready(f) || socialIncl;
+const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
+const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg></span>`;
+function socLi(f, sub){
+  return `<li><button type="button" class="sf${ready(f)?"":" dim"}" data-sal="${f.id}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}</span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
+}
 function renderSocial(){
   const v=$("#v-social");
-  const rows = allPositions().map(p=>{
-    let items = exitsFrom(p).filter(f=>ready(f)||socialIncl);
-    items.sort((a,b)=> (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0)));
-    return {p, items:items.slice(0,3)};
-  }).filter(r=>r.items.length);
+  const rows = allPositions().map(p=>({p, items: exitsFrom(p).filter(socOk).sort(socSort).slice(0,3)})).filter(r=>r.items.length);
   const fw = socialFootwork();
   const last = Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
+  const nSel = [...logSel].filter(id=>S.figures[id]).length;
   v.innerHTML = `
-    <button class="btn pri block-btn" data-act="block">Me he bloqueado</button>
+    <p class="small muted">Figuras al empezar una frase de 8. Toca una cuando te salga y quedará marcada para el registro.</p>
     <div>
-      ${fw.length?`<div class="social-pos"><div class="p">Para ganar tiempo</div><ul>${fw.slice(0,4).map(f=>`<li class="${ready(f)?"":"dim"}"><span>${esc(f.nombre)}</span><span class="to">${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}</span></li>`).join("")}</ul></div>`:""}
-      ${rows.length ? rows.map(r=>`<div class="social-pos"><div class="p">${esc(r.p)}</div><ul>${r.items.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul></div>`).join("")
+      ${fw.length?`<div class="social-pos"><div class="p">Para ganar tiempo</div><ul>${fw.slice(0,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
+      ${rows.length ? rows.map(r=>`<div class="social-pos"><div class="p">${esc(r.p)}</div><ul>${r.items.map(f=>socLi(f, `${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${f.tiempos?` · ${esc(f.tiempos)} t`:""}`)).join("")}</ul></div>`).join("")
        : `<div class="empty"><p>Aún no tienes figuras disponibles. Cuando una te salga cómoda en el social, márcala como «Disponible» y aparecerá aquí.</p>${figs().some(active)?`<p class="small muted">Activa «incluir en práctica» para verlas ya.</p>`:""}</div>`}
     </div>
-    <div class="row" style="justify-content:space-between">
-      <label class="small muted row" style="gap:6px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> incluir en práctica</label>
-      <span class="small muted">Figuras al empezar una frase de 8</span>
-    </div>
-    <button class="btn wide" data-act="log-open">Registrar el social${last?` · último ${fmtDate(last.fecha)}`:""}</button>`;
+    <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> incluir en práctica</label>
+    <button class="btn pri block-btn" data-act="block">Me he bloqueado</button>
+    <button class="btn wide" data-act="log-open">Registrar el social${nSel?` · ${nSel} ${nSel===1?"marcada":"marcadas"}`:(last?` · último ${fmtDate(last.fecha)}`:"")}</button>`;
   $("#soc-incl").onchange=e=>{socialIncl=e.target.checked; render();};
 }
+// Bloqueo: footwork o básico, elegir dónde estás y ver dos salidas grandes desde ahí.
 function showBlock(){
   const fw = figs().filter(f=>active(f) && !isMove(f));
-  $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-label="Me he bloqueado">
-    <ol>
-      <li><span>Footwork o básico<small>${fw.length?`Tus recursos: ${fw.slice(0,4).map(f=>`<b>${esc(f.nombre)}</b>`).join(", ")}.`:"Sigue bailando. No es un fallo, es tiempo para pensar."}</small></span></li>
-      <li><span>Recupera el pulso<small>Cuenta hasta el siguiente 1.</small></span></li>
-      <li><span>¿Dónde estás?<small>Posición y agarre.</small></span></li>
-      <li><span>Elige una salida<small>La más sencilla que tengas desde ahí.</small></span></li>
-    </ol>
-    <button class="btn" data-act="unblock">Cerrar</button></div>`;
+  const tiles = allPositions().filter(p=>exitsFrom(p).some(socOk));
+  let body;
+  if(blockPos){
+    const ex = exitsFrom(blockPos).filter(socOk).sort(socSort).slice(0,2);
+    body = `<h3 class="bk-from" id="bk-from" tabindex="-1">Elige una salida desde ${esc(blockPos)}</h3>
+      <ul class="bk-exits">${ex.map(f=>`<li><b>${esc(f.nombre)}</b><span>${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}</span>${f.senal?`<span class="sg">${esc(f.senal)}</span>`:""}</li>`).join("")}</ul>
+      <button type="button" class="btn" data-act="bpos-back">Otra posición</button>`;
+  } else {
+    body = tiles.length
+      ? `<h3 class="bk-from">¿Dónde estás?</h3><div class="bk-tiles">${tiles.map(p=>`<button type="button" class="bk-tile" data-bpos="${esc(p)}">${esc(p)}</button>`).join("")}</div>`
+      : `<p class="muted">Aún no tienes salidas disponibles. Sigue con el básico hasta el final de la frase.</p>`;
+  }
+  $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
+    <div class="bk-head"><h2 id="bk-t">Footwork o básico</h2>
+      <p class="muted">${fw.length?`Tus recursos: ${fw.slice(0,4).map(f=>`<b>${esc(f.nombre)}</b>`).join(", ")}. `:"Sigue bailando. No es un fallo, es tiempo para pensar. "}Recupera el pulso: cuenta hasta el siguiente 1.</p></div>
+    <div class="bk-body">${body}</div>
+    <button type="button" class="btn wide bk-close" data-act="unblock">Cerrar</button></div>`;
+  ($("#bk-from[tabindex]") || $(".bk-tile") || $(".bk-close"))?.focus({preventScroll:true});
 }
 
 // ---------- hoja: registro del social ----------
@@ -960,7 +1009,7 @@ function openLog(fresh){
   markClean();
 }
 function saveLog(){
-  const l={id:uid(), fecha:todayStr(), creado:Date.now(), figs:[...logSel], salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
+  const l={id:uid(), fecha:todayStr(), creado:Date.now(), figs:[...logSel].filter(id=>S.figures[id]), salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
   if(!l.figs.length && !l.salio && !l.bloqueo && !l.proximo){ toast("Marca una figura o rellena algún campo."); return; }
   logSuggest = [];
   l.figs.forEach(id=>{
@@ -970,7 +1019,7 @@ function saveLog(){
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
   S.logs[l.id]=l; persist({t:"log",id:l.id});
-  logSel = new Set(); backupNudge = backupInfo().stale; render(); openLog(true); toast("Registro guardado");
+  logSel = new Set(); saveSel(); backupNudge = backupInfo().stale; render(); openLog(true); toast("Registro guardado");
 }
 function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
@@ -1796,9 +1845,11 @@ document.addEventListener("click", async e=>{
   }
   const wk = e.target.closest("[data-week]");
   if(wk){ progWeek=+wk.dataset.week; return render(); }
-  const t = e.target.closest("[data-tab],[data-act],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd]");
+  const t = e.target.closest("[data-tab],[data-act],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos]");
   if(!t) return;
   const d=t.dataset;
+  if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); saveSel(); return render(); }
+  if(d.bpos!==undefined){ blockPos=d.bpos; return showBlock(); }
   if(d.tab) return go(d.tab);
   if(d.edit) return openFigure(d.edit);
   if(d.grade) return grade(d.grade);
@@ -1810,7 +1861,7 @@ document.addEventListener("click", async e=>{
     if(f){ f.estado=to; saveFigure(f); toast(`${f.nombre}: ${EST[to].t.toLowerCase()}`); if($('[aria-label="Registrar el social"]')) openLog(); else t.remove(); }
     return;
   }
-  if(d.logfig){ logSel.has(d.logfig) ? logSel.delete(d.logfig) : logSel.add(d.logfig); t.setAttribute("aria-pressed", logSel.has(d.logfig)); return; }
+  if(d.logfig){ logSel.has(d.logfig) ? logSel.delete(d.logfig) : logSel.add(d.logfig); t.setAttribute("aria-pressed", logSel.has(d.logfig)); saveSel(); render(); return; }
   if(d.dellog) return deleteLog(d.dellog);
   if(d.lren){ editKey=d.lren+d.i; confirmKey=null; return openSettings(); }
   if(d.lcancel){ editKey=null; return openSettings(); }
@@ -1837,8 +1888,9 @@ document.addEventListener("click", async e=>{
   if(a==="reveal"){ session.revealed=true; return render(); }
   if(a==="end"){ session=null; return render(); }
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
-  if(a==="block") return showBlock();
-  if(a==="unblock") return $("#overlay-root").innerHTML="";
+  if(a==="block"){ blockPos=null; return showBlock(); }
+  if(a==="unblock"){ blockPos=null; return $("#overlay-root").innerHTML=""; }
+  if(a==="bpos-back"){ blockPos=null; return showBlock(); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
   if(a==="nudge-off"){ backupNudge=false; return openLog(); }
   if(a==="log-save") return saveLog();

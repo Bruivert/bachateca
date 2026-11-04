@@ -226,7 +226,6 @@ button.card:active{background:var(--surface2)}
 .bk-tile{min-height:72px;border:0;border-radius:var(--r);background:var(--surface);color:var(--fg);font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.15;padding:12px 14px;text-align:left}
 .bk-tile:active{background:var(--surface2)}
 .bk-from{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;color:var(--muted)}
-.bk-from:focus{outline:none}
 .bk-exits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:20px}
 .bk-exits li{display:flex;flex-direction:column;gap:4px}
 .bk-exits b{font-family:var(--f-display);font-size:28px;font-weight:800;line-height:1.15}
@@ -241,7 +240,8 @@ button.card:active{background:var(--surface2)}
 .sheet::before{content:"";flex:none;width:36px;height:5px;border-radius:3px;background:var(--line);align-self:center}
 .sheet-head{display:flex;align-items:center;gap:10px}
 .sheet-head h2{margin-right:auto;font-size:22px}
-.sheet-head h2:focus,.flash .big:focus{outline:none}
+[tabindex="-1"]:focus{outline:none}
+.sheet-bg.still,.sheet-bg.still .sheet{animation:none}
 @keyframes up{from{transform:translateY(100%)}to{transform:none}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -409,18 +409,12 @@ const TIPOS = [{k:"figura",t:"Figura"},{k:"transicion",t:"Transición"},{k:"foot
 const TIPO = Object.fromEntries(TIPOS.map(e=>[e.k,e]));
 const DURS = ["4","8","16","24","32"];
 const LADDER = [1,3,7,14,30,60];
-const LS_LOCAL = "compas.v1";          // datos del modo «Solo aquí» (y versiones antiguas)
-const LS_CACHE = "compas.cache.v2";    // copia de la cuenta para abrir sin cobertura
-const LS_DIRTY = "compas.dirty.v2";    // cambios pendientes de subir
-const LS_MIGR  = "compas.migr.v2";     // aviso de migración resuelto
 const MAX_SESSION = 5;
 const PROMOTE_DISP = 2;   // usos en socials para proponer «Disponible»
 const PROMOTE_CONS = 6;   // usos para proponer «Consolidada»
 
 // ---------- estado ----------
 let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOLDS], classes:[...DEFAULT_CLASSES], linkRep:{} };
-let mode = null;          // "cloud" | "local"
-let refs = null;
 let tab = "repertorio";
 let filt = { q:"", baile:"todos", estado:"todos", vista:"pos" };
 let linkPos = null, linkHold = "";
@@ -439,16 +433,12 @@ const saveSel = () => lsSet(LS_SAL, {t:Date.now(), ids:[...logSel]});
 let blockPos = null;
 let logSuggest = [];
 let editKey = null, confirmKey = null;
-let migrateN = 0, migrateData = null;
-let sampleApi = null, sampleImages = 0;
 let sheetBase = null;       // estado de la hoja al abrirla, para saber si hay cambios sin guardar
 let confirmDone = null;     // hoja de confirmación abierta
 let backupNudge = false;    // recordar la copia tras registrar un social
 let pendingReload = false;  // versión nueva esperando a que se cierre la hoja
 const BK_AT = "bachateca.backup.at", BK_CH = "bachateca.backup.ch";
 const safeUrl = u => /^https?:\/\//i.test(u||"") ? u : "";
-const MAX_UPLOAD = 19.5*1024*1024;
-const vidUrl = id => "/_blob/" + id;
 const fmtT = t => { t=Math.max(0,t||0); const m=Math.floor(t/60), s=Math.floor(t%60); return m+":"+String(s).padStart(2,"0"); };
 const fmtMB = b => (b/1048576).toFixed(b<10485760?1:0).replace(".",",")+" MB";
 
@@ -597,7 +587,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.13";
+const APP_VERSION = "1.14";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -638,13 +628,12 @@ async function initStore(){
   let c=null; try{ if(idb) c = await kvGet("state"); }catch{}
   if(!c) c = lsGet(LS_FALLBACK);
   if(c) applyData(c);
-  mode="local"; assetsApi = idb ? {delete:id=>vidDel(id)} : null;
+  assetsApi = idb ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
   setTimeout(genMissingThumbs, 1200);
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") setTimeout(genMissingThumbs, 800); });
 }
-function setSync(){} function updateSync(){} function doMigration(){}
 
 // ---------- mutaciones ----------
 function saveFigure(f){
@@ -691,10 +680,6 @@ function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch{} wakeLock=n
 const holdTxt = h => h ? ` <span class="hold">(${esc(h)})</span>` : "";
 // Ruta con una sola flecha: «Cerrada (Abrazo) → Sombra (Dos manos)». Sin el inicio cuando ya lo dice el contexto.
 const routeTxt = (f, from) => `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${esc(f.agarreIn)} ` : "")}<span class="arrow">→</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
-function routeHTML(f){
-  if(!isMove(f)) return `<div class="route"><span>${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}</span></div>`;
-  return `<div class="route"><span>${esc(f.entrada||"¿Dónde empieza?")}${holdTxt(f.agarreIn)}</span><span class="arrow">→</span><span>${esc(f.salida||"¿Dónde acaba?")}${holdTxt(f.agarreOut)}</span></div>`;
-}
 function pill(k){ return `<span class="pill st-${k}">${esc(EST[k]?.t||k)}</span>`; }
 // Compás de 8 de una figura: qué tiempos de la frase ocupa y en cuál empieza.
 function compasTxt(f){
@@ -719,7 +704,7 @@ function figCard(f, inGroup){
   else sub = `<span class="tag warn">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
   return `<button class="card${th?" has-thumb":""}" data-edit="${f.id}">${th}${th?`<div class="card-body">`:""}
     <div class="fname">${esc(f.nombre)}</div>
-    <div class="route">${sub}</div>
+    <div class="route"><span>${sub}</span></div>
     <div class="meta">${pill(f.estado)}
       ${tipoOf(f)==="transicion"?`<span class="tag">transición</span>`:""}
       ${f.sugerido?`<span class="tag">✦ sugerido por Claude</span>`:""}
@@ -813,14 +798,21 @@ function renderRepasar(){
     return;
   }
   if(session.i>=session.ids.length){
-    const d=session.done, c=k=>d.filter(x=>x===k).length;
+    const d=session.done, c=k=>d.filter(x=>x===k).length, link=session.kind==="link";
+    const res=[c("fluida") && pl(c("fluida"),"fluida","fluidas"), c("dudas") && `${c("dudas")} con dudas`, c("no") && `${c("no")} sin recordar`].filter(Boolean);
+    // Qué viene después: lo que queda hoy o cuándo toca el siguiente.
+    const left = link ? dueLinks().length : dueFigs().length, t=todayStr();
+    const nx = (link ? linkPositions().map(p=>S.linkRep[p]?.due) : figs().filter(active).map(f=>f.rep?.due)).filter(x=>x && x>t).sort()[0];
+    const next = left ? `Quedan ${left} para hoy.` : nx ? `El siguiente repaso toca ${nx===todayStr(1)?"mañana":"el "+fmtDate(nx)}.` : "";
     v.innerHTML = `
       <h2>Repaso terminado</h2>
-      <div class="panel"><p>${session.kind==="link"?pl(d.length,"posición","posiciones"):pl(d.length,"figura","figuras")} · ${pl(c("fluida"),"fluida","fluidas")} · ${c("dudas")} con dudas · ${c("no")} sin recordar.</p>
+      <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
       <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${i}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
-      <button class="btn pri" data-act="end">Hecho</button></div>`;
+      ${next?`<p class="small muted">${next}</p>`:""}
+      <button class="btn pri" data-act="end">Hecho</button>
+      ${left?`<button class="btn" data-act="start-${link?"link":"fig"}">Repasar ${Math.min(left,MAX_SESSION)} más</button>`:""}</div>`;
     return;
   }
   const pct = Math.round(session.i/session.ids.length*100);
@@ -912,6 +904,13 @@ function coverage(){
 }
 function renderEnlazar(){
   const v=$("#v-enlazar");
+  // Primer uso: sin figuras con ruta no hay posiciones ni mapa que enseñar.
+  if(!figs().some(f=>active(f)&&placed(f))){
+    v.innerHTML = `<h2>¿Qué hago desde aquí?</h2>
+      <div class="empty"><p>Aquí verás qué figuras puedes hacer desde cada posición y dónde te falta una salida. Aparece en cuanto una figura fuera de la lista de espera tenga dónde empieza y dónde acaba.</p>
+      ${figs().length ? `<button class="btn" data-tab="repertorio">Ir al repertorio</button>` : `<div class="row"><button class="btn pri" data-act="full">Añadir figura</button><button class="btn ghost" data-act="examples">Ver con ejemplos</button></div>`}</div>`;
+    return;
+  }
   const cov = coverage();
   const gaps = cov.filter(c=>c.into.length && c.ready.length<2);
   if(!linkPos || !cov.some(c=>c.p===linkPos)) { linkPos = (cov.find(c=>c.out.length)||cov[0]||{}).p; linkHold=""; }
@@ -938,7 +937,7 @@ function renderEnlazar(){
         ${sel.out.length ? `<div class="practice">
           <h3>Practicar enlaces</h3>
           <p class="small muted">Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.</p>
-          <button class="btn" data-act="chain">Generar cadena desde ${esc(sel.p)}</button>
+          <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
       </div>` : ""}
@@ -1031,6 +1030,9 @@ function showBlock(){
   ($("#bk-from[tabindex]") || $(".bk-tile") || $(".bk-close"))?.focus({preventScroll:true});
 }
 
+// Al volver a pintar una hoja ya abierta (renombrar, marcar, promocionar) no se repite la entrada.
+const sheetBg = () => `sheet-bg${$("#sheet-root .sheet")?" still":""}`;
+
 // ---------- hoja: registro del social ----------
 function openLog(fresh){
   const LG=["lg-salio","lg-bloq","lg-prox"], keep = fresh ? null : LG.map(k=>$("#"+k)?.value||"");
@@ -1041,7 +1043,7 @@ function openLog(fresh){
   const blockList = Object.entries(blocks).sort((a,b)=>b[1]-a[1]);
   const sug = logSuggest.filter(s=>S.figures[s.id] && S.figures[s.id].estado!==s.to);
   const sc = $(".sheet")?.scrollTop || 0;
-  $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Registrar el social">
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Registrar el social">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Registrar el social</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${bk && bk.stale?`<div class="panel"><p><b>${bk.at?`Tu última copia es de hace ${bk.days} días.`:"Aún no tienes ninguna copia."}</b> Tus figuras y registros solo están en este dispositivo. Guarda una copia en Archivos o en iCloud Drive.</p>
       <div class="row"><button class="btn pri" data-act="export">Exportar copia</button><button class="btn ghost" data-act="nudge-off">Ahora no</button></div></div>`:""}
@@ -1102,9 +1104,10 @@ function openFigure(id, opts={}){
   if(!quick && !id && f.estado==="espera" && !opts.keepState) f.estado="practica";
   const optList=(list,sel,empty)=>`<option value="">${empty}</option>${[...new Set([...list, sel].filter(Boolean))].map(p=>`<option ${p===sel?"selected":""}>${esc(p)}</option>`).join("")}`;
   let tipo = tipoOf(f), estado = f.estado, prof = f.profesor||"", baile = f.baile||"Bachata";
-  $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><form class="sheet" id="fig-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="fig-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${quick?"Captura rápida":(id?"Editar figura":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    ${quick?`<p class="small muted">Guarda el vídeo y un nombre al salir de clase. Se queda en lista de espera y completas el resto un día libre.</p>`:""}
+    ${quick?`<p class="small muted">Guarda el vídeo y un nombre al salir de clase. Se queda en lista de espera y completas el resto un día libre.</p>
+    <div class="vidbox" id="vidbox"></div>`:""}
     <label class="f" for="ff-nombre">${quick?"Nombre (opcional)":"Nombre fácil de recordar"}<input type="text" id="ff-nombre" value="${esc(f.nombre)}" placeholder="${quick?"Si lo dejas vacío: clase y fecha":"Ej.: vuelta con hammerlock"}"></label>
     <div class="f"><span>Tipo</span><div class="seg neutral" id="ff-tipo">${TIPOS.map(t=>`<button type="button" aria-pressed="${tipo===t.k}" data-tipo="${t.k}">${t.t}</button>`).join("")}</div></div>
     ${S.classes.length?`<div class="f"><span>Clase</span><div class="chips scroll" id="ff-cls">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}</div></div>`:""}
@@ -1118,8 +1121,7 @@ function openFigure(id, opts={}){
     <p class="small muted">Agarre: tu mano–su mano. «Izq–der» es tu izquierda con su derecha.</p>
     <div class="f"><span>Estado</span><div class="seg" id="ff-estado">${ESTADOS.map(e=>`<button type="button" class="st-${e.k}" aria-pressed="${estado===e.k}" data-est="${e.k}" title="${esc(e.d)}">${e.t}</button>`).join("")}</div>
       <span class="small" id="ff-est-d">${esc(EST[estado].d)}</span></div>`}
-    <div class="vidbox" id="vidbox"></div>
-    ${quick?"":`
+    ${quick?"":`<div class="vidbox" id="vidbox"></div>
     <details ${id && (f.senal||f.profesor||f.video||f.tiempos||f.notas)?"open":""}><summary>Más detalles (opcional)</summary><div class="inner">
       <label class="f" for="ff-senal">Señal clave del leader<input type="text" id="ff-senal" value="${esc(f.senal)}" placeholder="Ej.: preparo en el 4, giro con la izquierda en el 5"></label>
       <div class="grid2">
@@ -1240,7 +1242,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  aiCtl?.abort(); formApi = null;
+  formApi = null;
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; backupNudge=false; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -1395,7 +1397,6 @@ function refreshTrim(){ // re-render conservando la posición del reproductor
   renderVidbox();
   const n=$("#ff-prev"); if(n){ n.onloadedmetadata=()=>{ try{ n.currentTime=t; }catch{} }; }
 }
-async function dropAsset(id){ try{ if(assetsApi) await assetsApi.delete(id); }catch{} }
 
 // Se llama de forma síncrona en el gesto de guardar: crea el reproductor y el audio
 // mientras iOS todavía considera que hay interacción del usuario.
@@ -1506,19 +1507,8 @@ async function compressVideo(vs, pr, onMsg){
 }
 
 // ---------- Claude: capturador y consejo ----------
-let aiCtl = null, coachCtl = null, coachText = "", formApi = null;
+let coachText = "", formApi = null;
 function setAi(html){ if(vstate) vstate.aiMsg = html; const o=$("#ai-out"); if(o) o.innerHTML = html; }
-function aiErr(e){
-  const c = e && e.code;
-  if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed","images_unavailable"].includes(c)){ sampleImages = 0; return "Claude no está disponible en esta vista."; }
-  if(c==="rate_limited") return "Has llegado al límite de uso de Claude. Prueba más tarde.";
-  if(c==="invalid_json" || c==="empty_completion") return "No se entendió la respuesta. Vuelve a probar.";
-  if(c==="refused") return "Claude no pudo analizar este vídeo.";
-  if(c==="cancelled") return "Cancelado.";
-  if(c==="session_expired") return "Vuelve a iniciar sesión en Claude.";
-  if(c==="image_rejected") return "No se pudieron enviar los fotogramas.";
-  return "No se pudo contactar con Claude. Prueba otra vez.";
-}
 async function grabFrames(v, start, end, n){
   if(!(v.readyState>=2)) await new Promise((res,rej)=>{ v.onloadeddata=res; v.onerror=()=>rej(new Error("load")); setTimeout(()=>rej(new Error("timeout")),20000); });
   const dur = isFinite(v.duration) ? v.duration : (end||0);
@@ -1822,7 +1812,7 @@ function openSettings(){
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   const bk = backupInfo(), bs = backupStatus(bk);
-  $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajustes">
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajustes">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Ajustes</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     <div class="panel">
       <h3>Copia de seguridad</h3>
@@ -1948,10 +1938,7 @@ document.addEventListener("click", async e=>{
   if(a==="full") return openFigure();
   if(a==="examples"){ closeSheet(); return loadExamples(); }
   if(a==="clear-examples"){ figs().filter(f=>f.ejemplo).forEach(f=>deleteFigure(f.id)); toast("Ejemplos quitados"); return openSettings(); }
-  if(a==="ai-stop"){ aiCtl?.abort(); return; }
-  if(a==="coach"){ if(d.running==="1"){ coachCtl?.abort(); return; } return runCoach(); }
-  if(a==="migr-up") return doMigration(true);
-  if(a==="migr-no") return doMigration(false);
+  if(a==="coach") return runCoach();
   if(a==="show-inc"){ filt.estado="incompletas"; return render(); }
   if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; return render(); }
   if(a==="start-fig") return startSession("fig", false);
@@ -2034,7 +2021,8 @@ function syncModal(){
   const open = !!($("#sheet-root").firstElementChild || $("#overlay-root").firstElementChild);
   const was = $(".wrap").inert;
   $(".wrap").inert = open; $("nav.tabs").inert = open;
-  if(open && !was){ const s=$("#sheet-root .sheet"); if(s && !s.contains(document.activeElement)) $("#sheet-t")?.focus({preventScroll:true}); }
+  const s=$("#sheet-root .sheet");
+  if(open && s && !s.contains(document.activeElement) && (!was || document.activeElement===document.body)) $("#sheet-t")?.focus({preventScroll:true});
   if(!open && was && focusBack && focusBack.isConnected) focusBack.focus({preventScroll:true});
 }
 const modalObs = new MutationObserver(syncModal);

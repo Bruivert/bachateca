@@ -309,6 +309,25 @@ details.info[open] summary{margin-bottom:6px}
 .sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
 .log{background:var(--surface);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:15px}
 .log .d{grid-column:1/-1;font-size:13px;color:var(--muted)}
+/* Compás de 8: la frase de bachata, con los taps (4 y 8) más altos, los tiempos que ocupa
+   la figura rellenos y un punto en el tiempo en que empieza. */
+.cmp{display:inline-flex;align-items:flex-end;gap:2px;height:13px;vertical-align:-1px;position:relative}
+.cmp i{display:block;width:4px;height:7px;border-radius:1px;background:var(--line);position:relative;font-style:normal}
+.cmp i.tap{height:13px}
+.cmp i.on{background:var(--accent-fg)}
+.cmp i.st::after{content:"";position:absolute;left:50%;bottom:-5px;width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--fg)}
+.cmp b{font-size:12px;font-weight:700;color:var(--muted);margin-left:4px;line-height:1}
+.cmp.lg{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;height:auto;width:100%;max-width:340px;align-items:end;vertical-align:baseline}
+.cmp.lg i{width:auto;height:auto;background:none;border-radius:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.cmp.lg i::before{content:"";display:block;width:100%;height:16px;border-radius:4px;background:var(--line)}
+.cmp.lg i.tap::before{height:28px}
+.cmp.lg i.on::before{background:var(--accent-fg)}
+.cmp.lg i.st::after{display:none}
+.cmp.lg i span{width:24px;height:24px;display:grid;place-items:center;border-radius:50%;font-size:13px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.cmp.lg i.tap span{color:var(--fg)}
+.cmp.lg i.st span{background:var(--fg);color:var(--bg)}
+.cmp-cap{font-size:14px;color:var(--muted);margin-top:6px}
+.cmp-row{display:flex;flex-direction:column;gap:8px}
 /* zona táctil de al menos 44 pt en controles pequeños, sin cambiar su aspecto */
 .icon-btn,.ib,.chip,.btn.sm,.bar .btn.pri,.toast .undo{position:relative}
 .icon-btn::after,.ib::after,.btn.sm::after,.bar .btn.pri::after{content:"";position:absolute;inset:-5px -3px}
@@ -571,7 +590,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.10";
+const APP_VERSION = "1.11";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -668,6 +687,21 @@ function routeHTML(f){
   return `<div class="route"><span>${esc(f.entrada||"¿Dónde empieza?")}${holdTxt(f.agarreIn)}</span><span class="arrow">→</span><span>${esc(f.salida||"¿Dónde acaba?")}${holdTxt(f.agarreOut)}</span></div>`;
 }
 function pill(k){ return `<span class="pill st-${k}">${esc(EST[k]?.t||k)}</span>`; }
+// Compás de 8 de una figura: qué tiempos de la frase ocupa y en cuál empieza.
+function compasTxt(f){
+  const t=+f.tiempo||0, n=+f.tiempos||0;
+  return [t?`empieza en el ${t}`:"", n?`${n} tiempos`:""].filter(Boolean).join(" · ");
+}
+function compas(f, big){
+  const t=+f.tiempo||0, n=+f.tiempos||0; if(!t && !n) return "";
+  const start=t||1, on=new Set();
+  for(let k=0;k<Math.min(n,8);k++) on.add((start-1+k)%8+1);
+  const reps = n>8 ? Math.round(n/8) : 0;
+  const cells=[1,2,3,4,5,6,7,8].map(b=>`<i class="${b%4===0?"tap ":""}${on.has(b)?"on ":""}${t===b?"st":""}">${big?`<span>${b}</span>`:""}</i>`).join("");
+  const label = compasTxt(f);
+  if(big) return `<div><span class="cmp lg" role="img" aria-label="${esc(label)}">${cells}</span><p class="cmp-cap" aria-hidden="true">${esc(label.charAt(0).toUpperCase()+label.slice(1))}${reps>1?` (${reps} frases de 8)`:""}</p></div>`;
+  return `<span class="cmp" role="img" aria-label="${esc(label)}">${cells}${reps>1?`<b>×${reps}</b>`:""}</span>`;
+}
 function figCard(f, inGroup){
   const th = f.thumb ? `<img class="thumb" src="${esc(f.thumb)}" alt="" loading="lazy">` : "";
   let sub;
@@ -682,7 +716,7 @@ function figCard(f, inGroup){
     <div class="meta">${pill(f.estado)}
       ${tipoOf(f)==="transicion"?`<span class="tag">transición</span>`:""}
       ${f.sugerido?`<span class="tag">✦ sugerido por Claude</span>`:""}
-      ${f.tiempos?`<span>${esc(f.tiempos)} t</span>`:""}
+      ${compas(f)}
       ${f.baile && f.baile!=="Bachata" ? `<span class="tag">${esc(f.baile)}</span>`:""}
       ${f.profesor?`<span>${esc(f.profesor)}</span>`:""}
       ${f.usos?`<span>salió ${f.usos}×</span>`:""}
@@ -692,7 +726,7 @@ function figCard(f, inGroup){
   </button>`;
 }
 function exitLi(f, opts={}){
-  return `<li class="${opts.dim?"dim":""}"><span>${esc(f.nombre)}</span><span class="to">${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${f.tiempos?` · ${esc(f.tiempos)} t`:""}</span></li>`;
+  return `<li class="${opts.dim?"dim":""}"><span>${esc(f.nombre)}</span><span class="to">${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}</span></li>`;
 }
 
 // ---------- vista: repertorio ----------
@@ -821,12 +855,11 @@ function renderRepasar(){
           <dl class="kv">
             ${isMove(f)?`<dt>Termina en</dt><dd><b>${esc(f.salida)}</b>${f.agarreOut?` · ${esc(f.agarreOut)}`:""}</dd>`:""}
             ${f.senal?`<dt>Señal clave</dt><dd>${esc(f.senal)}</dd>`:""}
-            ${f.tiempo?`<dt>Empieza en</dt><dd>el ${esc(f.tiempo)}</dd>`:""}
-            ${f.tiempos?`<dt>Dura</dt><dd>${esc(f.tiempos)} tiempos</dd>`:""}
             ${f.video && !f.vid?`<dt>Vídeo en Fotos</dt><dd>${esc(f.video)}</dd>`:""}
             ${safeUrl(f.enlace)?`<dt>Enlace</dt><dd><a href="${esc(safeUrl(f.enlace))}" target="_blank" rel="noopener">Abrir vídeo</a></dd>`:""}
             ${f.notas?`<dt>Notas</dt><dd>${esc(f.notas)}</dd>`:""}
           </dl>
+          ${(f.tiempo||f.tiempos)?`<div class="cmp-row"><p class="small muted">Compás</p>${compas(f,true)}</div>`:""}
           ${f.vid?playerHTML(f):""}
           ${isMove(f)?nextFrom(f):""}
           ${gradeHTML}
@@ -896,7 +929,7 @@ function renderEnlazar(){
           ${holdsHere.map(h=>`<button class="chip sm" data-hold="${esc(h)}" aria-pressed="${linkHold===h}">${esc(h)}</button>`).join("")}
         </div></div>`:""}
         <h3>Salen de ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""}</h3>
-        ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-edit="${f.id}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""}</span>${f.tiempos?`<span>${esc(f.tiempos)} t</span>`:""}</div></button>`).join("")}</div>`
+        ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-edit="${f.id}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""}</span>${compas(f)}</div></button>`).join("")}</div>`
           : `<p class="muted">Ninguna figura activa empieza en ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""}. Pregunta para clase: «Desde ${esc(sel.p)}, ¿qué figura sencilla puedo iniciar?»</p>`}
         ${sel.into.length ? `<p class="small muted">Llegas aquí desde: ${sel.into.map(f=>esc(f.nombre)+(f.agarreOut?` (${esc(f.agarreOut)})`:"")).join(", ")}.</p>`:""}
       </div>` : ""}
@@ -955,7 +988,7 @@ function renderSocial(){
     <p class="small muted">Figuras al empezar una frase de 8. Toca una cuando te salga y quedará marcada para el registro.</p>
     <div>
       ${fw.length?`<div class="social-pos"><div class="p">Para ganar tiempo</div><ul>${fw.slice(0,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
-      ${rows.length ? rows.map(r=>`<div class="social-pos"><div class="p">${esc(r.p)}</div><ul>${r.items.map(f=>socLi(f, `${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${f.tiempos?` · ${esc(f.tiempos)} t`:""}`)).join("")}</ul></div>`).join("")
+      ${rows.length ? rows.map(r=>`<div class="social-pos"><div class="p">${esc(r.p)}</div><ul>${r.items.map(f=>socLi(f, `${f.agarreIn?`con ${esc(f.agarreIn)} · `:""}→ ${esc(f.salida)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}`)).join("")}</ul></div>`).join("")
        : `<div class="empty"><p>Aún no tienes figuras disponibles. Cuando una te salga cómoda en el social, márcala como «Disponible» y aparecerá aquí.</p>${figs().some(active)?`<p class="small muted">Activa «incluir en práctica» para verlas ya.</p>`:""}</div>`}
     </div>
     <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> incluir en práctica</label>
@@ -1081,6 +1114,7 @@ function openFigure(id, opts={}){
         <label class="f" for="ff-dur">Dura (tiempos)<select id="ff-dur"><option value="">—</option>${DURS.map(t=>`<option ${String(f.tiempos||"")===t?"selected":""}>${t}</option>`).join("")}</select></label>
         <label class="f" for="ff-baile">Baile<select id="ff-baile">${["Bachata","Salsa"].map(b=>`<option ${baile===b?"selected":""}>${b}</option>`).join("")}</select></label>
       </div>
+      <div id="ff-cmp">${compas(f,true)}</div>
       <label class="f" for="ff-prof">Profesor / clase<input type="text" id="ff-prof" value="${esc(prof)}" placeholder="Ej.: Brotons · Parejas 1"></label>
       <label class="f" for="ff-video">Nombre del vídeo en Fotos<input type="text" id="ff-video" value="${esc(f.video)}" placeholder="Sugerido al guardar"></label>
       <label class="f" for="ff-enlace">Enlace al vídeo (Drive, Instagram…)<input type="text" id="ff-enlace" value="${esc(f.enlace)}" inputmode="url" placeholder="https://"></label>
@@ -1172,6 +1206,8 @@ function openFigure(id, opts={}){
     closeSheet();
     toast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
   };
+  const cmpUpd = ()=>{ const el=$("#ff-cmp"); if(el) el.innerHTML = compas({tiempo:$("#ff-tiempo").value, tiempos:$("#ff-dur").value}, true); };
+  ["ff-tiempo","ff-dur"].forEach(k=>$("#"+k)?.addEventListener("change", cmpUpd));
   $("#fig-form").addEventListener("input", clearFieldError);
   $("#fig-form").addEventListener("change", clearFieldError);
   setTimeout(()=>{ if(!id && !quick) $("#ff-nombre").focus(); },50);

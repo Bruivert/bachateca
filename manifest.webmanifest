@@ -1,0 +1,17 @@
+{
+  "name": "Bachateca",
+  "short_name": "Bachateca",
+  "description": "Tu biblioteca de figuras de bachata: figuras, enlaces y repaso para no quedarte en blanco en el social.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#071330",
+  "theme_color": "#071330",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

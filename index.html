@@ -29,6 +29,7 @@
   --st-espera:#7a88a8; --st-practica:#1e5eff; --st-disponible:#4a7a00; --st-consolidada:#0a1a3f;
   --warn:#d70015;
   --bar:rgba(243,246,255,.84);
+  --toast-act:#c4f838;
   --f-display:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
   --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   --r:14px;
@@ -43,6 +44,7 @@
     --st-espera:#8a9bbf; --st-practica:#6fb6ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
     --warn:#ff6b7a;
     --bar:rgba(7,19,48,.80);
+    --toast-act:#1e5eff;
     color-scheme:dark;
   }
 }
@@ -50,7 +52,9 @@
 [hidden]{display:none!important}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
-button,input,select,textarea{font:inherit;color:inherit}
+button{font:inherit;color:inherit}
+input,select,textarea{font:inherit;color:var(--fg)}
+::placeholder{color:var(--muted);opacity:1}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent-fg);outline-offset:2px}
 img,video{max-width:100%}
@@ -109,7 +113,9 @@ p{margin:0}
 input[type=text],input[type=search],select,textarea{width:100%;background:var(--surface);border:0;border-radius:12px;padding:11px 14px;min-width:0;font-size:16px;-webkit-appearance:none;appearance:none}
 input[type=search]{background:var(--fill)}
 select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
-.sheet input[type=text],.sheet select,.sheet textarea{background:var(--surface)}
+.sheet input[type=text],.sheet select,.sheet textarea{background-color:var(--surface)}
+.panel input[type=text],.panel select,.panel textarea{background-color:var(--surface2)}
+select:has(> option[value=""]:checked){color:var(--muted)}
 textarea{resize:vertical;min-height:76px}
 input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 label.f,div.f{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted);font-weight:500;min-width:0}
@@ -257,8 +263,7 @@ details.info[open] summary::before{content:"ⓘ "}
 details.info[open] summary{margin-bottom:6px}
 .sheet.dragging{transition:none!important}
 .sheet.snap{transition:transform .25s cubic-bezier(.2,.9,.25,1)}
-.toast .undo{background:none;border:0;color:var(--accent-fg);font-weight:700;margin-left:12px;padding:4px 2px;font-size:15px}
-@media (prefers-color-scheme: light){ .toast .undo{color:#c4f838} }
+.toast .undo{background:none;border:0;color:var(--toast-act);font-weight:700;margin:-10px -8px -10px 8px;padding:10px 8px;font-size:15px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:60;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:600;font-size:15px;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .poslist{display:flex;flex-direction:column;gap:0;border-radius:12px;overflow:hidden}
 .poslist>div{display:flex;align-items:center;gap:4px;background:var(--surface2);padding:6px 6px 6px 14px;position:relative;min-height:46px}
@@ -271,6 +276,23 @@ details.info[open] summary{margin-bottom:6px}
 .sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
 .log{background:var(--surface);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:15px}
 .log .d{grid-column:1/-1;font-size:13px;color:var(--muted)}
+/* errores junto al campo */
+.field-err{color:var(--warn);font-size:14px;font-weight:500;margin:-8px 2px 0}
+[aria-invalid="true"]{box-shadow:inset 0 0 0 1.5px var(--warn)}
+.del-row{background:var(--surface);margin-top:4px}
+.bk-st.due{color:var(--warn)}
+/* confirmación: hoja de acción de iOS */
+.confirm-bg{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;padding:0 max(8px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));animation:fade .2s ease-out}
+.confirm{width:100%;max-width:440px;display:flex;flex-direction:column;gap:8px;animation:up .3s cubic-bezier(.2,.9,.25,1)}
+.confirm .grp{background:var(--surface);border-radius:var(--r);display:flex;flex-direction:column;overflow:hidden}
+.confirm .msg{padding:16px 20px 14px;text-align:center;display:flex;flex-direction:column;gap:4px}
+.confirm .msg b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.confirm .msg span{font-size:14px;color:var(--muted)}
+.confirm button{border:0;background:var(--surface);min-height:56px;padding:12px 16px;font-size:19px;color:var(--accent-fg)}
+.confirm .grp button{border-top:.5px solid var(--line)}
+.confirm button.danger{color:var(--warn)}
+.confirm .cancel{border-radius:var(--r);font-weight:600}
+.confirm button:active{background:var(--surface2)}
 @media (max-width:420px){.grid2{grid-template-columns:1fr}.kv{grid-template-columns:96px 1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -302,6 +324,7 @@ details.info[open] summary{margin-bottom:6px}
 
 <div id="sheet-root"></div>
 <div id="overlay-root"></div>
+<div id="confirm-root"></div>
 
 <script>
 
@@ -350,6 +373,11 @@ let logSuggest = [];
 let editKey = null, confirmKey = null;
 let migrateN = 0, migrateData = null;
 let sampleApi = null, sampleImages = 0;
+let sheetBase = null;       // estado de la hoja al abrirla, para saber si hay cambios sin guardar
+let confirmDone = null;     // hoja de confirmación abierta
+let backupNudge = false;    // recordar la copia tras registrar un social
+let pendingReload = false;  // versión nueva esperando a que se cierre la hoja
+const BK_AT = "bachateca.backup.at", BK_CH = "bachateca.backup.ch";
 const safeUrl = u => /^https?:\/\//i.test(u||"") ? u : "";
 const MAX_UPLOAD = 19.5*1024*1024;
 const vidUrl = id => "/_blob/" + id;
@@ -387,7 +415,63 @@ function toast(msg, action){
   let t=$(".toast"); if(!t){t=document.createElement("div");t.className="toast";t.setAttribute("role","status");document.body.appendChild(t);}
   t.textContent=msg;
   if(action){ const b=document.createElement("button"); b.type="button"; b.className="undo"; b.textContent=action.label; b.onclick=()=>{ t.hidden=true; clearTimeout(toastT); action.fn(); }; t.appendChild(b); }
-  t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; if(action && action.onExpire) action.onExpire(); }, action ? 5000 : 2400);
+  t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; if(action && action.onExpire) action.onExpire(); }, action ? 10000 : 2400);
+}
+// Hoja de acción para confirmar (descartar, borrar). Devuelve true si se confirma.
+function askConfirm({title, msg="", ok, cancel="Cancelar"}){
+  if(confirmDone) confirmDone(false);
+  return new Promise(res=>{
+    const prev=document.activeElement;
+    $("#confirm-root").innerHTML = `<div class="confirm-bg" data-cf="no"><div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="cf-t"${msg?' aria-describedby="cf-m"':""}>
+      <div class="grp"><div class="msg"><b id="cf-t">${esc(title)}</b>${msg?`<span id="cf-m">${esc(msg)}</span>`:""}</div>
+      <button type="button" class="danger" data-cf="ok">${esc(ok)}</button></div>
+      <button type="button" class="cancel" data-cf="no">${esc(cancel)}</button></div></div>`;
+    confirmDone = v=>{ confirmDone=null; $("#confirm-root").innerHTML=""; if(prev && prev.isConnected) prev.focus({preventScroll:true}); res(v); };
+    $("#confirm-root .cancel").focus();
+  });
+}
+// ---------- cambios sin guardar en las hojas ----------
+const pressSig = () => [...document.querySelectorAll("#sheet-root [data-tipo],#sheet-root [data-est],#sheet-root [data-cls],#sheet-root [data-logfig]")].map(b=>b.getAttribute("aria-pressed")==="true"?1:0).join("");
+const vSig = () => vstate ? `${vstate.file?vstate.file.size:0}/${vstate.remove?1:0}` : "";
+const fieldDirty = el => {
+  if(el.tagName==="SELECT"){ const i=[...el.options].findIndex(o=>o.defaultSelected); return el.selectedIndex !== (i<0?0:i); }
+  if(el.type==="checkbox") return el.checked !== el.defaultChecked;
+  return el.value !== el.defaultValue;
+};
+function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!carried}; }
+function sheetDirty(){
+  if(!$(".sheet") || !sheetBase) return false;
+  if(sheetBase.carried || ($("#lg-salio") && logSel.size)) return true;
+  if([...document.querySelectorAll("#sheet-root input:not([type=file]),#sheet-root select,#sheet-root textarea")].some(fieldDirty)) return true;
+  return pressSig()!==sheetBase.press || vSig()!==sheetBase.v;
+}
+async function requestClose(){
+  if(confirmDone) return;
+  if(!busy && sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has cambiado en esta hoja no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return;
+  confirmKey=null; editKey=null; closeSheet();
+}
+// ---------- copia de seguridad ----------
+function backupInfo(){
+  const at=+lsGet(BK_AT)||0, ch=+lsGet(BK_CH)||0;
+  const real=figs().filter(f=>!f.ejemplo), logs=Object.values(S.logs);
+  const nf=real.filter(f=>(f.creado||0)>at).length, nl=logs.filter(l=>(l.creado||0)>at).length;
+  const days=at ? Math.floor((Date.now()-at)/864e5) : null;
+  const has=real.length>0 || logs.length>0;
+  return {at, days, nf, nl, ch, has, stale: has && (!at || (ch>0 && days>=7))};
+}
+function backupStatus(b){
+  if(!b.at) return {main: b.has ? "Aún no has hecho ninguna copia." : "Aún no hay nada que copiar.", since:""};
+  const when = b.days===0 ? "hoy" : b.days===1 ? "ayer" : `hace ${b.days} días`;
+  const parts=[];
+  if(b.nf) parts.push(`${b.nf} ${b.nf===1?"figura nueva":"figuras nuevas"}`);
+  if(b.nl) parts.push(`${b.nl} ${b.nl===1?"social registrado":"socials registrados"}`);
+  return {main:`Última copia: ${when}.`, since: parts.length ? `Desde entonces: ${parts.join(" y ")}.` : (b.ch ? "Desde entonces has hecho cambios." : "Sin cambios desde entonces.")};
+}
+async function exportBackup(){
+  const ok = await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"}));
+  if(!ok) return;
+  lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); toast("Copia exportada");
+  if($('[aria-label="Ajustes"]')) openSettings(); else if($('[aria-label="Registrar el social"]')) openLog();
 }
 function nextRep(r0,g){
   const r=Object.assign({step:0,aciertos:0,fallos:0}, r0||{});
@@ -428,6 +512,7 @@ let saveT = null;
 function persist(op){
   if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); } vidDel(op.id).catch(()=>{}); return; }
   clearTimeout(saveT); saveT=setTimeout(saveNow, 150);
+  lsSet(BK_CH, (+lsGet(BK_CH)||0)+1);
 }
 async function saveNow(){
   saveT=null; const snap=clone(S);
@@ -440,7 +525,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.8";
+const APP_VERSION = "1.9";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -837,8 +922,10 @@ function showBlock(){
 }
 
 // ---------- hoja: registro del social ----------
-function openLog(){
-  const cand = figs().filter(active).sort((a,b)=>(ready(b)-ready(a)) || ((b.usos||0)-(a.usos||0)));
+function openLog(fresh){
+  const LG=["lg-salio","lg-bloq","lg-prox"], keep = fresh ? null : LG.map(k=>$("#"+k)?.value||"");
+  const bk = backupNudge ? backupInfo() : null;
+  const cand =figs().filter(active).sort((a,b)=>(ready(b)-ready(a)) || ((b.usos||0)-(a.usos||0)));
   const logs = Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"") || (b.creado||0)-(a.creado||0));
   const blocks = {}; logs.forEach(l=>{ if(l.bloqueo) blocks[l.bloqueo]=(blocks[l.bloqueo]||0)+1; });
   const blockList = Object.entries(blocks).sort((a,b)=>b[1]-a[1]);
@@ -846,6 +933,8 @@ function openLog(){
   const sc = $(".sheet")?.scrollTop || 0;
   $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><div class="sheet" role="dialog" aria-label="Registrar el social">
     <div class="sheet-head"><h2>Registrar el social</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    ${bk && bk.stale?`<div class="panel"><p><b>${bk.at?`Tu última copia es de hace ${bk.days} días.`:"Aún no tienes ninguna copia."}</b> Tus figuras y registros solo están en este dispositivo. Guarda una copia en Archivos o en iCloud Drive.</p>
+      <div class="row"><button class="btn pri" data-act="export">Exportar copia</button><button class="btn ghost" data-act="nudge-off">Ahora no</button></div></div>`:""}
     ${sug.length?`<div class="panel"><h3>Según tus socials</h3>
       ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${S.figures[s.id].usos}×</span></span><button class="btn sm" data-promote="${s.id}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
     <div class="panel">
@@ -866,7 +955,9 @@ function openLog(){
       <div>${names.length?`<div>✓ ${names.map(esc).join(", ")}</div>`:""}${l.salio?`<div>✓ ${esc(l.salio)}</div>`:""}${l.bloqueo?`<div style="color:var(--warn)">✕ Bloqueo en ${esc(l.bloqueo)}</div>`:""}${l.proximo?`<div class="muted">→ ${esc(l.proximo)}</div>`:""}</div>
       <button class="btn ghost sm danger" data-dellog="${l.id}">Borrar</button></div>`;}).join("")}</div>`:""}
   </div></div>`;
+  if(keep) LG.forEach((k,i)=>{ if(keep[i]) $("#"+k).value=keep[i]; });
   const s=$(".sheet"); if(s) s.scrollTop=sc;
+  markClean();
 }
 function saveLog(){
   const l={id:uid(), fecha:todayStr(), creado:Date.now(), figs:[...logSel], salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
@@ -879,7 +970,7 @@ function saveLog(){
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
   S.logs[l.id]=l; persist({t:"log",id:l.id});
-  logSel = new Set(); render(); openLog(); toast("Registro guardado");
+  logSel = new Set(); backupNudge = backupInfo().stale; render(); openLog(true); toast("Registro guardado");
 }
 function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
@@ -930,11 +1021,10 @@ function openFigure(id, opts={}){
       <label class="f" for="ff-enlace">Enlace al vídeo (Drive, Instagram…)<input type="text" id="ff-enlace" value="${esc(f.enlace)}" inputmode="url" placeholder="https://"></label>
       <label class="f" for="ff-notas">Notas<textarea id="ff-notas" placeholder="Correcciones del profe, errores típicos…">${esc(f.notas)}</textarea></label>
     </div></details>`}
-    <p class="small" id="ff-err" style="color:var(--warn)" hidden></p>
+    ${id?`<button type="button" class="btn danger wide del-row" data-act="del-fig" data-id="${f.id}">Borrar figura</button>`:""}
     <div class="row sheet-foot">
       <button type="submit" class="btn pri" style="flex:1">Guardar</button>
       ${quick?`<button type="button" class="btn" data-act="to-full">Ficha completa</button>`:""}
-      ${id?`<button type="button" class="btn danger" data-act="del-fig" data-id="${f.id}">Borrar</button>`:""}
     </div>
   </form></div>`;
   vstate = opts.keepV || {cur: f.vid||null, trim: f.vidTrim||null, thumb: f.thumb||null, figId: f.id, file:null, url:null, dur:0, start:0, end:0, remove:false};
@@ -975,7 +1065,6 @@ function openFigure(id, opts={}){
     e.preventDefault();
     if(busy) return;
     const val = k => { const el=$("#"+k); return el ? el.value.trim() : ""; };
-    const err=$("#ff-err");
     const mv = moveTipo(tipo);
     let nombre = val("ff-nombre");
     if(!nombre && quick) nombre = `${prof||"Clase"} · ${fmtDate(todayStr())}`;
@@ -985,8 +1074,8 @@ function openFigure(id, opts={}){
     const agarreIn = quick ? (f.agarreIn || sg?.agarreIn || "") : $("#ff-agin").value;
     const agarreOut = quick ? (f.agarreOut || (mv ? sg?.agarreOut : agarreIn) || "") : (mv ? $("#ff-agout").value : agarreIn);
     const est = quick ? "espera" : estado;
-    if(!nombre){ err.textContent="Falta el nombre."; err.hidden=false; return; }
-    if(mv && est!=="espera" && (!entrada||!salida)){ err.textContent="Para sacarla de la lista de espera indica dónde empieza y dónde acaba."; err.hidden=false; return; }
+    if(!nombre){ fieldError([$("#ff-nombre")], $('label[for="ff-nombre"]'), "Falta el nombre."); return; }
+    if(mv && est!=="espera" && (!entrada||!salida)){ fieldError([!entrada && $("#ff-in"), !salida && $("#ff-out")].filter(Boolean), $("#ff-in").closest(".grid2"), "Para sacarla de la lista de espera indica dónde empieza y dónde acaba."); return; }
     const prev = S.figures[f.id] || {};
     const out = Object.assign({}, prev, {id:f.id, nombre, tipo, entrada, salida, agarreIn, agarreOut, estado:est, ejemplo:false});
     if(quick){ out.profesor=prof; out.baile=baile; out.video = out.video || nombre; if(sg){ out.sugerido=true; if(sg.senal && !out.senal) out.senal=sg.senal; } }
@@ -1018,13 +1107,30 @@ function openFigure(id, opts={}){
     closeSheet();
     toast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
   };
+  $("#fig-form").addEventListener("input", clearFieldError);
+  $("#fig-form").addEventListener("change", clearFieldError);
   setTimeout(()=>{ if(!id && !quick) $("#ff-nombre").focus(); },50);
+  markClean(!!opts.keepV);
+}
+// Error junto al campo: se anuncia, se enfoca el campo y se lleva a la vista.
+function fieldError(fields, anchor, msg){
+  clearFieldError();
+  const p=document.createElement("p"); p.className="field-err"; p.id="ff-err"; p.setAttribute("role","alert"); p.textContent=msg;
+  anchor.after(p);
+  fields.forEach(x=>{ x.setAttribute("aria-invalid","true"); x.setAttribute("aria-describedby","ff-err"); });
+  fields[0].focus({preventScroll:true});
+  anchor.scrollIntoView({block:"center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+function clearFieldError(){
+  $("#ff-err")?.remove();
+  document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
   aiCtl?.abort(); formApi = null;
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
-  const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; $("#sheet-root").innerHTML="";
+  const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; backupNudge=false; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
+  if(pendingReload) setTimeout(()=>{ if(!$(".sheet") && !busy) location.reload(); }, 1500);
 }
 
 // ---------- vídeo ----------
@@ -1599,26 +1705,31 @@ function openSettings(){
   const exN = figs().filter(f=>f.ejemplo).length;
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${figs().filter(f=>f.vid).length} vídeos · ${fmtMB(e.usage||0)} usados${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
+  const bk = backupInfo(), bs = backupStatus(bk);
   $("#sheet-root").innerHTML = `<div class="sheet-bg" data-act="close-bg"><div class="sheet" role="dialog" aria-label="Ajustes">
     <div class="sheet-head"><h2>Ajustes</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    <p class="small muted" style="margin:-4px 2px 0">${esc(screenDiag)} · pestaña ${esc(tab)}</p>
+    <div class="panel">
+      <h3>Copia de seguridad</h3>
+      <p><b class="bk-st${bk.stale?" due":""}">${esc(bs.main)}</b>${bs.since?` <span class="muted">${esc(bs.since)}</span>`:""}</p>
+      <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»).</p>
+      <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar JSON</button></div>
+    </div>
+    <div class="panel">
+      <h3>Espacio en este dispositivo</h3>
+      <p class="small muted" id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</p>
+      <p class="small muted" id="vid-usage">Calculando…</p>
+      <p class="small muted" id="persist-st"></p>
+      <button class="btn sm" data-act="persist">Proteger mis datos</button>
+    </div>
     ${listHTML("pos")}
     ${listHTML("hold")}
     ${listHTML("cls")}
     <div class="panel">
-      <h3>Copia de seguridad</h3>
-      <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»). Para traer tus datos del artefacto de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
-      <div class="row"><button class="btn" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar JSON</button>
-      <label class="btn" for="imp-file" style="display:inline-flex">Importar archivo</label><input type="file" id="imp-file" accept="application/json,.json" hidden></div>
+      <h3>Restaurar o importar</h3>
+      <p class="small muted">Para recuperar una copia, elige el archivo exportado. Para traer tus datos del artefacto de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
+      <div class="row"><label class="btn" for="imp-file" style="display:inline-flex">Importar archivo</label><input type="file" id="imp-file" accept="application/json,.json" hidden></div>
       <textarea id="imp-text" placeholder="…o pega aquí un JSON exportado" aria-label="Pegar JSON"></textarea>
       <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">${confirmKey==="replace"?"¿Reemplazar? También borra los vídeos de las figuras que no estén en el archivo":"Reemplazar todo"}</button></div>
-    </div>
-    <div class="panel">
-      <h3>Espacio en este dispositivo</h3>
-      <p class="small muted" id="screen-diag">${esc(screenDiag)}</p>
-      <p class="small muted" id="vid-usage">Calculando…</p>
-      <p class="small muted" id="persist-st"></p>
-      <button class="btn sm" data-act="persist">Proteger mis datos</button>
     </div>
     <div class="panel">
       <h3>Ejemplos</h3>
@@ -1628,6 +1739,7 @@ function openSettings(){
   $("#imp-file").onchange = async e=>{ const file=e.target.files[0]; if(!file) return; try{ $("#imp-text").value = await file.text(); toast("Archivo cargado. Elige cómo importarlo."); }catch{ toast("No se pudo leer el archivo."); } };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
+  markClean();
 }
 function exportData(){ return JSON.stringify({app:"bachateca",version:3,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep},null,2); }
 function importData(replace){
@@ -1707,8 +1819,8 @@ document.addEventListener("click", async e=>{
   if(d.ldel){ const k="del"+d.ldel+d.i; if(confirmKey!==k){ confirmKey=k; return openSettings(); } confirmKey=null; S[LISTS[d.ldel].key].splice(+d.i,1); saveMeta(); return openSettings(); }
   if(d.ladd){ const inp=$("#new-"+d.ladd), v=inp.value.trim(), a=S[LISTS[d.ladd].key]; if(!v) return; if(a.includes(v)){ toast("Ya existe."); return; } a.push(v); saveMeta(); return openSettings(); }
   const a=d.act;
-  if(a==="close-bg"){ if(e.target===t) closeSheet(); return; }
-  if(a==="close"){ confirmKey=null; editKey=null; return closeSheet(); }
+  if(a==="close-bg"){ if(e.target===t) requestClose(); return; }
+  if(a==="close") return requestClose();
   if(a==="quick") return openFigure(null,{quick:true});
   if(a==="full") return openFigure();
   if(a==="examples"){ closeSheet(); return loadExamples(); }
@@ -1727,10 +1839,16 @@ document.addEventListener("click", async e=>{
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
   if(a==="block") return showBlock();
   if(a==="unblock") return $("#overlay-root").innerHTML="";
-  if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(); }
+  if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
+  if(a==="nudge-off"){ backupNudge=false; return openLog(); }
   if(a==="log-save") return saveLog();
-  if(a==="del-fig"){ const id=d.id; closeSheet(); deleteFigureUndo(id); return; }
-  if(a==="export"){ shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})); return; }
+  if(a==="del-fig"){
+    const id=d.id, f=S.figures[id]; if(!f) return;
+    const ok = await askConfirm({title:`¿Borrar «${f.nombre}»?`, msg: f.vid ? "También se borra su vídeo guardado en la app. Tendrás unos segundos para deshacerlo." : "Tendrás unos segundos para deshacerlo.", ok:"Borrar figura"});
+    if(!ok) return;
+    closeSheet(); deleteFigureUndo(id); return;
+  }
+  if(a==="export") return exportBackup();
   if(a==="persist"){
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok=>{ toast(ok?"Datos protegidos":"El sistema no lo ha permitido. Instala la app en la pantalla de inicio y vuelve a probar."); openSettings(); });
     else toast("Este navegador no lo permite.");
@@ -1768,11 +1886,24 @@ document.addEventListener("mouseover", e=>{ const wk=e.target.closest && e.targe
     if(!sh) return; const el=sh; sh=null; el.classList.remove("dragging");
     if(!active) return;
     const fast = dy>60 && (Date.now()-t0)<250;
-    if(dy>120 || fast){ el.classList.add("snap"); el.style.transform="translateY(100%)"; setTimeout(()=>{ confirmKey=null; editKey=null; closeSheet(); }, 200); }
-    else { el.classList.add("snap"); el.style.transform=""; setTimeout(()=>el.classList.remove("snap"), 260); }
+    const dismiss = (dy>120 || fast) && !sheetDirty();
+    if(dismiss){ el.classList.add("snap"); el.style.transform="translateY(100%)"; setTimeout(()=>{ confirmKey=null; editKey=null; closeSheet(); }, 200); }
+    else { el.classList.add("snap"); el.style.transform=""; setTimeout(()=>el.classList.remove("snap"), 260); if(dy>120 || fast) requestClose(); }
   });
 })();
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("#overlay-root").innerHTML) $("#overlay-root").innerHTML=""; else closeSheet(); } });
+document.addEventListener("keydown", e=>{
+  if(confirmDone){
+    if(e.key==="Escape"){ e.preventDefault(); confirmDone(false); }
+    else if(e.key==="Tab"){ const bs=[...document.querySelectorAll("#confirm-root button")], i=bs.indexOf(document.activeElement); e.preventDefault(); bs[(i+(e.shiftKey?bs.length-1:1))%bs.length].focus(); }
+    return;
+  }
+  if(e.key==="Escape"){ if($("#overlay-root").innerHTML) $("#overlay-root").innerHTML=""; else requestClose(); }
+});
+$("#confirm-root").addEventListener("click", e=>{
+  const b=e.target.closest("[data-cf]"); if(!b || !confirmDone) return;
+  if(b.classList.contains("confirm-bg") && e.target!==b) return;
+  confirmDone(b.dataset.cf==="ok");
+});
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && (tab==="social"||busy)) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ confirmKey=null; editKey=null; openSettings(); };
@@ -1784,7 +1915,8 @@ initStore();
 if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){
   // Busca actualizaciones al abrir y recarga una vez cuando llega una versión nueva.
   const hadController = !!navigator.serviceWorker.controller; let reloaded = false;
-  navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(!hadController || reloaded) return; reloaded = true; location.reload(); });
+  // Si hay una hoja abierta, espera a que se cierre para no perder lo que se está escribiendo.
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(!hadController || reloaded) return; reloaded = true; if($(".sheet") || busy) pendingReload = true; else location.reload(); });
   navigator.serviceWorker.register("sw.js").then(r=>{ try{ r.update(); }catch{} }).catch(()=>{});
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") navigator.serviceWorker.getRegistration().then(r=>r && r.update()).catch(()=>{}); });
 }

@@ -158,6 +158,7 @@ button.card:active{background:var(--surface2)}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{border:0;background:var(--fill);border-radius:99px;padding:8px 14px;font-size:15px;font-weight:600;color:var(--fg)}
 .chip.sm{padding:6px 12px;font-size:14px}
+.chip{transition:background-color .15s ease-out,color .15s ease-out}
 .chip[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 .chip.warn{box-shadow:inset 0 0 0 1.5px var(--warn)}
 .chip .n{font-variant-numeric:tabular-nums;opacity:.75;margin-left:5px}
@@ -172,8 +173,10 @@ button.card:active{background:var(--surface2)}
 /* fin del repaso: cada figura con una barra del compás que se llena según cómo salió */
 .rv-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .rv-list li{display:flex;align-items:center;gap:12px}
-.rv-list i{flex:none;width:6px;height:30px;border-radius:2px;background:linear-gradient(to top,var(--accent-fg) var(--h,0%),var(--fill) var(--h,0%))}
-.rv-list .rv-fluida i{--h:100%}.rv-list .rv-dudas i{--h:50%}
+.rv-list i{flex:none;width:6px;height:30px;border-radius:2px;background:var(--fill);position:relative;overflow:hidden}
+.rv-list i::after{content:"";position:absolute;inset:0;background:var(--accent-fg);transform-origin:bottom;transform:scaleY(var(--k,0));animation:rv-fill .45s cubic-bezier(.16,1,.3,1) backwards;animation-delay:calc(var(--n,0) * 110ms + 150ms)}
+.rv-list .rv-fluida i{--k:1}.rv-list .rv-dudas i{--k:.5}
+@keyframes rv-fill{from{transform:scaleY(0)}}
 .rv-list .t{display:flex;flex-direction:column;min-width:0}
 .rv-list .t span{font-size:14px;color:var(--muted)}
 .rv-list .rv-no .t span{color:var(--warn)}
@@ -183,6 +186,8 @@ button.card:active{background:var(--surface2)}
 .tonight dt{font-size:14px;color:var(--muted);padding-top:1px}
 .tonight dd{margin:0;display:flex;flex-direction:column;gap:4px;min-width:0}
 .tonight h3:focus{outline:none}
+.tonight.enter{animation:rise .42s cubic-bezier(.16,1,.3,1)}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}
 .bk-line{display:flex;flex-direction:column;gap:6px;padding:0 4px}
 .bk-line p{margin:0}
 /* Ajustes: la copia arriba y el resto como filas que abren su propia pantalla */
@@ -248,6 +253,12 @@ button.card:active{background:var(--surface2)}
 .sf .ck svg{width:14px;height:14px;fill:none;stroke:var(--accent-ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
 .sf[aria-pressed="true"] .ck{background:var(--accent);box-shadow:none}
 .sf[aria-pressed="true"] .ck svg{opacity:1}
+/* marcar «salió»: el círculo da un golpe, como un tap, y la marca se dibuja */
+.sf .ck svg path{stroke-dasharray:1}
+.sf.pop[aria-pressed="true"] .ck{animation:tap .28s cubic-bezier(.16,1,.3,1)}
+.sf.pop[aria-pressed="true"] .ck svg path{animation:draw .22s .06s ease-out backwards}
+@keyframes tap{0%{transform:scale(.72)}55%{transform:scale(1.12)}100%{transform:none}}
+@keyframes draw{from{stroke-dashoffset:1}}
 /* panel «Me he bloqueado» */
 .bk-head{display:flex;flex-direction:column;gap:6px}
 .bk-head h2{font-size:30px}
@@ -366,7 +377,13 @@ details.info[open] summary{margin-bottom:6px}
 /* Compás de 8: la frase de bachata, con los taps (4 y 8) más altos, los tiempos que ocupa
    la figura rellenos y un punto en el tiempo en que empieza. */
 .cmp{display:inline-flex;align-items:flex-end;gap:2px;height:13px;vertical-align:-1px;position:relative}
-.cmp i{display:block;width:4px;height:7px;border-radius:1px;background:var(--line);position:relative;font-style:normal}
+.cmp i{display:block;width:4px;height:7px;border-radius:1px;background:var(--line);position:relative;font-style:normal;transform-origin:bottom}
+/* figura recién guardada: la tarjeta se ilumina y su compás se enciende del 1 al 8 */
+.card.lit{animation:lit 1.4s ease-out}
+@keyframes lit{from{background:color-mix(in srgb,var(--accent) 16%,var(--surface))}}
+.card.lit .cmp i{animation:cmp-on .34s cubic-bezier(.16,1,.3,1) backwards}
+.card.lit .cmp i:nth-child(1){animation-delay:150ms}.card.lit .cmp i:nth-child(2){animation-delay:220ms}.card.lit .cmp i:nth-child(3){animation-delay:290ms}.card.lit .cmp i:nth-child(4){animation-delay:360ms}.card.lit .cmp i:nth-child(5){animation-delay:430ms}.card.lit .cmp i:nth-child(6){animation-delay:500ms}.card.lit .cmp i:nth-child(7){animation-delay:570ms}.card.lit .cmp i:nth-child(8){animation-delay:640ms}
+@keyframes cmp-on{from{transform:scaleY(.15);opacity:.25}}
 .cmp i.tap{height:13px}
 .cmp i.on{background:var(--accent-fg)}
 .cmp i.st::after{content:"";position:absolute;left:50%;bottom:-5px;width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--fg)}
@@ -492,6 +509,8 @@ const nightOn = () => Date.now()-nightAt < NIGHT_MS;
 const paintNight = () => document.documentElement.classList.toggle("night", tab==="social" || nightOn());
 function setNight(on){ nightAt = on ? Date.now() : 0; lsSet(LS_NOCHE, nightAt); paintNight(); }
 let blockPos = null;
+// Lo recién hecho, para animarlo una sola vez: figura guardada, fila marcada y registro guardado.
+let justSaved = null, lastSal = null, tonightFresh = false;
 let logSuggest = [];
 let editKey = null, confirmKey = null;
 let sheetBase = null;       // estado de la hoja al abrirla, para saber si hay cambios sin guardar
@@ -652,7 +671,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.18";
+const APP_VERSION = "1.19";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -768,7 +787,7 @@ function figCard(f, inGroup){
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = routeTxt(f, !inGroup);
   else sub = `<span class="tag warn">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
-  return `<button class="card${th?" has-thumb":""}" data-edit="${f.id}">${th}${th?`<div class="card-body">`:""}
+  return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-edit="${f.id}">${th}${th?`<div class="card-body">`:""}
     <div class="fname">${esc(f.nombre)}</div>
     <div class="route"><span>${sub}</span></div>
     <div class="meta">${pill(f.estado)}
@@ -878,7 +897,7 @@ function renderRepasar(){
     v.innerHTML = `
       <h2>${allOk?"Todo a compás":"Repaso terminado"}</h2>
       <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
-      <ul class="rv-list">${items.map(x=>`<li class="rv-${x.g}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
+      <ul class="rv-list">${items.map((x,n)=>`<li class="rv-${x.g}" style="--n:${n}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
       <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${i}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
@@ -1057,9 +1076,9 @@ function renderChain(){
 function socialFootwork(){ return figs().filter(f=>active(f) && !isMove(f) && (ready(f)||socialIncl)); }
 const socOk = f => ready(f) || socialIncl;
 const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
-const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg></span>`;
+const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" pathLength="1"/></svg></span>`;
 function socLi(f, sub){
-  return `<li><button type="button" class="sf${ready(f)?"":" dim"}" data-sal="${f.id}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}</span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
+  return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${f.id}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}</span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
 }
 function renderSocial(){
   const v=$("#v-social");
@@ -1129,7 +1148,7 @@ let logDone = null;
 function tonightHTML(l){
   const names = (l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean).map(esc);
   if(l.salio) names.push(esc(l.salio));
-  return `<div class="panel tonight"><h3 id="tonight-t" tabindex="-1">Esta noche</h3>
+  return `<div class="panel tonight${tonightFresh?" enter":""}"><h3 id="tonight-t" tabindex="-1">Esta noche</h3>
     <dl>
       <dt>Salieron</dt><dd>${names.length?joinY(names):`<span class="muted">Nada marcado</span>`}</dd>
       <dt>Bloqueo</dt><dd>${l.bloqueo?`<b>${esc(l.bloqueo)}</b><span class="small muted">Pregunta en clase: «Desde ${esc(l.bloqueo)}, ¿qué figura sencilla puedo hacer?»</span>`:"Ninguno"}</dd>
@@ -1197,7 +1216,7 @@ function saveLog(){
   });
   S.logs[l.id]=l; persist({t:"log",id:l.id});
   logSel = new Set(); logBloq = ""; saveSel(); setNight(false);
-  backupNudge = backupInfo().stale; render(); logAll=false; logDone=l.id; openLog();
+  backupNudge = backupInfo().stale; render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
   const s=$(".sheet"); if(s) s.scrollTop=0; $("#tonight-t")?.focus({preventScroll:true}); announce("Registro guardado");
 }
 function deleteLog(id){
@@ -1332,7 +1351,7 @@ function openFigure(id, opts={}){
       }
       busy=false;
     } else if(vstate.remove){ delete out.vid; delete out.vidInfo; delete out.vidTrim; delete out.thumb; }
-    saveFigure(out);
+    justSaved = out.id; saveFigure(out);
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();
     toast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
@@ -2022,6 +2041,7 @@ function render(){
   else if(tab==="enlazar") renderEnlazar();
   else if(tab==="social") renderSocial();
   hydrateVideos($("#v-"+tab));
+  justSaved = null; lastSal = null;
 }
 
 // ---------- eventos ----------
@@ -2039,12 +2059,12 @@ document.addEventListener("click", async e=>{
   const t = e.target.closest("[data-tab],[data-act],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv]");
   if(!t) return;
   const d=t.dataset;
-  if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); saveSel(); return render(); }
+  if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); lastSal=d.sal; saveSel(); return render(); }
   if(d.setv) return setGo(d.setv);
   if(d.bpos!==undefined){ blockPos=d.bpos; logBloq=d.bpos; saveSel(); return showBlock(); }
   if(d.bexit){
     const id=d.bexit, had=logSel.has(id), f=S.figures[id];
-    logSel.add(id); saveSel(); blockPos=null; $("#overlay-root").innerHTML=""; render();
+    logSel.add(id); lastSal=id; saveSel(); blockPos=null; $("#overlay-root").innerHTML=""; render();
     return toast(f?`«${f.nombre}» marcada para el registro`:"Marcada para el registro", had?null:{label:"Deshacer", fn:()=>{ logSel.delete(id); saveSel(); render(); }});
   }
   if(d.tab) return go(d.tab);

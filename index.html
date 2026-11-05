@@ -432,6 +432,8 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
 .log{background:var(--surface);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:15px}
 .log .d{grid-column:1/-1;font-size:13px;color:var(--muted)}
+/* Borrar un registro se puede deshacer: el botón no necesita gritar en rojo en cada fila. */
+.log [data-dellog]{color:var(--muted)}
 /* Compás de 8: la frase de bachata, con los taps (4 y 8) más altos, los tiempos que ocupa
    la figura rellenos y un punto en el tiempo en que empieza. */
 .cmp{display:inline-flex;align-items:flex-end;gap:2px;height:13px;vertical-align:-1px;position:relative}
@@ -568,6 +570,11 @@ const saveSel = () => lsSet(LS_SAL, {t:Date.now(), ids:[...logSel], bloq:logBloq
 // Modo noche: se enciende al entrar en Social y sigue en las demás pestañas hasta guardar el registro,
 // pulsar «Terminar el social» o pasadas 6 h, para que la pantalla no se ponga blanca en la sala.
 const LS_NOCHE = "bachateca.noche", NIGHT_MS = 216e5;
+// Ayuda de primera vez: el párrafo explica una función hasta que la usas; después desaparece.
+const LS_VISTO = "bachateca.visto";
+const visto = new Set(lsGet(LS_VISTO) || []);
+const learn = k => { if(!visto.has(k)){ visto.add(k); lsSet(LS_VISTO, [...visto]); } };
+const firstHelp = (k, txt) => visto.has(k) ? "" : `<p class="small muted">${txt}</p>`;
 let nightAt = +lsGet(LS_NOCHE) || 0;
 const nightOn = () => Date.now()-nightAt < NIGHT_MS;
 // La noche vive en Social. Fuera de Social solo sigue con un social en curso: algo marcado, un bloqueo apuntado
@@ -768,7 +775,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.29";
+const APP_VERSION = "1.30";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -954,32 +961,33 @@ function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(
 // ---------- vista: repasar ----------
 function renderRepasar(){
   const v=$("#v-repasar");
+  if(Object.keys(S.linkRep).length || figs().some(f=>f.rep && (f.rep.aciertos||f.rep.fallos))) learn("rev");   // ya has repasado antes
   if(!session){
     const dF=dueFigs(), dL=dueLinks();
     const anyActive = figs().some(active), anyLinks = linkPositions().length>0;
     const next = figs().filter(f=>active(f) && !isDue(f)).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||""))[0];
     v.innerHTML = `
-      <h2>Recupera sin mirar</h2>
       <div class="panel">
         <h3>Enlaces</h3>
-        <p class="small muted">Ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Es justo lo que se bloquea en el social.</p>
+        ${firstHelp("rev", "Ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Es justo lo que se bloquea en el social.")}
         ${dL.length ? `<p><b>${dL.length}</b> ${dL.length===1?"posición toca":"posiciones tocan"} hoy.</p><button class="btn pri" data-act="start-link">Repasar enlaces</button>`
           : anyLinks ? `<p class="small muted">Nada pendiente hoy.</p><button class="btn" data-act="start-link-any">Repasar 3 posiciones al azar</button>`
           : `<p class="small muted">Necesitas al menos una figura fuera de la lista de espera con dónde empieza y dónde acaba.</p><button class="btn" data-tab="repertorio">Ir al repertorio</button>`}
       </div>
       <div class="panel">
         <h3>Figuras</h3>
-        <p class="small muted">Ves el nombre y dónde empieza. Hazla sin mirar y di cómo acaba. Después compruebas, con el vídeo si lo tiene.</p>
+        ${firstHelp("rev", "Ves el nombre y dónde empieza. Hazla sin mirar y di cómo acaba. Después compruebas, con el vídeo si lo tiene.")}
         ${dF.length ? `<p><b>${dF.length}</b> ${dF.length===1?"figura toca":"figuras tocan"} hoy. Sesión de ${Math.min(dF.length,MAX_SESSION)}, unos ${Math.min(dF.length,MAX_SESSION)*2} minutos.</p><button class="btn pri" data-act="start-fig">Repasar figuras</button>`
           : anyActive ? `<p class="small muted">Nada pendiente hoy.${next?` Próxima: <b>${esc(next.nombre)}</b>, ${fmtDate(next.rep.due)}.`:""}</p><button class="btn" data-act="start-fig-any">Repasar 3 al azar</button>`
           : figs().length ? `<p class="small muted">Las figuras en lista de espera no entran en el repaso. Cámbialas a «En práctica» cuando quieras trabajarlas.</p>`
           : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
       </div>
       ${progressHTML()}
-      <details class="info"><summary>Cómo se programan los repasos</summary>«Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
+      <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
     return;
   }
   if(session.i>=session.ids.length){
+    learn("rev");
     const d=session.done, c=k=>d.filter(x=>x===k).length, link=session.kind==="link";
     const res=[c("fluida") && pl(c("fluida"),"fluida","fluidas"), c("dudas") && `${c("dudas")} con dudas`, c("no") && `${c("no")} sin recordar`].filter(Boolean);
     // Qué viene después: lo que queda hoy o cuándo toca el siguiente.
@@ -1011,7 +1019,7 @@ function renderRepasar(){
   const pct = Math.round(session.i/session.ids.length*100);
   const head = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><p class="muted small">${session.i+1} de ${session.ids.length}</p>`;
   const gradeHTML = `<p class="small muted">¿Cómo te ha salido?</p>
-    <div class="grade"><button class="btn" data-grade="no">No la recordé</button><button class="btn" data-grade="dudas">Con dudas</button><button class="btn pri" data-grade="fluida">Fluida</button></div>`;
+    <div class="grade"><button class="btn" data-grade="no">No la recordé</button><button class="btn" data-grade="dudas">Con dudas</button><button class="btn" data-grade="fluida">Fluida</button></div>`;
   if(session.kind==="link"){
     const p=session.ids[session.i], ex=exitsFrom(p), ar=arrivals(p);
     v.innerHTML = `${head}
@@ -1119,7 +1127,7 @@ function renderEnlazar(){
     <div class="chips" role="group" aria-label="Posición">
       ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}${c.into.length&&c.ready.length<2?", menos de 2 seguras":""}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
     </div>
-    <p class="small muted chip-legend">El número es cuántas salidas tienes desde esa posición.${gaps.length?` <span class="ring" aria-hidden="true"></span> Borde rojo: llegas ahí con menos de 2 salidas seguras.`:""}</p>
+    ${!visto.has("pos") || gaps.length ? `<p class="small muted chip-legend">${visto.has("pos")?"":"El número es cuántas salidas tienes desde esa posición."}${gaps.length?` <span class="ring" aria-hidden="true"></span> Borde rojo: llegas ahí con menos de 2 salidas seguras.`:""}</p>`:""}
     ${sel ? `
       <div class="panel">
         ${holdsHere.length ? `<div class="f"><span>Llegas con el agarre</span><div class="chips">
@@ -1132,7 +1140,7 @@ function renderEnlazar(){
         ${sel.into.length ? `<p class="small muted">Llegas aquí desde: ${sel.into.map(f=>esc(f.nombre)+(f.agarreOut?` (${esc(f.agarreOut)})`:"")).join(", ")}.</p>`:""}
         ${sel.out.length ? `<div class="practice">
           <h3>Practicar enlaces</h3>
-          <p class="small muted">Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.</p>
+          ${firstHelp("chain", "Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
           <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
@@ -1142,7 +1150,6 @@ function mapHTML(cov, gaps, incN){
   return `
     <div class="panel">
       <h3>Mapa de salidas</h3>
-      <p class="small muted">Toca una posición para ver sus salidas.</p>
       ${gaps.length ? `<div class="note">Llegas a ${joinY(gaps.map(g=>`<b>${esc(g.p)}</b>`))}, pero desde ${gaps.length===1?"ahí":"esas posiciones"} tienes menos de 2 salidas seguras. Es donde más fácil te bloqueas: pide en clase una salida sencilla desde ${gaps.length===1?"ahí":"cada una"}.</div>` : (figs().some(placed)?`<div class="note ok">Desde todas las posiciones a las que llegas tienes al menos 2 salidas seguras.</div>`:"")}
       ${graphHTML(cov)}
       <details class="info"><summary>Ver la tabla por posición</summary>
@@ -1152,7 +1159,7 @@ function mapHTML(cov, gaps, incN){
         </div>
         <p>Seguras son las salidas disponibles o consolidadas; el total suma también las que tienes en práctica. No cuentan la lista de espera ni el footwork.${incN?` ${incN===1?"1 figura no aparece porque le falta":incN+" figuras no aparecen porque les falta"} dónde empieza o acaba.`:""}</p>
       </details>
-      <button class="btn" data-act="coach">✦ Preguntar a Claude qué trabajar</button><p class="small muted">Se abre la hoja de compartir con tus datos de salidas y bloqueos: elige la app de Claude.</p><div class="coach" id="coach-out" ${coachText?"":"hidden"}>${esc(coachText)}</div>
+      <button class="btn" data-act="coach">✦ Preguntar a Claude qué trabajar</button>${firstHelp("coach", "Se abre la hoja de compartir con tus datos de salidas y bloqueos: elige la app de Claude.")}<div class="coach" id="coach-out" ${coachText?"":"hidden"}>${esc(coachText)}</div>
     </div>`;
 }
 function makeChain(start){
@@ -1205,7 +1212,7 @@ function renderSocial(){
   const nSel = [...logSel].filter(id=>S.figures[id]).length;
   const pend = [nSel?`${nSel} ${nSel===1?"marcada":"marcadas"}`:"", logBloq?`bloqueo en ${esc(logBloq)}`:""].filter(Boolean).join(" · ");
   v.innerHTML = `
-    <p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>
+    ${Object.keys(S.logs).length?"":`<p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>`}
     <div>
       ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${socTop(fw,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
       ${rows.length ? rows.map(r=>`<div class="social-pos"><h3 class="p">${esc(r.p)}</h3><ul>${r.items.map(f=>socLi(f, `${routeTxt(f)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}`)).join("")}</ul></div>`).join("")
@@ -1353,7 +1360,7 @@ function openLog(fresh){
     ${!done && logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
       const names=(l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean);
       return `<div class="log"><span class="d">${fmtDate(l.fecha)}</span>
-      <div>${names.length?`<div>✓ ${names.map(esc).join(", ")}</div>`:""}${l.salio?`<div>✓ ${esc(l.salio)}</div>`:""}${l.bloqueo?`<div style="color:var(--warn)">✕ Bloqueo en ${esc(l.bloqueo)}</div>`:""}${l.proximo?`<div class="muted">→ ${esc(l.proximo)}</div>`:""}</div>
+      <div>${names.length?`<div>✓ ${names.map(esc).join(", ")}</div>`:""}${l.salio?`<div>✓ ${esc(l.salio)}</div>`:""}${l.bloqueo?`<div class="muted">Bloqueo en <b style="color:var(--fg)">${esc(l.bloqueo)}</b></div>`:""}${l.proximo?`<div class="muted">→ ${esc(l.proximo)}</div>`:""}</div>
       <button class="btn ghost sm danger" data-dellog="${l.id}" aria-label="Borrar el registro del ${fmtDate(l.fecha)}">Borrar</button></div>`;}).join("")}</div>`:""}
   </div></div>`;
   if(!done){
@@ -2098,7 +2105,7 @@ function progressHTML(){
     </figure>
     <details><summary>Ver datos</summary><div style="overflow-x:auto"><table class="dtab"><thead><tr><th>Semana</th><th>Seguras</th><th>Práctica</th><th>Espera</th><th>Socials</th></tr></thead>
       <tbody>${weeks.map(wk=>`<tr><td>${esc(wk.label)}</td><td>${wk.ready}</td><td>${wk.c.practica}</td><td>${wk.c.espera}</td><td>${wk.soc}</td></tr>`).join("")}</tbody></table></div></details>
-    <p class="small muted">Seguras son las figuras disponibles o consolidadas: las que ves en Social. Cada barra las cuenta al final de esa semana. En figuras antiguas sin historial se usa su estado actual.</p>
+    <details class="info"><summary>Qué cuenta como segura</summary>Las figuras disponibles o consolidadas: las que ves en Social. Cada barra las cuenta al final de esa semana. En figuras antiguas sin historial se usa su estado actual.</details>
   </div>`;
 }
 
@@ -2301,7 +2308,7 @@ document.addEventListener("click", async e=>{
   if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
   if(d.grade) return grade(d.grade);
   if(d.lview){ linkView=d.lview; return render(); }
-  if(d.pos!==undefined && !t.closest("form")){ linkPos=d.pos; linkHold=""; chain=null;
+  if(d.pos!==undefined && !t.closest("form")){ learn("pos"); linkPos=d.pos; linkHold=""; chain=null;
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
@@ -2333,7 +2340,7 @@ document.addEventListener("click", async e=>{
   if(a==="full") return openFigure();
   if(a==="examples"){ closeSheet(); return loadExamples(); }
   if(a==="clear-examples"){ figs().filter(f=>f.ejemplo).forEach(f=>deleteFigure(f.id)); toast("Ejemplos quitados"); return openSettings(); }
-  if(a==="coach") return runCoach();
+  if(a==="coach"){ learn("coach"); return runCoach(); }
   if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; return render(); }
   if(a==="start-fig") return startSession("fig", false);
   if(a==="start-fig-any") return startSession("fig", true);
@@ -2341,7 +2348,7 @@ document.addEventListener("click", async e=>{
   if(a==="start-link-any") return startSession("link", true);
   if(a==="reveal"){ session.revealed=true; render(); const an=$("#v-repasar .answer"); if(an){ an.tabIndex=-1; an.focus({preventScroll:true}); } return; }
   if(a==="end"){ session=null; return render(); }
-  if(a==="chain"){ chain=makeChain(linkPos); return render(); }
+  if(a==="chain"){ learn("chain"); chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; blockHold=null; blockPick=null; return showBlock(); }
   if(a==="bexit-back"){ const id=blockPick; blockPick=null; return showBlock(`[data-bexit="${CSS.escape(id||"")}"]`); }
   if(a==="bexit-done"){

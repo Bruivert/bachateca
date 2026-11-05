@@ -568,10 +568,18 @@ let vstate = null;
 const LS_SAL = "bachateca.salieron";
 // Tras registrar un social con la copia antigua, el aviso espera a la próxima vez que abras la app (en Repertorio).
 const LS_NUDGE = "bachateca.nudge";
-const salInit = (()=>{ const s=lsGet(LS_SAL); return s && Date.now()-s.t < 432e5 ? s : {}; })();
+// Lo marcado en un social no caduca: guarda el día del social y, si es de otro día, se avisa para registrarlo o descartarlo.
+// Un social que acaba de madrugada cuenta como del día anterior (corte a las 6:00).
+const noonOf = t => { const d=new Date(t); d.setHours(12,0,0,0); return d.toISOString().slice(0,10); };
+const socDay = (t=Date.now()) => noonOf(t - 216e5);
+const salInit = lsGet(LS_SAL) || {};
 let logSel = new Set(Array.isArray(salInit.ids) ? salInit.ids : []);
 let logBloq = typeof salInit.bloq==="string" ? salInit.bloq : "";
-const saveSel = () => lsSet(LS_SAL, {t:Date.now(), ids:[...logSel], bloq:logBloq});
+let salD = salInit.d || (salInit.t ? socDay(salInit.t) : "");
+const salPending = () => logSel.size>0 || !!logBloq;
+const saveSel = () => { salD = salPending() ? (salD || socDay()) : ""; lsSet(LS_SAL, {t:Date.now(), d:salD, ids:[...logSel], bloq:logBloq}); };
+const salStale = () => salPending() && !!salD && salD!==socDay();
+const dayName = d => { const n=Math.round((new Date(socDay()+"T12:00:00")-new Date(d+"T12:00:00"))/864e5); return n>=1 && n<=6 ? new Date(d+"T12:00:00").toLocaleDateString("es-ES",{weekday:"long"}) : fmtDate(d); };
 // Modo noche: se enciende al entrar en Social y sigue en las demás pestañas hasta guardar el registro,
 // pulsar «Terminar el social» o pasadas 6 h, para que la pantalla no se ponga blanca en la sala.
 const LS_NOCHE = "bachateca.noche", NIGHT_MS = 216e5;
@@ -585,7 +593,7 @@ const nightOn = () => Date.now()-nightAt < NIGHT_MS;
 // La noche vive en Social. Fuera de Social solo sigue con un social en curso: algo marcado, un bloqueo apuntado
 // o Social abierto de noche (de 20 h a 7 h). Mirar la chuleta por la mañana ya no oscurece el resto de la app.
 const lateAt = t => { const h=new Date(t).getHours(); return h>=20 || h<7; };
-const socialLive = () => nightOn() && (logSel.size>0 || !!logBloq || lateAt(nightAt));
+const socialLive = () => nightOn() && ((salPending() && !salStale()) || lateAt(nightAt));
 function paintNight(){
   const live = socialLive();
   document.documentElement.classList.toggle("night", tab==="social" || live);
@@ -780,7 +788,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.32";
+const APP_VERSION = "1.33";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -944,6 +952,7 @@ function renderRepertorio(){
   const v=$("#v-repertorio");
   v.innerHTML = `
     ${all.length ? `<p class="sum"><span><b>${all.length}</b> ${all.length===1?"figura":"figuras"}</span><span aria-hidden="true">·</span><span><b>${consN}</b> ${consN===1?"consolidada":"consolidadas"}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar"><b>${dueN}</b> ${dueN===1?"repaso hoy":"repasos hoy"}</button>`:""}</p>`:""}
+    ${staleHTML()}
     ${nudgeHTML()}
     ${installHTML()}
     ${all.length ? `
@@ -1222,6 +1231,7 @@ function renderSocial(){
   const nSel = [...logSel].filter(id=>S.figures[id]).length;
   const pend = [nSel?`${nSel} ${nSel===1?"marcada":"marcadas"}`:"", logBloq?`bloqueo en ${esc(logBloq)}`:""].filter(Boolean).join(" · ");
   v.innerHTML = `
+    ${staleHTML()}
     ${Object.keys(S.logs).length?"":`<p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>`}
     <div>
       ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${socTop(fw,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
@@ -1280,7 +1290,8 @@ function showBlock(focus){
     foot = `<button type="button" class="btn" data-act="bexit-back">Otra salida</button><button type="button" class="btn pri" data-act="bexit-done">Hecho, la bailé</button>`;
   } else if(blockPos){
     const ex = blockExits(blockPos, blockHold);
-    const hs = [...new Set(exitsFrom(blockPos).map(f=>f.agarreIn).filter(Boolean))];
+    // El agarre solo filtra cuando hay más salidas de las que caben: con 2 o menos ya se ven todas.
+    const all = exitsFrom(blockPos), hs = all.length>2 ? [...new Set(all.map(f=>f.agarreIn).filter(Boolean))] : [];
     body = `<h3 class="bk-from" id="bk-from" tabindex="-1">${ex.length>1?"Elige una salida desde":"Tu salida desde"} ${esc(blockPos)}</h3>
       ${hs.length>1?`<div class="chips bk-holds" role="group" aria-label="Agarre que llevas"><span class="muted">Agarre</span>${hs.map(h=>`<button type="button" class="chip" aria-pressed="${blockHold===h}" data-bhold="${esc(h)}"${holdSay(h)!==h?` aria-label="${esc(holdSay(h))}"`:""}>${esc(h)}</button>`).join("")}</div>`:""}
       <ul class="bk-exits">${ex.map(f=>bkExit(f)).join("")}</ul>
@@ -1349,7 +1360,7 @@ function openLog(fresh){
   const sug = logSuggest.filter(s=>S.figures[s.id] && S.figures[s.id].estado!==s.to);
   const sc = $(".sheet")?.scrollTop || 0;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-sheet="log">
-    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${done?"Esta noche":"Registrar el social"}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${done ? (done.fecha===socDay()?"Esta noche":`El social del ${dayName(done.fecha)}`) : (salStale()?`Registrar el social del ${dayName(salD)}`:"Registrar el social")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${done?`<p class="small muted tn-date">${fmtDate(done.fecha)}</p>`:""}
     ${done ? tonightHTML(done) : ""}
     ${sug.length?`<div class="panel"><h3>Según tus socials</h3>
@@ -1383,7 +1394,7 @@ function openLog(fresh){
   markClean();
 }
 function saveLog(){
-  const l={id:uid(), fecha:todayStr(), creado:Date.now(), figs:[...logSel].filter(id=>S.figures[id]), salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
+  const l={id:uid(), fecha:salD || socDay(), creado:Date.now(), figs:[...logSel].filter(id=>S.figures[id]), salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
   if(!l.figs.length && !l.salio && !l.bloqueo && !l.proximo){ toast("Marca una figura o rellena algún campo."); return; }
   logSuggest = [];
   l.figs.forEach(id=>{
@@ -1744,6 +1755,14 @@ async function shareOrDownload(file){
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click();
   setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return true;
+}
+// Social de otro día sin registrar: registrarlo con su fecha o descartarlo (con Deshacer).
+function staleHTML(){
+  if(!salStale()) return "";
+  const n=[...logSel].filter(id=>S.figures[id]).length;
+  const what=[n?pl(n,"marcada","marcadas"):"", logBloq?`bloqueo en ${esc(logBloq)}`:""].filter(Boolean).join(" · ");
+  return `<div class="note"><b>Social del ${esc(dayName(salD))} sin registrar</b>${what?`: ${what}.`:"."}
+    <div class="row"><button class="btn sm pri" data-act="stale-log">Registrar</button><button class="btn sm" data-act="stale-drop">Descartar</button></div></div>`;
 }
 function nudgeHTML(){
   if(!lsGet(LS_NUDGE)) return "";
@@ -2363,7 +2382,7 @@ document.addEventListener("click", async e=>{
   if(a==="end"){ session=null; return render(); }
   if(a==="chain"){ learn("chain"); chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; blockHold=null; blockPick=null; return showBlock(); }
-  if(a==="bexit-back"){ const id=blockPick; blockPick=null; return showBlock(`[data-bexit="${CSS.escape(id||"")}"]`); }
+  if(a==="bexit-back"){ const id=blockPick; blockPick=null; blockHold=null; return showBlock(`[data-bexit="${CSS.escape(id||"")}"]`); }
   if(a==="bexit-done"){
     const id=blockPick, had=logSel.has(id), f=S.figures[id]; if(!f) return closeBlock();
     logSel.add(id); lastSal=id; logBloq=blockPos; saveSel(); blockPos=null; blockHold=null; blockPick=null; $("#overlay-root").innerHTML=""; render();
@@ -2379,6 +2398,12 @@ document.addEventListener("click", async e=>{
   }
   if(a==="bpos-back"){ blockPos=null; blockHold=null; blockPick=null; return showBlock("#bk-where"); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
+  if(a==="stale-log"){ logSuggest=[]; confirmKey=null; return openLog(true); }
+  if(a==="stale-drop"){
+    const prev={ids:[...logSel], bloq:logBloq, d:salD};
+    logSel=new Set(); logBloq=""; saveSel(); render();
+    return toast("Marcas descartadas", {label:"Deshacer", fn:()=>{ logSel=new Set(prev.ids); logBloq=prev.bloq; salD=prev.d; saveSel(); render(); }});
+  }
   if(a==="nudge-off"){ lsSet(LS_NUDGE, 0); return render(); }
   if(a==="log-save") return saveLog();
   if(a==="log-again"){ logDone=null; logSuggest=[]; return openLog(true); }

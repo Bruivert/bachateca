@@ -23,9 +23,9 @@
 :root{
   /* Paleta: azul, blanco y verde fosforito */
   --bg:#f3f6ff; --surface:#ffffff; --surface2:#e8eeff; --line:#d3dcf2; --fill:rgba(30,94,255,.08);
-  --fg:#0a1a3f; --muted:#5b6b8f;
+  --fg:#0a1a3f; --muted:#596989;
   --accent:#1e5eff; --accent-ink:#ffffff; --accent-fg:#1a4fd8; --accent-soft:rgba(30,94,255,.10);
-  --neon:#c4f838; --neon-ink:#0a1a3f; --chip-on:#c4f838; --chip-on-ink:#0a1a3f;
+  --neon:#c4f838; --neon-ink:#0a1a3f; --chip-on:#0a1a3f; --chip-on-ink:#ffffff;
   --st-espera:#56637f; --st-practica:#1a4fd8; --st-disponible:#3d6600; --st-consolidada:#0a1a3f;
   --warn:#d70015;
   --bar:rgba(243,246,255,.84);
@@ -42,7 +42,7 @@
     --accent:#c4f838; --accent-ink:#071330; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.12);
     --neon:#c4f838; --neon-ink:#071330; --chip-on:#ffffff; --chip-on-ink:#071330;
     --st-espera:#8a9bbf; --st-practica:#6fb6ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
-    --warn:#ff6b7a;
+    --warn:#ff7a87;
     --bar:rgba(7,19,48,.80);
     --toast-act:#1e5eff;
     color-scheme:dark;
@@ -55,7 +55,7 @@
   --accent:#c4f838; --accent-ink:#071330; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.12);
   --neon:#c4f838; --neon-ink:#071330; --chip-on:#ffffff; --chip-on-ink:#071330;
   --st-espera:#8a9bbf; --st-practica:#6fb6ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
-  --warn:#ff6b7a;
+  --warn:#ff7a87;
   --bar:rgba(7,19,48,.80);
   --toast-act:#1e5eff;
   color-scheme:dark;
@@ -146,7 +146,6 @@ button.card:active{background:var(--surface2)}
 .panel .list>.card{background:var(--surface2)}
 .route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:500}
 .route .arrow{color:var(--accent-fg);font-weight:700}
-.hold{opacity:.85}
 .fname{font-weight:600;font-size:17px;color:var(--fg);line-height:1.25}
 .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600}
@@ -161,7 +160,7 @@ button.card:active{background:var(--surface2)}
 .chip.sm{padding:6px 12px;font-size:14px}
 .chip[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 .chip.warn{box-shadow:inset 0 0 0 1.5px var(--warn)}
-.chip .n{font-variant-numeric:tabular-nums;opacity:.6;margin-left:5px}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.75;margin-left:5px}
 .panel{background:var(--surface);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
 .note{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:15px}
 .note.ok{background:color-mix(in srgb,var(--st-disponible) 14%,transparent)}
@@ -178,8 +177,8 @@ button.card:active{background:var(--surface2)}
 .chain .step:first-child{border-top:0}
 .chain .k{font-family:var(--f-display);font-weight:800;color:var(--accent-fg);font-variant-numeric:tabular-nums}
 .seg2{display:grid;grid-template-columns:1fr 1fr;background:var(--fill);border-radius:10px;padding:2px}
-.seg2 button{background:none;border:0;border-radius:8px;padding:7px;font-size:14px;font-weight:600;color:var(--fg)}
-.seg2 button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg2 button{background:none;border:0;border-radius:8px;padding:7px;min-height:42px;font-size:14px;font-weight:600;color:var(--fg)}
+.seg2 button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 
 /* repaso */
 .flash{background:var(--surface);border-radius:20px;padding:22px 20px;display:flex;flex-direction:column;gap:14px}
@@ -214,7 +213,7 @@ button.card:active{background:var(--surface2)}
 .sf .n{font-size:19px}
 .sf .to{font-size:14px;color:var(--muted)}
 .sf.dim .t{opacity:.5}
-.sf .ck{flex:none;width:28px;height:28px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line);display:grid;place-items:center}
+.sf .ck{flex:none;width:28px;height:28px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--muted);display:grid;place-items:center}
 .sf .ck svg{width:14px;height:14px;fill:none;stroke:var(--accent-ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
 .sf[aria-pressed="true"] .ck{background:var(--accent);box-shadow:none}
 .sf[aria-pressed="true"] .ck svg{opacity:1}
@@ -264,10 +263,11 @@ button.card:active{background:var(--surface2)}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
-.seg button{border:0;background:var(--fill);border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600}
+.seg button{border:0;background:var(--fill);border-radius:10px;padding:8px 12px;min-height:44px;font-size:14px;font-weight:600;color:var(--sc,var(--fg))}
+.seg .st-espera{--sc:var(--st-espera)}.seg .st-practica{--sc:var(--st-practica)}.seg .st-disponible{--sc:var(--st-disponible)}.seg .st-consolidada{--sc:var(--st-consolidada)}
 .seg.neutral button{color:var(--fg)}
-.seg button[aria-pressed="true"]{background:color-mix(in srgb,currentColor 18%,var(--surface));box-shadow:inset 0 0 0 1.5px currentColor}
-.seg.neutral button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink);box-shadow:none}
+.seg button[aria-pressed="true"]{background:var(--sc);color:var(--bg)}
+.seg.neutral button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 details summary{cursor:pointer;color:var(--accent-fg);font-weight:600;font-size:16px;padding:4px 0;list-style:none}
 details summary::-webkit-details-marker{display:none}
 details summary::before{content:"+ ";font-weight:700}
@@ -284,7 +284,7 @@ details .inner{display:flex;flex-direction:column;gap:12px}
 .player video.mirror{transform:scaleX(-1)}
 .pctl{display:flex;gap:6px;flex-wrap:wrap}
 .pctl button{border:0;background:var(--fill);border-radius:99px;padding:6px 12px;font-size:14px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
-.pctl button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.pctl button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 .graph,.chart{margin:0;display:flex;flex-direction:column;gap:8px}
 .graph{background:var(--surface);border-radius:var(--r);padding:12px}
 .graph svg,.chart svg{width:100%;height:auto;max-width:100%;display:block}
@@ -325,8 +325,8 @@ details.info[open] summary{margin-bottom:6px}
 .poslist>div{display:flex;align-items:center;gap:4px;background:var(--surface2);padding:6px 6px 6px 14px;position:relative;min-height:46px}
 .poslist>div+div::before{content:"";position:absolute;top:0;left:14px;right:0;border-top:.5px solid var(--line)}
 .poslist span.nm{margin-right:auto;min-width:0;overflow-wrap:break-word}
-.ib{width:36px;height:36px;flex:none;border:0;border-radius:10px;background:none;color:var(--accent-fg);display:grid;place-items:center}
-.ib:disabled{opacity:.3}.ib.danger{color:var(--warn)}.ib:active{background:var(--fill)}
+.ib{width:44px;height:44px;flex:none;border:0;border-radius:10px;background:none;color:var(--accent-fg);display:grid;place-items:center}
+.ib:disabled{opacity:.3}.ib.danger{color:var(--warn);margin-left:8px}.ib:active{background:var(--fill)}
 .chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .chips.scroll::-webkit-scrollbar{display:none}.chips.scroll .chip{flex:none}
 .sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
@@ -352,8 +352,11 @@ details.info[open] summary{margin-bottom:6px}
 .cmp-cap{font-size:14px;color:var(--muted);margin-top:6px}
 .cmp-row{display:flex;flex-direction:column;gap:8px}
 /* zona táctil de al menos 44 pt en controles pequeños, sin cambiar su aspecto */
-.icon-btn,.ib,.chip,.btn.sm,.bar .btn.pri,.toast .undo,.sum .lnk{position:relative}
-.icon-btn::after,.ib::after,.btn.sm::after,.bar .btn.pri::after,.sum .lnk::after{content:"";position:absolute;inset:-6px -3px}
+.icon-btn,.chip,.btn.sm,.bar .btn.pri,.toast .undo,.sum .lnk,.pctl button,details summary{position:relative}
+.icon-btn::after,.btn.sm::after,.bar .btn.pri::after,.sum .lnk::after{content:"";position:absolute;inset:-6px -3px}
+.pctl button::after{content:"";position:absolute;inset:-7px -3px}
+details summary::after{content:"";position:absolute;inset:-8px -4px}
+details.info summary::after{inset:-10px -4px}
 .chip::after{content:"";position:absolute;inset:-7px -3px}
 /* texto solo para VoiceOver */
 .sr{position:absolute!important;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}
@@ -390,17 +393,17 @@ details.info[open] summary{margin-bottom:6px}
   </header>
   <h1 class="ltitle" id="ltitle">Repertorio</h1>
 
-  <section class="view" id="v-repertorio"></section>
-  <section class="view" id="v-repasar" hidden></section>
-  <section class="view" id="v-enlazar" hidden></section>
-  <section class="view" id="v-social" hidden></section>
+  <section class="view" id="v-repertorio" role="tabpanel" aria-labelledby="tab-repertorio"></section>
+  <section class="view" id="v-repasar" role="tabpanel" aria-labelledby="tab-repasar" hidden></section>
+  <section class="view" id="v-enlazar" role="tabpanel" aria-labelledby="tab-enlazar" hidden></section>
+  <section class="view" id="v-social" role="tabpanel" aria-labelledby="tab-social" hidden></section>
 </div>
 
 <nav class="tabs" role="tablist" aria-label="Secciones">
-  <button role="tab" data-tab="repertorio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Repertorio</span></button>
-  <button role="tab" data-tab="repasar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="13" height="15" rx="2"/><path d="M8 3h10a2 2 0 0 1 2 2v12"/></svg><span>Repasar</span><span class="badge" id="due-badge" hidden>0</span></button>
-  <button role="tab" data-tab="enlazar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.3 11l9.4-4M7.3 13l9.4 4"/></svg><span>Enlazar</span></button>
-  <button role="tab" data-tab="social"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg><span>Social</span></button>
+  <button role="tab" id="tab-repertorio" aria-controls="v-repertorio" data-tab="repertorio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Repertorio</span></button>
+  <button role="tab" id="tab-repasar" aria-controls="v-repasar" data-tab="repasar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="13" height="15" rx="2"/><path d="M8 3h10a2 2 0 0 1 2 2v12"/></svg><span>Repasar</span><span class="badge" id="due-badge" hidden>0</span></button>
+  <button role="tab" id="tab-enlazar" aria-controls="v-enlazar" data-tab="enlazar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.3 11l9.4-4M7.3 13l9.4 4"/></svg><span>Enlazar</span></button>
+  <button role="tab" id="tab-social" aria-controls="v-social" data-tab="social"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg><span>Social</span></button>
 </nav>
 
 <div id="sheet-root"></div>
@@ -477,6 +480,8 @@ const todayStr = (off=0) => { const d=new Date(); d.setHours(12,0,0,0); d.setDat
 const fmtDate = s => { try { return new Date(s+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}); } catch { return s; } };
 const clone = o => JSON.parse(JSON.stringify(o));
 const pl = (n, uno, varios) => `${n} ${n===1?uno:varios}`;
+// Para buscar sin tener en cuenta acentos ni mayúsculas: «transicion» encuentra «Transición».
+const fold = v => String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
 const joinY = a => a.length>1 ? a.slice(0,-1).join(", ")+" y "+a[a.length-1] : a.join("");
 const arrOr = (a,d) => Array.isArray(a)&&a.length ? [...a] : [...d];
 const figs = () => Object.values(S.figures).sort((a,b)=> (b.creado||0)-(a.creado||0));
@@ -502,10 +507,12 @@ function toast(msg, action){
   let t=$(".toast"); if(!t){t=document.createElement("div");t.className="toast";t.setAttribute("role","status");document.body.appendChild(t);}
   t.textContent=msg;
   if(action){ const b=document.createElement("button"); b.type="button"; b.className="undo"; b.textContent=action.label; b.onclick=()=>{ t.hidden=true; clearTimeout(toastT); action.fn(); }; t.appendChild(b); }
-  t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; if(action && action.onExpire) action.onExpire(); }, action ? 10000 : 2400);
+  t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; if(action && action.onExpire) action.onExpire(); }, action ? 10000 : Math.min(6000, Math.max(2400, msg.length*55)));
 }
 // Avisos para VoiceOver sin cambiar la pantalla.
 const announce = m => { const r=$("#sr-live"); if(!r) return; r.textContent=""; setTimeout(()=>{ r.textContent=m; }, 60); };
+// Para lo que cambia mientras escribes: avisa solo cuando paras.
+let annT; const announceSoon = m => { clearTimeout(annT); annT=setTimeout(()=>announce(m), 700); };
 // Hoja de acción para confirmar (descartar, borrar). Devuelve true si se confirma.
 function askConfirm({title, msg="", ok, cancel="Cancelar"}){
   if(confirmDone) confirmDone(false);
@@ -531,7 +538,7 @@ function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
   if(sheetBase.carried) return true;
-  if([...document.querySelectorAll("#sheet-root input:not([type=file]),#sheet-root select,#sheet-root textarea")].some(fieldDirty)) return true;
+  if([...document.querySelectorAll("#sheet-root input:not([type=file]),#sheet-root select,#sheet-root textarea:not([readonly])")].some(fieldDirty)) return true;
   return pressSig()!==sheetBase.press || vSig()!==sheetBase.v;
 }
 async function requestClose(){
@@ -614,7 +621,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.15";
+const APP_VERSION = "1.16";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -756,12 +763,13 @@ function renderRepertorio(){
   const consN = all.filter(f=>f.estado==="consolidada").length;
   const incN = all.filter(incomplete).length;
   const bailes = [...new Set(all.map(f=>f.baile||"Bachata"))];
-  const q = filt.q.trim().toLowerCase();
+  const q = fold(filt.q.trim());
   const list = all.filter(f =>
     (filt.baile==="todos" || (f.baile||"Bachata")===filt.baile) &&
     (filt.estado==="todos" || (filt.estado==="incompletas" ? incomplete(f) : f.estado===filt.estado)) &&
-    (!q || [f.nombre,f.profesor,f.entrada,f.salida,f.agarreIn,f.agarreOut,f.senal,f.notas,f.video,TIPO[tipoOf(f)].t].join(" ").toLowerCase().includes(q))
+    (!q || [f.nombre,f.profesor,f.entrada,f.salida,f.agarreIn,f.agarreOut,f.senal,f.notas,f.video,TIPO[tipoOf(f)].t].map(fold).join(" ").includes(q))
   );
+  if(q) announceSoon(list.length ? pl(list.length,"figura encontrada","figuras encontradas") : "Ninguna figura coincide");
   let body = "";
   if(filt.vista==="pos"){
     const groups = [];
@@ -811,7 +819,7 @@ function renderRepasar(){
         <p class="small muted">Ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Es justo lo que se bloquea en el social.</p>
         ${dL.length ? `<p><b>${dL.length}</b> ${dL.length===1?"posición toca":"posiciones tocan"} hoy.</p><button class="btn pri" data-act="start-link">Repasar enlaces</button>`
           : anyLinks ? `<p class="small muted">Nada pendiente hoy.</p><button class="btn" data-act="start-link-any">Repasar 3 posiciones al azar</button>`
-          : `<p class="small muted">Necesitas al menos una figura fuera de la lista de espera con dónde empieza y dónde acaba.</p>`}
+          : `<p class="small muted">Necesitas al menos una figura fuera de la lista de espera con dónde empieza y dónde acaba.</p><button class="btn" data-tab="repertorio">Ir al repertorio</button>`}
       </div>
       <div class="panel">
         <h3>Figuras</h3>
@@ -819,7 +827,7 @@ function renderRepasar(){
         ${dF.length ? `<p><b>${dF.length}</b> ${dF.length===1?"figura toca":"figuras tocan"} hoy. Sesión de ${Math.min(dF.length,MAX_SESSION)}, unos ${Math.min(dF.length,MAX_SESSION)*2} minutos.</p><button class="btn pri" data-act="start-fig">Repasar figuras</button>`
           : anyActive ? `<p class="small muted">Nada pendiente hoy.${next?` Próxima: <b>${esc(next.nombre)}</b>, ${fmtDate(next.rep.due)}.`:""}</p><button class="btn" data-act="start-fig-any">Repasar 3 al azar</button>`
           : figs().length ? `<p class="small muted">Las figuras en lista de espera no entran en el repaso. Cámbialas a «En práctica» cuando quieras trabajarlas.</p>`
-          : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p>`}
+          : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
       </div>
       ${progressHTML()}
       <details class="info"><summary>Cómo se programan los repasos</summary>«Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
@@ -950,7 +958,7 @@ function renderEnlazar(){
   v.innerHTML = `
     <h2>¿Qué hago desde aquí?</h2>
     <div class="chips" role="group" aria-label="Posición">
-      ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
+      ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}${c.into.length&&c.ready.length<2?", menos de 2 seguras":""}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
     </div>
     ${sel ? `
       <div class="panel">
@@ -1774,7 +1782,7 @@ function progressHTML(){
     const c={espera:0,practica:0,disponible:0,consolidada:0};
     all.forEach(f=>{ const st=stateAt(f,end); if(st) c[st]++; });
     const soc = Object.values(S.logs).filter(l=>l.fecha>=s.toISOString().slice(0,10) && l.fecha<=end).length;
-    weeks.push({label:s.toLocaleDateString("es-ES",{day:"numeric",month:"short"}).replace(".",""), c, ready:c.disponible+c.consolidada, soc, cur:i===0});
+    weeks.push({label:s.toLocaleDateString("es-ES",{day:"numeric",month:"short"}).replace(".",""), day:s.getDate(), mon:s.getMonth(), c, ready:c.disponible+c.consolidada, soc, cur:i===0});
   }
   const max = Math.max(4, ...weeks.map(w=>w.ready));
   const step = max<=8 ? 2 : max<=20 ? 5 : 10, top = Math.ceil(max/step)*step;
@@ -1793,7 +1801,7 @@ function progressHTML(){
         ${ticks.map(v=>`<line class="c-grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="c-ax" x="${L-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`).join("")}
         ${weeks.map((wk,i)=>{ const x=L+i*bw+bw*0.2, bwid=bw*0.6;
           return `<path class="c-bar${i===sel?" c-sel":""}" d="${barPath(x,bwid,wk.ready)}"/>
-            <text class="c-ax" x="${x+bwid/2}" y="${H-8}" text-anchor="middle">${esc(wk.label)}</text>
+            <text class="c-ax" x="${x+bwid/2}" y="${H-8}" text-anchor="middle">${i===0||wk.mon!==weeks[i-1].mon?esc(wk.label):wk.day}</text>
             <rect class="c-hit" data-week="${i}" x="${L+i*bw}" y="${T}" width="${bw}" height="${ph+B}"/>`; }).join("")}
       </svg>
       <figcaption class="small" id="prog-read">Semana del ${esc(w.label)}${w.cur?" (en curso)":""}: <b>${w.c.consolidada}</b> ${w.c.consolidada===1?"consolidada":"consolidadas"} · <b>${w.c.disponible}</b> ${w.c.disponible===1?"disponible":"disponibles"} · ${w.c.practica} en práctica · ${w.c.espera} en espera · ${pl(w.soc,"social registrado","socials registrados")}</figcaption>
@@ -1867,6 +1875,7 @@ function openSettings(){
       <p><b class="bk-st${bk.stale?" due":""}">${esc(bs.main)}</b>${bs.since?` <span class="muted">${esc(bs.since)}</span>`:""}</p>
       <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»).</p>
       <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar como texto</button></div>
+      <textarea id="exp-text" readonly hidden aria-label="Texto de tu copia"></textarea>
     </div>
     <div class="panel">
       <h3>Espacio en este dispositivo</h3>
@@ -1879,7 +1888,7 @@ function openSettings(){
     ${listHTML("cls")}
     <div class="panel">
       <h3>Restaurar o importar</h3>
-      <p class="small muted">Para recuperar una copia, elige el archivo exportado. Para traer tus datos del artefacto de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
+      <p class="small muted">Para recuperar una copia, elige el archivo exportado. Si usabas Bachateca dentro de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
       <div class="row"><label class="btn" for="imp-file" style="display:inline-flex">Elegir archivo de copia</label><input type="file" id="imp-file" accept="application/json,.json" hidden></div>
       <textarea id="imp-text" placeholder="…o pega aquí el texto de una copia" aria-label="Texto de la copia"></textarea>
       <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">Reemplazar todo</button></div>
@@ -2026,7 +2035,7 @@ document.addEventListener("click", async e=>{
   if(a==="copy"){
     const txt=exportData();
     try{ await navigator.clipboard.writeText(txt); toast("Copiado. Pégalo en Notas o donde lo quieras guardar."); }
-    catch{ const ta=$("#imp-text"); ta.value=txt; ta.select(); toast("Selecciona y copia el texto del recuadro de «Restaurar o importar»."); }
+    catch{ const ta=$("#exp-text"); ta.hidden=false; ta.value=txt; ta.focus(); ta.select(); toast("No se pudo copiar solo. Mantén pulsado el recuadro y elige Copiar."); }
     return;
   }
   if(a==="import-merge") return importData(false);

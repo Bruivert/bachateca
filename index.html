@@ -299,8 +299,9 @@ button.card:active{background:var(--surface2)}
 .bk-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .bk-tile{min-height:72px;border:0;border-radius:var(--r);background:var(--surface);color:var(--fg);font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.15;padding:12px 14px;text-align:left}
 .bk-tile:active{background:var(--surface2)}
-.bk-from{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;color:var(--muted)}
-.overlay.picked{gap:14px}
+.bk-from{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;color:var(--fg)}
+.bk-hint{margin:0;font-size:16px;color:var(--muted)}
+.overlay.picked{gap:12px}
 .overlay.picked .bk-head p{display:none}
 .overlay.picked .bk-mid{gap:10px}
 .overlay.picked .bk-body{gap:12px}
@@ -315,14 +316,19 @@ button.card:active{background:var(--surface2)}
 .bk-exit .sg{font-size:17px}
 .bk-exit .nx{font-size:15px;color:var(--muted);margin-top:6px}
 .bk-exit .nx b{color:var(--fg);font-weight:600}
+/* La salida elegida se queda abierta mientras la bailas: la señal y lo que viene después, más grandes. */
+.bk-exit.on{box-shadow:inset 0 0 0 2px var(--neon);padding:18px}
+.bk-exit.on .sg{font-size:20px;line-height:1.3}
+.bk-exit.on .nx{font-size:18px;margin-top:10px}
 .bk-body{margin-top:auto;display:flex;flex-direction:column;gap:16px}
-.bk-foot{display:flex;gap:10px}
-.bk-foot .btn{flex:1}
+/* El pie se queda pegado abajo: en pantallas bajas, «Hecho, la bailé» y «Cerrar» siempre a mano. */
+.bk-foot{display:flex;gap:10px;position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));margin-bottom:calc(-24px - env(safe-area-inset-bottom,0px));padding:8px 0 calc(24px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+.bk-foot .btn{flex:1 1 auto;white-space:nowrap;padding-inline:12px}
 /* el compás del rescate: un tiempo se enciende cada 0,48 s (unos 125 golpes por minuto) para contar hasta el 1 */
-.bk-mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.bk-mid{display:flex;flex-direction:column;gap:14px}
 .bk-tap{border:0;background:none;padding:10px 0;margin:-10px 0;color:inherit;text-align:left;touch-action:manipulation}
 .bk-tap:active .bk-pulse i::before{filter:brightness(1.4)}
-#bk-tempo{margin:-6px 0 0}
+#bk-tempo{margin:-6px 0 0;font-size:17px;line-height:1.35;color:var(--muted)}
 .bk-pulse{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;align-items:end;max-width:420px}
 .bk-pulse i{display:flex;flex-direction:column;align-items:center;gap:8px;font-style:normal}
 .bk-pulse i::before{content:"";display:block;width:100%;height:18px;border-radius:5px;background:var(--surface2);animation:beat calc(var(--beat,.48s) * 8) steps(1,end) infinite;animation-delay:calc((var(--b) - var(--o,0)) * var(--beat,.48s))}
@@ -332,7 +338,12 @@ button.card:active{background:var(--surface2)}
 .bk-count{margin:0;font-size:20px;font-weight:600;line-height:1.3;color:var(--fg)}
 @keyframes beat{0%{background:var(--neon)}12.5%,100%{background:var(--surface2)}}
 @keyframes beat-n{0%{color:var(--fg)}12.5%,100%{color:var(--muted)}}
-@media (prefers-reduced-motion:reduce){.bk-pulse i.one::before{background:var(--neon)}}
+/* Con «Reducir movimiento» el pulso se queda: es un cambio de color, no movimiento, y el rescate lo necesita. */
+@media (prefers-reduced-motion:reduce){
+  .bk-pulse i::before{animation:beat calc(var(--beat,.48s) * 8) steps(1,end) infinite!important;animation-delay:calc((var(--b) - var(--o,0)) * var(--beat,.48s))!important}
+  .bk-pulse span{animation:beat-n calc(var(--beat,.48s) * 8) steps(1,end) infinite!important;animation-delay:calc((var(--b) - var(--o,0)) * var(--beat,.48s))!important}
+  .bk-pulse i.one span{animation:none!important}
+}
 .overlay{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;justify-content:flex-start;gap:22px;padding:calc(24px + env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));overflow-y:auto}
 
 /* hojas */
@@ -569,7 +580,7 @@ function paintNight(){
   const lv=$("#live"); if(lv) lv.hidden = tab==="social" || !live;
 }
 function setNight(on){ nightAt = on ? Date.now() : 0; lsSet(LS_NOCHE, nightAt); paintNight(); }
-let blockPos = null, blockHold = null;
+let blockPos = null, blockHold = null, blockPick = null;
 // Lo recién hecho, para animarlo una sola vez: figura guardada, fila marcada y registro guardado.
 let justSaved = null, lastSal = null, tonightFresh = false;
 let logSuggest = [];
@@ -757,7 +768,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.28";
+const APP_VERSION = "1.29";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1212,8 +1223,10 @@ const bkSort = pos => (a,b) => (ready(b)-ready(a)) || ((a.salida===pos)-(b.salid
 const blockExits = (pos, hold) => exitsFrom(pos, hold).sort(bkSort(pos)).slice(0,2);
 const nextOf = f => exitsFrom(f.salida, f.agarreOut, f.id).sort(bkSort(f.salida))[0];
 // Pulso del rescate: 125 golpes por minuto hasta que lo marcas tocando el compás en 1, 2, 3, 4 al ritmo de la canción.
-let bkBeat = .48, bkTaps = [];
-const bkPulse = (o=0) => `<div class="bk-pulse" aria-hidden="true" style="--beat:${bkBeat}s;--o:${o}">${[1,2,3,4,5,6,7,8].map(b=>`<i class="${b%4===0?"tap":""}${b===1?" one":""}" style="--b:${b-1}"><span>${b}</span></i>`).join("")}</div>`;
+// bkT0 es cuándo cayó el 1 marcado: al volver a abrir el rescate el pulso sigue en fase con la canción.
+let bkBeat = .48, bkTaps = [], bkT0 = 0;
+const bkPhase = () => bkT0 ? ((performance.now()-bkT0)/1000/bkBeat) % 8 : 0;
+const bkPulse = (o=bkPhase()) => `<div class="bk-pulse" aria-hidden="true" style="--beat:${bkBeat}s;--o:${o.toFixed(3)}">${[1,2,3,4,5,6,7,8].map(b=>`<i class="${b%4===0?"tap":""}${b===1?" one":""}" style="--b:${b-1}"><span>${b}</span></i>`).join("")}</div>`;
 function bkTap(){
   const now = performance.now();
   if(bkTaps.length && now - bkTaps[bkTaps.length-1] > 2000) bkTaps = [];
@@ -1225,47 +1238,63 @@ function bkTap(){
   if(iv < .3 || iv > .8){ if(hint) hint.textContent = "No lo he cogido. Toca otra vez en 1, 2, 3, 4."; return; }
   bkBeat = Math.round(iv*1000)/1000;
   // El cuarto toque fue el 4: el compás sigue desde ahí, con el 5 en el siguiente golpe.
+  bkT0 = now - 3*bkBeat*1000;
   const pl = $(".bk-pulse"); if(pl) pl.outerHTML = bkPulse(3);
   const bpm = Math.round(60/bkBeat);
   if(hint) hint.textContent = `A tu ritmo: ${bpm} golpes por minuto.`;
   announce(`Pulso a ${bpm} golpes por minuto`);
 }
-function bkExit(f){
-  const nx = nextOf(f);
-  return `<li><button type="button" class="bk-exit${ready(f)?"":" dim"}" data-bexit="${f.id}">
+function bkExit(f, on){
+  const nx = nextOf(f), tag = on ? "div" : "button";
+  return `<li><${tag}${on?"":` type="button" data-bexit="${f.id}"`} class="bk-exit${ready(f)?"":" dim"}${on?" on":""}">
     <span class="nm">${esc(f.nombre)}</span>
     <span class="r">${routeTxt(f)}${ready(f)?"":" · en práctica"}</span>
     ${f.senal?`<span class="sg">${esc(f.senal)}</span>`:""}
-    <span class="nx">Y después: ${nx?`<b>${esc(nx.nombre)}</b>`:"básico"}</span></button></li>`;
+    <span class="nx">Y después: ${nx?`<b>${esc(nx.nombre)}</b>`:"básico"}</span></${tag}></li>`;
 }
-function showBlock(){
-  const fw = figs().filter(f=>active(f) && !isMove(f));
+// Pasos: dónde estás → qué salida vas a hacer → la salida abierta mientras la bailas, con «Hecho, la bailé».
+function showBlock(focus){
   const tiles = allPositions().filter(p=>exitsFrom(p).length);
-  let body;
-  if(blockPos){
+  const pick = blockPick && S.figures[blockPick];
+  let body, foot;
+  if(blockPos && pick){
+    body = `<h3 class="bk-from" id="bk-from" tabindex="-1">Tu salida desde ${esc(blockPos)}</h3>
+      <ul class="bk-exits">${bkExit(pick, true)}</ul>`;
+    foot = `<button type="button" class="btn" data-act="bexit-back">Otra salida</button><button type="button" class="btn pri" data-act="bexit-done">Hecho, la bailé</button>`;
+  } else if(blockPos){
     const ex = blockExits(blockPos, blockHold);
     const hs = [...new Set(exitsFrom(blockPos).map(f=>f.agarreIn).filter(Boolean))];
     body = `<h3 class="bk-from" id="bk-from" tabindex="-1">${ex.length>1?"Elige una salida desde":"Tu salida desde"} ${esc(blockPos)}</h3>
       ${hs.length>1?`<div class="chips bk-holds" role="group" aria-label="Agarre que llevas"><span class="muted">Agarre</span>${hs.map(h=>`<button type="button" class="chip" aria-pressed="${blockHold===h}" data-bhold="${esc(h)}">${esc(h)}</button>`).join("")}</div>`:""}
-      <ul class="bk-exits">${ex.map(bkExit).join("")}</ul>
-      <p class="small muted">Tócala y quedará marcada en el registro.</p>`;
+      <ul class="bk-exits">${ex.map(f=>bkExit(f)).join("")}</ul>
+      <p class="bk-hint">Toca la que vas a hacer.</p>`;
+    foot = `<button type="button" class="btn" data-act="bpos-back">Otra posición</button><button type="button" class="btn bk-close" data-act="unblock">Cerrar</button>`;
   } else {
     body = tiles.length
-      ? `<h3 class="bk-from">¿Dónde estás?</h3><div class="bk-tiles">${tiles.map(p=>`<button type="button" class="bk-tile" data-bpos="${esc(p)}">${esc(p)}</button>`).join("")}</div>`
+      ? `<h3 class="bk-from" id="bk-where" tabindex="-1">¿Dónde estás?</h3><div class="bk-tiles">${tiles.map(p=>`<button type="button" class="bk-tile" data-bpos="${esc(p)}">${esc(p)}</button>`).join("")}</div>`
       : `<p class="muted">Aún no tienes salidas desde ninguna posición. Sigue con el básico hasta el final de la frase.</p>`;
+    foot = `<button type="button" class="btn bk-close" data-act="unblock">Cerrar</button>`;
   }
-  $("#overlay-root").innerHTML = `<div class="overlay${blockPos?" picked":""}" role="dialog" aria-modal="true" aria-labelledby="bk-t">
-    <div class="bk-head"><h2 id="bk-t">Footwork o básico</h2>
-      <p class="muted">${fw.length?`Para ganar tiempo: ${fw.slice(0,4).map(f=>`<b>${esc(f.nombre)}</b>`).join(", ")}.`:"Sigue bailando. No es un fallo, es tiempo para pensar."}</p></div>
-    <div class="bk-mid"><button type="button" class="bk-tap" data-act="bk-tap" aria-describedby="bk-tempo">${bkPulse()}<span class="sr">Marcar el pulso</span></button><p class="bk-count">Recupera el pulso: cuenta hasta el siguiente 1.</p><p class="small muted" id="bk-tempo" aria-live="polite">${bkBeat!==.48?`A tu ritmo: ${Math.round(60/bkBeat)} golpes por minuto.`:"Toca el compás en 1, 2, 3, 4 para seguir la canción."}</p></div>
-    <div class="bk-body">${body}</div>
-    <div class="bk-foot">${blockPos?`<button type="button" class="btn" data-act="bpos-back">Otra posición</button>`:""}<button type="button" class="btn bk-close" data-act="unblock">Cerrar</button></div></div>`;
-  ($("#bk-from[tabindex]") || $(".bk-tile") || $(".bk-close"))?.focus({preventScroll:true});
+  let ov = $("#overlay-root .overlay");
+  if(!ov){
+    const fw = figs().filter(f=>active(f) && !isMove(f));
+    $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
+      <div class="bk-head"><h2 id="bk-t" tabindex="-1">Footwork o básico</h2>
+        <p class="muted">${fw.length?`Para ganar tiempo: ${fw.slice(0,4).map(f=>`<b>${esc(f.nombre)}</b>`).join(", ")}.`:"Sigue bailando. No es un fallo, es tiempo para pensar."}</p></div>
+      <div class="bk-mid"><button type="button" class="bk-tap" data-act="bk-tap" aria-describedby="bk-tempo">${bkPulse()}<span class="sr">Marcar el pulso</span></button><p class="bk-count">Recupera el pulso: cuenta hasta el siguiente 1.</p><p id="bk-tempo" aria-live="polite">${bkBeat!==.48?`A tu ritmo: ${Math.round(60/bkBeat)} golpes por minuto.`:"Toca el compás en 1, 2, 3, 4 para seguir la canción."}</p></div>
+      <div class="bk-body"></div>
+      <div class="bk-foot"></div></div>`;
+    ov = $("#overlay-root .overlay");
+  }
+  ov.classList.toggle("picked", !!blockPos);
+  ov.querySelector(".bk-body").innerHTML = body;
+  ov.querySelector(".bk-foot").innerHTML = foot;
+  $(focus || "#bk-t")?.focus({preventScroll:true});
 }
 // Mirar otra posición no apunta nada: el bloqueo se apunta al elegir una salida o al cerrar desde una posición.
 function closeBlock(){
   const pos = blockPos, prev = logBloq, rec = !!pos && pos!==prev;
-  blockPos=null; blockHold=null; $("#overlay-root").innerHTML="";
+  blockPos=null; blockHold=null; blockPick=null; $("#overlay-root").innerHTML="";
   if(rec){ logBloq=pos; saveSel(); }
   render();
   if(rec) toast(`Apuntado: bloqueo en ${pos}`, {label:"Deshacer", fn:()=>{ logBloq=prev; saveSel(); render(); }});
@@ -2264,13 +2293,9 @@ document.addEventListener("click", async e=>{
   const d=t.dataset;
   if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); lastSal=d.sal; saveSel(); return render(); }
   if(d.setv) return setGo(d.setv);
-  if(d.bpos!==undefined){ blockPos=d.bpos; blockHold=null; return showBlock(); }
-  if(d.bhold!==undefined){ blockHold = blockHold===d.bhold ? null : d.bhold; showBlock(); return $(`[data-bhold="${CSS.escape(d.bhold)}"]`)?.focus({preventScroll:true}); }
-  if(d.bexit){
-    const id=d.bexit, had=logSel.has(id), f=S.figures[id];
-    logSel.add(id); lastSal=id; logBloq=blockPos; saveSel(); blockPos=null; blockHold=null; $("#overlay-root").innerHTML=""; render();
-    return toast(f?`«${f.nombre}» marcada para el registro`:"Marcada para el registro", had?null:{label:"Deshacer", fn:()=>{ logSel.delete(id); saveSel(); render(); }});
-  }
+  if(d.bpos!==undefined){ blockPos=d.bpos; blockHold=null; blockPick=null; return showBlock("#bk-from"); }
+  if(d.bhold!==undefined){ blockHold = blockHold===d.bhold ? null : d.bhold; return showBlock(`[data-bhold="${CSS.escape(d.bhold)}"]`); }
+  if(d.bexit){ blockPick=d.bexit; return showBlock("#bk-from"); }
   if(d.tab) return go(d.tab);
   if(d.view) return openView(d.view);
   if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
@@ -2317,7 +2342,13 @@ document.addEventListener("click", async e=>{
   if(a==="reveal"){ session.revealed=true; render(); const an=$("#v-repasar .answer"); if(an){ an.tabIndex=-1; an.focus({preventScroll:true}); } return; }
   if(a==="end"){ session=null; return render(); }
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
-  if(a==="block"){ blockPos=null; blockHold=null; return showBlock(); }
+  if(a==="block"){ blockPos=null; blockHold=null; blockPick=null; return showBlock(); }
+  if(a==="bexit-back"){ const id=blockPick; blockPick=null; return showBlock(`[data-bexit="${CSS.escape(id||"")}"]`); }
+  if(a==="bexit-done"){
+    const id=blockPick, had=logSel.has(id), f=S.figures[id]; if(!f) return closeBlock();
+    logSel.add(id); lastSal=id; logBloq=blockPos; saveSel(); blockPos=null; blockHold=null; blockPick=null; $("#overlay-root").innerHTML=""; render();
+    return toast(f?`«${f.nombre}» marcada para el registro`:"Marcada para el registro", had?null:{label:"Deshacer", fn:()=>{ logSel.delete(id); saveSel(); render(); }});
+  }
   if(a==="bk-tap") return bkTap();
   if(a==="unblock") return closeBlock();
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
@@ -2326,7 +2357,7 @@ document.addEventListener("click", async e=>{
     if(tab==="social") go("repertorio"); else render();
     return toast(logSel.size || logBloq ? "Social terminado. Lo que marcaste sigue en Social para registrarlo." : "Social terminado.");
   }
-  if(a==="bpos-back"){ blockPos=null; blockHold=null; return showBlock(); }
+  if(a==="bpos-back"){ blockPos=null; blockHold=null; blockPick=null; return showBlock("#bk-where"); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
   if(a==="nudge-off"){ lsSet(LS_NUDGE, 0); return render(); }
   if(a==="log-save") return saveLog();

@@ -679,7 +679,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.20";
+const APP_VERSION = "1.21";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1086,7 +1086,7 @@ const socOk = f => ready(f) || socialIncl;
 const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
 const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" pathLength="1"/></svg></span>`;
 function socLi(f, sub){
-  return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${f.id}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}</span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
+  return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${f.id}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}<span class="sr">, salió esta noche</span></span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
 }
 function renderSocial(){
   const v=$("#v-social");
@@ -1098,8 +1098,8 @@ function renderSocial(){
   v.innerHTML = `
     <p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>
     <div>
-      ${fw.length?`<div class="social-pos"><div class="p">Para ganar tiempo</div><ul>${fw.slice(0,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
-      ${rows.length ? rows.map(r=>`<div class="social-pos"><div class="p">${esc(r.p)}</div><ul>${r.items.map(f=>socLi(f, `${routeTxt(f)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}`)).join("")}</ul></div>`).join("")
+      ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${fw.slice(0,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
+      ${rows.length ? rows.map(r=>`<div class="social-pos"><h3 class="p">${esc(r.p)}</h3><ul>${r.items.map(f=>socLi(f, `${routeTxt(f)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}`)).join("")}</ul></div>`).join("")
        : `<div class="empty"><p>Aún no tienes figuras disponibles. Cuando una te salga cómoda en el social, márcala como «Disponible» y aparecerá aquí.</p>${figs().some(active)?`<p class="small muted">Marca «Incluir las que están en práctica» para verlas ya.</p>`:""}</div>`}
     </div>
     <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> Incluir las que están en práctica</label>
@@ -1431,7 +1431,7 @@ function renderVidbox(){
   const box=$("#vidbox"); if(!box||!vstate) return;
   if(!assetsApi){ box.hidden=true; box.innerHTML=""; return; }
   box.hidden=false;
-  const pick=`<input type="file" id="ff-file" accept="video/*" hidden>`;
+  const pick=`<input type="file" id="ff-file" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">`;
   const ai=`<button type="button" class="btn sm" data-vid="ai">✦ Identificar con Claude</button>`;
   const aiOut=`<div id="ai-out" class="small" aria-live="polite">${vstate.aiMsg||""}</div>`;
   if(vstate.file){
@@ -1446,14 +1446,14 @@ function renderVidbox(){
       <label class="small row" for="ff-compact" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ff-compact" ${vstate.compact?"checked":""}><span>Guardar solo el fragmento en calidad media: ocupa mucho menos, pero tarda lo que dura el fragmento.</span></label>
       ${vstate.fromId?"":`<p class="small muted">Vídeo de ${fmtMB(vstate.file.size)}. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`}
       <p class="vprog" id="vprog" aria-live="polite"></p>
-      <div class="row"><label class="btn sm" for="ff-file">Elegir otro</label><button type="button" class="btn ghost sm" data-vid="cancel">${vstate.fromId?"Cancelar recorte":"No usar este vídeo"}</button>${ai}</div>${aiOut}`;
+      <div class="row"><button type="button" class="btn sm" data-pick="ff-file">Elegir otro</button><button type="button" class="btn ghost sm" data-vid="cancel">${vstate.fromId?"Cancelar recorte":"No usar este vídeo"}</button>${ai}</div>${aiOut}`;
   } else if(vstate.cur && !vstate.remove){
     box.innerHTML=`${pick}${playerHTML({vid:vstate.cur, vidTrim:vstate.trim, thumb:vstate.thumb})}
-      <div class="row"><button type="button" class="btn sm" data-vid="retrim">Ajustar recorte</button><label class="btn sm" for="ff-file">Cambiar vídeo</label><button type="button" class="btn sm" data-vid="savevid">Guardar en Fotos</button><button type="button" class="btn ghost sm danger" data-vid="remove">Quitar vídeo</button>${ai}</div>${aiOut}`;
+      <div class="row"><button type="button" class="btn sm" data-vid="retrim">Ajustar recorte</button><button type="button" class="btn sm" data-pick="ff-file">Cambiar vídeo</button><button type="button" class="btn sm" data-vid="savevid">Guardar en Fotos</button><button type="button" class="btn ghost sm danger" data-vid="remove">Quitar vídeo</button>${ai}</div>${aiOut}`;
     hydrateVideos(box);
     if(!vstate.curBlob) vidGet(vstate.cur).then(b=>{ if(vstate) vstate.curBlob=b; }).catch(()=>{});
   } else {
-    box.innerHTML=`${pick}<label class="btn" for="ff-file">Añadir vídeo de la clase</label>
+    box.innerHTML=`${pick}<button type="button" class="btn" data-pick="ff-file">Añadir vídeo de la clase</button>
       <p class="small muted">${vstate.remove?"El vídeo se quitará al guardar. ":""}Elígelo desde Fotos. Se guarda en este dispositivo con su calidad original y marcas dónde empieza y acaba la figura.</p>`;
   }
   const fi=$("#ff-file");
@@ -1999,7 +1999,7 @@ function openSettings(){
   if(setView==="pos" || setView==="hold" || setView==="cls") body = listHTML(setView, true);
   else if(setView==="importar") body = `<div class="panel">
       <p class="small muted">Para recuperar una copia, elige el archivo exportado. Si usabas Bachateca dentro de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
-      <div class="row"><label class="btn" for="imp-file" style="display:inline-flex">Elegir archivo de copia</label><input type="file" id="imp-file" accept="application/json,.json" hidden></div>
+      <div class="row"><button type="button" class="btn" data-pick="imp-file">Elegir archivo de copia</button><input type="file" id="imp-file" accept="application/json,.json" class="sr" tabindex="-1" aria-hidden="true"></div>
       <textarea id="imp-text" placeholder="…o pega aquí el texto de una copia" aria-label="Texto de la copia"></textarea>
       <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">Reemplazar todo</button></div>
     </div>`;
@@ -2069,7 +2069,18 @@ function loadExamples(){
 }
 
 // ---------- render ----------
+// Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-view","data-act","data-promote"];
+function focusKey(el){
+  if(!el || el===document.body) return null;
+  if(el.id) return "#"+CSS.escape(el.id);
+  const a = FOCUS_ATTRS.find(k=>el.hasAttribute(k));
+  return a ? `[${a}="${CSS.escape(el.getAttribute(a))}"]` : null;
+}
+let focusAfter = null;
 function render(){
+  const view = $("#v-"+tab), ae = document.activeElement;
+  const fk = focusAfter || (view && view.contains(ae) && focusKey(ae)); focusAfter = null;
   const due = dueFigs().length + dueLinks().length;
   const b=$("#due-badge"); b.textContent=due; b.hidden=!due; b.closest("button").setAttribute("aria-label", due ? `Repasar, ${due} pendientes` : "Repasar");
   if(!loaded){ $("#v-"+tab).innerHTML=`<p class="muted">Cargando tu repertorio…</p>`; return; }
@@ -2079,6 +2090,7 @@ function render(){
   else if(tab==="social") renderSocial();
   hydrateVideos($("#v-"+tab));
   justSaved = null; lastSal = null;
+  if(fk && !$("#sheet-root .sheet") && !$("#overlay-root").firstElementChild){ const el=$("#v-"+tab).querySelector(fk); if(el && el!==document.activeElement) el.focus({preventScroll:true}); }
 }
 
 // ---------- eventos ----------
@@ -2093,8 +2105,11 @@ document.addEventListener("click", async e=>{
   }
   const wk = e.target.closest("[data-week]");
   if(wk){ progWeek=+wk.dataset.week; return render(); }
+  const pk = e.target.closest("[data-pick]");
+  if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
   const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv]");
   if(!t) return;
+  if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
   if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); lastSal=d.sal; saveSel(); return render(); }
   if(d.setv) return setGo(d.setv);

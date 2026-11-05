@@ -402,7 +402,7 @@ details.info[open] summary{margin-bottom:6px}
 .sheet.snap{transition:transform .25s cubic-bezier(.2,.9,.25,1)}
 html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .toast .undo{background:none;border:0;color:var(--toast-act);font-weight:700;margin:-10px -8px -10px 8px;padding:10px 8px;font-size:15px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:60;background:var(--toast-bg);color:var(--toast-fg);padding:10px 16px;border-radius:20px;font-weight:600;font-size:15px;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:60;background:var(--toast-bg);color:var(--toast-fg);padding:10px 16px;border-radius:20px;font-weight:600;font-size:15px;width:max-content;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .poslist{display:flex;flex-direction:column;gap:0;border-radius:12px;overflow:hidden}
 .poslist>div{display:flex;align-items:center;gap:4px;background:var(--surface2);padding:6px 6px 6px 14px;position:relative;min-height:46px}
 .poslist>div+div::before{content:"";position:absolute;top:0;left:14px;right:0;border-top:.5px solid var(--line)}
@@ -741,7 +741,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.25";
+const APP_VERSION = "1.26";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1161,8 +1161,10 @@ function renderChain(){
 }
 
 // ---------- vista: social ----------
-function socialFootwork(){ return figs().filter(f=>active(f) && !isMove(f) && (ready(f)||socialIncl)); }
-const socOk = f => ready(f) || socialIncl;
+function socialFootwork(){ return figs().filter(f=>active(f) && !isMove(f) && socOk(f)).sort(socSort); }
+// Lo que ya marcaste esta noche se ve siempre, aunque esté en práctica o quede fuera de las primeras.
+const socOk = f => ready(f) || socialIncl || logSel.has(f.id);
+const socTop = (list, n) => [...list.slice(0,n), ...list.slice(n).filter(f=>logSel.has(f.id))];
 const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
 const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" pathLength="1"/></svg></span>`;
 function socLi(f, sub){
@@ -1170,7 +1172,7 @@ function socLi(f, sub){
 }
 function renderSocial(){
   const v=$("#v-social");
-  const rows = allPositions().map(p=>({p, items: exitsFrom(p).filter(socOk).sort(socSort).slice(0,3)})).filter(r=>r.items.length);
+  const rows = allPositions().map(p=>({p, items: socTop(exitsFrom(p).filter(socOk).sort(socSort), 3)})).filter(r=>r.items.length);
   const fw = socialFootwork();
   const last = Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
   const nSel = [...logSel].filter(id=>S.figures[id]).length;
@@ -1178,7 +1180,7 @@ function renderSocial(){
   v.innerHTML = `
     <p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>
     <div>
-      ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${fw.slice(0,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
+      ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${socTop(fw,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
       ${rows.length ? rows.map(r=>`<div class="social-pos"><h3 class="p">${esc(r.p)}</h3><ul>${r.items.map(f=>socLi(f, `${routeTxt(f)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}`)).join("")}</ul></div>`).join("")
        : `<div class="empty"><p>Aún no tienes figuras disponibles. Cuando una te salga cómoda en el social, márcala como «Disponible» y aparecerá aquí.</p>${figs().some(active)?`<p class="small muted">Marca «Incluir las que están en práctica» para verlas ya.</p>`:""}</div>`}
     </div>
@@ -1244,6 +1246,14 @@ function showBlock(){
     <div class="bk-foot">${blockPos?`<button type="button" class="btn" data-act="bpos-back">Otra posición</button>`:""}<button type="button" class="btn bk-close" data-act="unblock">Cerrar</button></div></div>`;
   ($("#bk-from[tabindex]") || $(".bk-tile") || $(".bk-close"))?.focus({preventScroll:true});
 }
+// Mirar otra posición no apunta nada: el bloqueo se apunta al elegir una salida o al cerrar desde una posición.
+function closeBlock(){
+  const pos = blockPos, prev = logBloq, rec = !!pos && pos!==prev;
+  blockPos=null; blockHold=null; $("#overlay-root").innerHTML="";
+  if(rec){ logBloq=pos; saveSel(); }
+  render();
+  if(rec) toast(`Apuntado: bloqueo en ${pos}`, {label:"Deshacer", fn:()=>{ logBloq=prev; saveSel(); render(); }});
+}
 
 // Al volver a pintar una hoja ya abierta (renombrar, marcar, promocionar) no se repite la entrada.
 const sheetBg = () => `sheet-bg${$("#sheet-root .sheet")?" still":""}`;
@@ -1288,7 +1298,7 @@ function openLog(fresh){
       </div>
       <label class="f" for="lg-salio">Otra cosa que salió (opcional)<input type="text" id="lg-salio" placeholder="Ej.: un giro que improvisé"></label>
       <label class="f" for="lg-bloq">Me bloqueé en
-        <select id="lg-bloq"><option value="">No me bloqueé</option>${allPositions().map(p=>`<option>${esc(p)}</option>`).join("")}</select>
+        <select id="lg-bloq"><option value="">No me bloqueé</option>${allPositions().map(p=>`<option${p===logBloq?" selected":""}>${esc(p)}</option>`).join("")}</select>
         ${logBloq?`<span class="small muted">Lo apuntaste en «Me he bloqueado».</span>`:""}
       </label>
       <label class="f" for="lg-prox">Para practicar la próxima vez<input type="text" id="lg-prox" placeholder="Una sola cosa"></label>
@@ -1302,9 +1312,9 @@ function openLog(fresh){
       <button class="btn ghost sm danger" data-dellog="${l.id}" aria-label="Borrar el registro del ${fmtDate(l.fecha)}">Borrar</button></div>`;}).join("")}</div>`:""}
   </div></div>`;
   if(!done){
-    if(logBloq) $("#lg-bloq").value=logBloq;
     if(keep) LG.forEach((k,i)=>{ if(keep[i]) $("#"+k).value=keep[i]; });
-    $("#lg-bloq").onchange=e=>{ logBloq=e.target.value; saveSel(); };
+    // El bloqueo se guarda al momento: no cuenta como cambio sin guardar.
+    $("#lg-bloq").onchange=e=>{ logBloq=e.target.value; saveSel(); [...e.target.options].forEach(o=>o.defaultSelected=o.selected); };
   }
   const lq=$("#lg-q"); if(lq) lq.oninput=()=>{ const q=fold(lq.value.trim()); document.querySelectorAll("#lg-chips [data-q]").forEach(c=>{ c.hidden = !!q && !c.dataset.q.includes(q); }); };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
@@ -1372,6 +1382,7 @@ function openFigure(id, opts={}){
   const base = {id:uid(), nombre:"", tipo:"figura", baile:"Bachata", entrada:"", salida:"", agarreIn:"", agarreOut:"", estado: quick?"espera":"practica", profesor:""};
   const f = id ? Object.assign({tipo:"figura"}, clone(S.figures[id])) : Object.assign(base, opts.prefill||{});
   if(!quick && !id && f.estado==="espera" && !opts.keepState) f.estado="practica";
+  if(opts.estado) f.estado=opts.estado;
   const optList=(list,sel,empty)=>`<option value="">${empty}</option>${[...new Set([...list, sel].filter(Boolean))].map(p=>`<option ${p===sel?"selected":""}>${esc(p)}</option>`).join("")}`;
   let tipo = tipoOf(f), estado = f.estado, prof = f.profesor||"", baile = f.baile||"Bachata";
   const hasCls = S.classes.length>0, otherCls = !quick && !!prof && !S.classes.includes(prof);
@@ -2236,11 +2247,11 @@ document.addEventListener("click", async e=>{
   const d=t.dataset;
   if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); lastSal=d.sal; saveSel(); return render(); }
   if(d.setv) return setGo(d.setv);
-  if(d.bpos!==undefined){ blockPos=d.bpos; blockHold=null; logBloq=d.bpos; saveSel(); return showBlock(); }
+  if(d.bpos!==undefined){ blockPos=d.bpos; blockHold=null; return showBlock(); }
   if(d.bhold!==undefined){ blockHold = blockHold===d.bhold ? null : d.bhold; showBlock(); return $(`[data-bhold="${CSS.escape(d.bhold)}"]`)?.focus({preventScroll:true}); }
   if(d.bexit){
     const id=d.bexit, had=logSel.has(id), f=S.figures[id];
-    logSel.add(id); lastSal=id; saveSel(); blockPos=null; $("#overlay-root").innerHTML=""; render();
+    logSel.add(id); lastSal=id; logBloq=blockPos; saveSel(); blockPos=null; blockHold=null; $("#overlay-root").innerHTML=""; render();
     return toast(f?`«${f.nombre}» marcada para el registro`:"Marcada para el registro", had?null:{label:"Deshacer", fn:()=>{ logSel.delete(id); saveSel(); render(); }});
   }
   if(d.tab) return go(d.tab);
@@ -2255,6 +2266,13 @@ document.addEventListener("click", async e=>{
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.promote){
     const f=S.figures[d.promote] ? clone(S.figures[d.promote]) : null; const to=d.to||"disponible";
+    // Sin dónde empieza o acaba no sale de la lista de espera: se abre la ficha con lo que falta señalado.
+    if(f && incomplete(f) && to!=="espera"){
+      openFigure(f.id, {fromView: !!t.closest("[data-viewfig]"), estado:to});
+      const fin=$("#ff-in"), fout=$("#ff-out");
+      if(fin) fieldError([!f.entrada && fin, !f.salida && fout].filter(Boolean), fin.closest(".grid2"), `Para ${to==="practica"?"empezar a practicarla":"pasarla a "+EST[to].t.toLowerCase()} indica dónde empieza y dónde acaba.`);
+      return;
+    }
     if(f){ f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`); if($('[data-sheet="log"]')) openLog(); else if($("#sheet-root [data-viewfig]")) openView(f.id); else t.remove(); }
     return;
   }
@@ -2284,7 +2302,7 @@ document.addEventListener("click", async e=>{
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; blockHold=null; return showBlock(); }
   if(a==="bk-tap") return bkTap();
-  if(a==="unblock"){ blockPos=null; return $("#overlay-root").innerHTML=""; }
+  if(a==="unblock") return closeBlock();
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
   if(a==="night-off"){ setNight(false); releaseWake(); return go("repertorio"); }
   if(a==="bpos-back"){ blockPos=null; blockHold=null; return showBlock(); }
@@ -2348,21 +2366,24 @@ document.addEventListener("keydown", e=>{
     else if(e.key==="Tab"){ const bs=[...document.querySelectorAll("#confirm-root button")], i=bs.indexOf(document.activeElement); e.preventDefault(); bs[(i+(e.shiftKey?bs.length-1:1))%bs.length].focus(); }
     return;
   }
-  if(e.key==="Escape"){ if($("#overlay-root").innerHTML) $("#overlay-root").innerHTML=""; else requestClose(); }
+  if(e.key==="Escape"){ if($("#overlay-root").innerHTML) closeBlock(); else requestClose(); }
 });
 // Con una hoja o el panel de bloqueo abiertos, el resto de la app queda inerte (VoiceOver no se sale).
 // Al abrir, el foco va al título de la hoja; al cerrar, vuelve a donde estaba.
-let focusBack = null;
+// Si al cerrar la pantalla se ha vuelto a pintar, el foco va a su equivalente nuevo; y nunca le quita el foco a «Deshacer».
+let focusBack = null, focusBackKey = null;
 const outsideModal = el => !el.closest("#sheet-root,#overlay-root,#confirm-root");
-document.addEventListener("focusin", e=>{ if(outsideModal(e.target)) focusBack=e.target; });
-document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("button,a"); if(b && outsideModal(b)) focusBack=b; }, true);
+const setFocusBack = el => { focusBack=el; focusBackKey=focusKey(el); };
+document.addEventListener("focusin", e=>{ if(outsideModal(e.target)) setFocusBack(e.target); });
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("button,a"); if(b && outsideModal(b)) setFocusBack(b); }, true);
 function syncModal(){
   const open = !!($("#sheet-root").firstElementChild || $("#overlay-root").firstElementChild);
   const was = $(".wrap").inert;
   $(".wrap").inert = open; $("nav.tabs").inert = open;
   const s=$("#sheet-root .sheet");
   if(open && s && !s.contains(document.activeElement) && (!was || document.activeElement===document.body)) $("#sheet-t")?.focus({preventScroll:true});
-  if(!open && was && focusBack && focusBack.isConnected) focusBack.focus({preventScroll:true});
+  const ae=document.activeElement, lost = !ae || ae===document.body || !ae.isConnected;
+  if(!open && was && lost){ const el = focusBack && focusBack.isConnected ? focusBack : focusBackKey && $(`#v-${tab}`)?.querySelector(focusBackKey); el?.focus({preventScroll:true}); }
 }
 const modalObs = new MutationObserver(syncModal);
 modalObs.observe($("#sheet-root"), {childList:true}); modalObs.observe($("#overlay-root"), {childList:true});

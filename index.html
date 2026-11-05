@@ -91,11 +91,13 @@ header.top{position:sticky;top:0;z-index:20;margin:0 calc(-1 * max(16px,env(safe
 .mk-a{fill:var(--fg)} .mk-b{fill:var(--st-practica)} .mk-n{fill:var(--neon)}
 .sync{display:none}
 .bar .btn,.bar .icon-btn{flex-shrink:0;white-space:nowrap}
-.live{display:flex;align-items:center;margin-top:8px;padding-left:14px;border-radius:99px;background:var(--surface)}
+.live{display:flex;align-items:center;margin-top:8px;padding:4px 4px 4px 14px;border-radius:99px;background:var(--surface)}
 .live[hidden]{display:none}
-.live-go{flex:1;display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;min-height:44px;color:var(--fg);font-size:15px;font-weight:600;text-align:left}
+.live-go,.live-end{position:relative;border:0;background:none;min-height:40px;font-size:15px;font-weight:600}
+.live-go::after,.live-end::after{content:"";position:absolute;inset:-4px 0}
+.live-go{flex:1;display:flex;align-items:center;gap:8px;padding:0;color:var(--fg);text-align:left}
 .live-go i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--neon)}
-.live-end{border:0;background:none;padding:0 16px;min-height:44px;color:var(--link);font-size:15px;font-weight:600}
+.live-end{padding:0 12px;color:var(--link)}
 .ltitle{font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:.005em;line-height:1.1;margin:14px 0 2px}
 
 /* botones */
@@ -755,7 +757,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.27";
+const APP_VERSION = "1.28";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;

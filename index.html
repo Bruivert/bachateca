@@ -164,7 +164,7 @@ button.card:active{background:var(--surface2)}
 .panel .list>.card{background:var(--surface2)}
 .route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:500}
 .route .arrow{color:var(--link);font-weight:700}
-.fname{font-weight:600;font-size:17px;color:var(--fg);line-height:1.25}
+.fname{font-weight:600;font-size:17px;color:var(--fg);line-height:1.3}
 .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600}
 .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
@@ -262,6 +262,9 @@ button.card:active{background:var(--surface2)}
 .exits li .to{font-size:14px;color:var(--muted)}
 .exits li.dim>span:first-child{color:var(--muted)}
 .grade{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+/* Calificar queda a mano: pegado abajo, encima de la barra de pestañas, aunque la respuesta sea larga. */
+.grade-bar{position:sticky;bottom:calc(70px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:2;display:flex;flex-direction:column;gap:8px;margin:0 -20px -22px;padding:12px 20px 22px;background:var(--surface);border-radius:0 0 20px 20px}
+.grade-bar p{margin:0}
 .grade .btn{padding:12px 6px;font-size:15px}
 .progress{height:4px;background:var(--fill);border-radius:99px;overflow:hidden}
 .progress i{display:block;height:100%;background:var(--mark)}
@@ -777,7 +780,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.31";
+const APP_VERSION = "1.32";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -868,9 +871,14 @@ async function askWake(){ try{ if("wakeLock" in navigator && !wakeLock){ wakeLoc
 function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch{} wakeLock=null; }
 
 // ---------- piezas comunes ----------
-const holdTxt = h => h ? ` <span class="hold">(${esc(h)})</span>` : "";
+// VoiceOver lee «Izq–der» como «tu izquierda con su derecha» (no «Izq guion der») y la flecha como «hasta».
+const SIDE = {izq:"izquierda", der:"derecha"};
+const holdSay = h => { const m=h.trim().match(/^(izq|der)\.?\s*[–—-]\s*(izq|der)\.?$/i);
+  return m ? `tu ${SIDE[m[1].toLowerCase()]} con su ${SIDE[m[2].toLowerCase()]}` : h.replace(/\s*[–—]\s*/g," con "); };
+const holdName = h => holdSay(h)===h ? esc(h) : `<span aria-hidden="true">${esc(h)}</span><span class="sr">${esc(holdSay(h))}</span>`;
+const holdTxt = h => h ? ` <span class="hold">(${holdName(h)})</span>` : "";
 // Ruta con una sola flecha: «Cerrada (Abrazo) → Sombra (Dos manos)». Sin el inicio cuando ya lo dice el contexto.
-const routeTxt = (f, from) => `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${esc(f.agarreIn)} ` : "")}<span class="arrow">→</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
+const routeTxt = (f, from) => `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${holdName(f.agarreIn)} ` : "")}<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
 function pill(k){ return `<span class="pill st-${k}">${esc(EST[k]?.t||k)}</span>`; }
 // Compás de 8 de una figura: qué tiempos de la frase ocupa y en cuál empieza.
 function compasTxt(f){
@@ -1020,8 +1028,8 @@ function renderRepasar(){
   }
   const pct = Math.round(session.i/session.ids.length*100);
   const head = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><p class="muted small">${session.i+1} de ${session.ids.length}</p>`;
-  const gradeHTML = `<p class="small muted">¿Cómo te ha salido?</p>
-    <div class="grade"><button class="btn" data-grade="no">No la recordé</button><button class="btn" data-grade="dudas">Con dudas</button><button class="btn" data-grade="fluida">Fluida</button></div>`;
+  const gradeHTML = `<div class="grade-bar"><p class="small muted">¿Cómo te ha salido?</p>
+    <div class="grade"><button class="btn" data-grade="no">No la recordé</button><button class="btn" data-grade="dudas">Con dudas</button><button class="btn" data-grade="fluida">Fluida</button></div></div>`;
   if(session.kind==="link"){
     const p=session.ids[session.i], ex=exitsFrom(p), ar=arrivals(p);
     v.innerHTML = `${head}
@@ -1134,7 +1142,7 @@ function renderEnlazar(){
       <div class="panel">
         ${holdsHere.length ? `<div class="f"><span>Llegas con el agarre</span><div class="chips">
           <button class="chip sm" data-hold="" aria-pressed="${!linkHold}">Cualquiera</button>
-          ${holdsHere.map(h=>`<button class="chip sm" data-hold="${esc(h)}" aria-pressed="${linkHold===h}">${esc(h)}</button>`).join("")}
+          ${holdsHere.map(h=>`<button class="chip sm" data-hold="${esc(h)}" aria-pressed="${linkHold===h}"${holdSay(h)!==h?` aria-label="${esc(holdSay(h))}"`:""}>${esc(h)}</button>`).join("")}
         </div></div>`:""}
         <h3>Salen de ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""}</h3>
         ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-view="${f.id}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${routeTxt(f)}</span>${compas(f)}</div></button>`).join("")}</div>`
@@ -1274,7 +1282,7 @@ function showBlock(focus){
     const ex = blockExits(blockPos, blockHold);
     const hs = [...new Set(exitsFrom(blockPos).map(f=>f.agarreIn).filter(Boolean))];
     body = `<h3 class="bk-from" id="bk-from" tabindex="-1">${ex.length>1?"Elige una salida desde":"Tu salida desde"} ${esc(blockPos)}</h3>
-      ${hs.length>1?`<div class="chips bk-holds" role="group" aria-label="Agarre que llevas"><span class="muted">Agarre</span>${hs.map(h=>`<button type="button" class="chip" aria-pressed="${blockHold===h}" data-bhold="${esc(h)}">${esc(h)}</button>`).join("")}</div>`:""}
+      ${hs.length>1?`<div class="chips bk-holds" role="group" aria-label="Agarre que llevas"><span class="muted">Agarre</span>${hs.map(h=>`<button type="button" class="chip" aria-pressed="${blockHold===h}" data-bhold="${esc(h)}"${holdSay(h)!==h?` aria-label="${esc(holdSay(h))}"`:""}>${esc(h)}</button>`).join("")}</div>`:""}
       <ul class="bk-exits">${ex.map(f=>bkExit(f)).join("")}</ul>
       <p class="bk-hint">Toca la que vas a hacer.</p>`;
     foot = `<button type="button" class="btn" data-act="bpos-back">Otra posición</button><button type="button" class="btn bk-close" data-act="unblock">Cerrar</button>`;
@@ -1446,8 +1454,9 @@ function openFigure(id, opts={}){
     <div class="vidbox" id="vidbox"></div>`:""}
     <label class="f" for="ff-nombre">${quick?"Nombre (opcional)":"Nombre fácil de recordar"}<input type="text" id="ff-nombre" value="${esc(f.nombre)}" placeholder="${quick?"Si lo dejas vacío: clase y fecha":"Ej.: vuelta con hammerlock"}"></label>
     <div class="f"><span>Tipo</span><div class="seg neutral" id="ff-tipo">${TIPOS.map(t=>`<button type="button" aria-pressed="${tipo===t.k}" data-tipo="${t.k}">${t.t}</button>`).join("")}</div></div>
-    ${hasCls?`<div class="f"><span id="ff-cls-l">Clase</span><div class="chips scroll" id="ff-cls" role="group" aria-labelledby="ff-cls-l">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}${quick?"":`<button type="button" class="chip sm" aria-pressed="${otherCls}" id="ff-cls-other" aria-controls="ff-prof">Otra…</button>`}</div>
-      ${quick?"":`<input type="text" id="ff-prof" value="${esc(prof)}" placeholder="Otra clase o profesor" aria-label="Otra clase o profesor"${otherCls?"":" hidden"}>`}</div>`:""}
+    ${hasCls?`<div class="f"><span id="ff-cls-l">Clase</span><div class="chips scroll" id="ff-cls" role="group" aria-labelledby="ff-cls-l">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+      ${quick?"":`<div class="chips"><button type="button" class="chip sm" aria-pressed="${otherCls}" id="ff-cls-other" aria-controls="ff-prof">Otra clase…</button></div>
+      <input type="text" id="ff-prof" value="${esc(prof)}" placeholder="Nombre de la clase o del profesor" aria-label="Otra clase o profesor"${otherCls?"":" hidden"}>`}</div>`:""}
     ${quick?"":`
     <div class="grid2">
       <label class="f" for="ff-in"><span id="ff-in-l">Empieza en</span><select id="ff-in">${optList(S.positions,f.entrada,"Elige…")}</select></label>
@@ -1456,11 +1465,11 @@ function openFigure(id, opts={}){
       <label class="f" for="ff-agout" id="ff-agout-wrap">Agarre al terminar<select id="ff-agout">${optList(S.holds,f.agarreOut,"Sin indicar")}</select></label>
     </div>
     <p class="small muted">Agarre: tu mano–su mano. «Izq–der» es tu izquierda con su derecha.</p>
+    <label class="f" for="ff-senal">Señal clave del leader<input type="text" id="ff-senal" value="${esc(f.senal)}" placeholder="Ej.: preparo en el 4, giro con la izquierda en el 5"></label>
     <div class="f"><span>Estado</span><div class="seg states" id="ff-estado">${ESTADOS.map(e=>`<button type="button" class="st-${e.k}" aria-pressed="${estado===e.k}" data-est="${e.k}" title="${esc(e.d)}">${e.t}</button>`).join("")}</div>
       <span class="small" id="ff-est-d">${esc(EST[estado].d)}</span></div>`}
     ${quick?"":`<div class="vidbox" id="vidbox"></div>
-    <details ${id && (f.senal||(!hasCls && f.profesor)||f.video||f.tiempos||f.notas)?"open":""}><summary>Más detalles (opcional)</summary><div class="inner">
-      <label class="f" for="ff-senal">Señal clave del leader<input type="text" id="ff-senal" value="${esc(f.senal)}" placeholder="Ej.: preparo en el 4, giro con la izquierda en el 5"></label>
+    <details ${id && ((!hasCls && f.profesor)||f.video||f.tiempos||f.notas)?"open":""}><summary>Más detalles (opcional)</summary><div class="inner">
       <div class="grid2">
         <label class="f" for="ff-tiempo">Empieza en el tiempo<select id="ff-tiempo"><option value="">—</option>${["1","5"].map(t=>`<option ${f.tiempo===t?"selected":""}>${t}</option>`).join("")}</select></label>
         <label class="f" for="ff-dur">Dura (tiempos)<select id="ff-dur"><option value="">—</option>${DURS.map(t=>`<option ${String(f.tiempos||"")===t?"selected":""}>${t}</option>`).join("")}</select></label>
@@ -1494,6 +1503,7 @@ function openFigure(id, opts={}){
   document.querySelectorAll("#ff-cls button[data-cls]").forEach(b=> b.onclick=()=>{
     const c=b.dataset.cls; prof = prof===c ? "" : c;
     document.querySelectorAll("#ff-cls button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.cls===prof));
+    $("#ff-cls-other")?.setAttribute("aria-pressed", false);
     const pi=$("#ff-prof"); if(pi){ pi.value=prof; if(hasCls) pi.hidden=true; }
     if(prof){
       baile = /salsa/i.test(prof) ? "Salsa" : "Bachata";
@@ -1562,6 +1572,7 @@ function openFigure(id, opts={}){
       }
       busy=false;
     } else if(vstate.remove){ delete out.vid; delete out.vidInfo; delete out.vidTrim; delete out.thumb; }
+    if(out.profesor && !S.classes.includes(out.profesor)){ S.classes.push(out.profesor); persist({t:"meta"}); }
     justSaved = out.id; saveFigure(out);
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();

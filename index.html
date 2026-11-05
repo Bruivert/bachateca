@@ -221,6 +221,11 @@ button.card:active{background:var(--surface2)}
 .practice .chain{align-self:stretch}
 .panel .graph{padding:0;background:none}
 .chain{display:flex;flex-direction:column}
+.chain-bar{display:flex;gap:3px;margin-top:4px;width:100%;align-self:stretch}
+.chain-bar span{min-width:0;height:26px;border-radius:6px;background:var(--mark);color:var(--surface);font-size:13px;font-weight:700;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.chain-bar span.dead{background:var(--fill);color:var(--muted);font-weight:600}
+.chip-legend{margin:-4px 2px 0}
+.chip-legend .ring{display:inline-block;width:14px;height:14px;border-radius:99px;box-shadow:inset 0 0 0 1.5px var(--warn);vertical-align:-2px;margin:0 2px}
 .chain .step{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:10px 0;border-top:.5px solid var(--line)}
 .chain .step:first-child{border-top:0}
 .chain .k{font-family:var(--f-display);font-weight:800;color:var(--link);font-variant-numeric:tabular-nums}
@@ -500,6 +505,8 @@ let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOL
 let tab = "repertorio";
 let filt = { q:"", baile:"todos", estado:"todos", vista:"pos" };
 let linkPos = null, linkHold = "";
+// Enlazar se parte en dos: «Desde aquí» (qué hago desde una posición) y «Mapa» (dónde me faltan salidas).
+let linkView = "aqui";
 let chain = null;
 let session = null;
 let socialIncl = false;
@@ -684,7 +691,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.22";
+const APP_VERSION = "1.23";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1023,11 +1030,14 @@ function renderEnlazar(){
   if(linkHold && !holdsHere.includes(linkHold)) linkHold="";
   const exits = sel ? exitsFrom(sel.p, linkHold) : [];
   const incN = figs().filter(f=>active(f)&&incomplete(f)).length + figs().filter(f=>!active(f)&&incomplete(f)).length;
+  const tabs2 = `<div class="seg2" role="group" aria-label="Vista"><button data-lview="aqui" aria-pressed="${linkView==="aqui"}">Desde aquí</button><button data-lview="mapa" aria-pressed="${linkView==="mapa"}">Mapa</button></div>`;
+  if(linkView==="mapa"){ v.innerHTML = `${tabs2}${mapHTML(cov, gaps, incN)}`; return; }
   v.innerHTML = `
-    <h2>¿Qué hago desde aquí?</h2>
+    ${tabs2}
     <div class="chips" role="group" aria-label="Posición">
       ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}${c.into.length&&c.ready.length<2?", menos de 2 seguras":""}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
     </div>
+    <p class="small muted chip-legend">El número es cuántas salidas tienes desde esa posición.${gaps.length?` <span class="ring" aria-hidden="true"></span> Borde rojo: llegas ahí con menos de 2 salidas seguras.`:""}</p>
     ${sel ? `
       <div class="panel">
         ${holdsHere.length ? `<div class="f"><span>Llegas con el agarre</span><div class="chips">
@@ -1044,9 +1054,13 @@ function renderEnlazar(){
           <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
-      </div>` : ""}
+      </div>` : ""}`;
+}
+function mapHTML(cov, gaps, incN){
+  return `
     <div class="panel">
       <h3>Mapa de salidas</h3>
+      <p class="small muted">Toca una posición para ver sus salidas.</p>
       ${gaps.length ? `<div class="note">Llegas a ${joinY(gaps.map(g=>`<b>${esc(g.p)}</b>`))}, pero desde ${gaps.length===1?"ahí":"esas posiciones"} tienes menos de 2 salidas seguras. Es donde más fácil te bloqueas: pide en clase una salida sencilla desde ${gaps.length===1?"ahí":"cada una"}.</div>` : (figs().some(placed)?`<div class="note ok">Desde todas las posiciones a las que llegas tienes al menos 2 salidas seguras.</div>`:"")}
       ${graphHTML(cov)}
       <details class="info"><summary>Ver la tabla por posición</summary>
@@ -1078,11 +1092,17 @@ function makeChain(start){
 function renderChain(){
   if(!chain.steps.length) return `<p class="muted small">Aún no hay figuras para encadenar.</p>`;
   let n=0;
-  return `<div class="chain">${chain.steps.map(s=> s.dead
+  // Barra de la canción: cada figura ocupa sus tiempos (8 si no los tiene) y el básico final, una frase.
+  const beats = s => s.dead ? 8 : (+s.f.tiempos||8);
+  const total = chain.steps.reduce((a,s)=>a+beats(s),0), fr = Math.round(total/8);
+  let m=0;
+  const bar = `<div class="chain-bar" aria-hidden="true">${chain.steps.map(s=>`<span class="${s.dead?"dead":""}" style="flex:${beats(s)}">${s.dead?"básico":++m}</span>`).join("")}</div>
+    <p class="small muted">${total} tiempos: ${fr===1?"una frase de 8":`unas ${fr} frases de 8`} seguidas.</p>`;
+  return `${bar}<div class="chain">${chain.steps.map(s=> s.dead
     ? `<div class="step"><span class="k">↺</span><div><b>Básico</b><div class="small muted">${s.usedUp
         ? `Las salidas desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} ya están en la cadena. Vuelve al básico y empieza otra vuelta.`
         : `Desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} aún no tienes salidas. Vuelve al básico: también es una transición.`}</div></div></div>`
-    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}</div></div></div>`).join("")}</div>`;
+    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
 }
 
 // ---------- vista: social ----------
@@ -2075,7 +2095,7 @@ function loadExamples(){
 
 // ---------- render ----------
 // Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
-const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-view","data-act","data-promote"];
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-view","data-act","data-promote"];
 function focusKey(el){
   if(!el || el===document.body) return null;
   if(el.id) return "#"+CSS.escape(el.id);
@@ -2112,7 +2132,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv],[data-lview]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -2128,7 +2148,10 @@ document.addEventListener("click", async e=>{
   if(d.view) return openView(d.view);
   if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
   if(d.grade) return grade(d.grade);
-  if(d.pos!==undefined && !t.closest("form")){ linkPos=d.pos; linkHold=""; chain=null; return render(); }
+  if(d.lview){ linkView=d.lview; return render(); }
+  if(d.pos!==undefined && !t.closest("form")){ linkPos=d.pos; linkHold=""; chain=null;
+    if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
+    return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.promote){

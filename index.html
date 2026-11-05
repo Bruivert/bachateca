@@ -195,12 +195,20 @@ button.card:active{background:var(--surface2)}
 .mrow{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:0 12px 0 16px;border:0;background:none;color:var(--fg);font-size:16px;text-align:left;position:relative}
 .mrow+.mrow::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
 .mrow:active{background:var(--fill)}
-.mrow span:first-child{flex:1}
+.mrow>span:first-child{flex:1}
 .mrow .mv{color:var(--muted);font-variant-numeric:tabular-nums}
 .mrow svg{flex:none;width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .menu-h{font-size:13px;font-weight:500;color:var(--muted);margin:4px 16px -8px}
 .sheet-head .back{padding-left:4px;padding-right:8px}
 .sub-t{font-size:22px;margin:-4px 0 0}
+/* hoja para ver una figura */
+.fview .meta-line{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:-8px 0 0;font-size:15px;color:var(--muted)}
+.fview .route-big{margin:0;font-size:19px;line-height:1.35}
+.fview .lbl{margin:0 0 4px;font-size:13px;font-weight:500;color:var(--muted)}
+.fview .txt{margin:0;white-space:pre-wrap}
+.fview .mrow{padding-block:8px}
+.fview .mrow>span:first-child{display:flex;flex-direction:column;gap:2px}
+.fview>.btn{align-self:flex-start}
 .cov{display:grid;grid-template-columns:1fr auto auto;gap:6px 14px;align-items:center;font-size:15px}
 .cov .h{font-size:13px;color:var(--muted)}
 .cov .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -671,7 +679,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.19";
+const APP_VERSION = "1.20";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -787,7 +795,7 @@ function figCard(f, inGroup){
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = routeTxt(f, !inGroup);
   else sub = `<span class="tag warn">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
-  return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-edit="${f.id}">${th}${th?`<div class="card-body">`:""}
+  return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-view="${f.id}">${th}${th?`<div class="card-body">`:""}
     <div class="fname">${esc(f.nombre)}</div>
     <div class="route"><span>${sub}</span></div>
     <div class="meta">${pill(f.estado)}
@@ -1022,7 +1030,7 @@ function renderEnlazar(){
           ${holdsHere.map(h=>`<button class="chip sm" data-hold="${esc(h)}" aria-pressed="${linkHold===h}">${esc(h)}</button>`).join("")}
         </div></div>`:""}
         <h3>Salen de ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""}</h3>
-        ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-edit="${f.id}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${routeTxt(f)}</span>${compas(f)}</div></button>`).join("")}</div>`
+        ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-view="${f.id}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${routeTxt(f)}</span>${compas(f)}</div></button>`).join("")}</div>`
           : `<p class="muted">Aún no tienes figuras que empiecen en ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""} (sin contar la lista de espera). Pregunta en clase: «Desde ${esc(sel.p)}, ¿qué figura sencilla puedo hacer?»</p>`}
         ${sel.into.length ? `<p class="small muted">Llegas aquí desde: ${sel.into.map(f=>esc(f.nombre)+(f.agarreOut?` (${esc(f.agarreOut)})`:"")).join(", ")}.</p>`:""}
         ${sel.out.length ? `<div class="practice">
@@ -1232,6 +1240,34 @@ function deleteLog(id){
 }
 
 // ---------- hoja: ficha / captura rápida ----------
+// ---------- hoja: ver una figura ----------
+// Lo que se mira antes de bailarla: vídeo, ruta, compás, señal y qué puedes hacer después. Editar queda a un toque.
+function openView(id){
+  const f = S.figures[id]; if(!f) return;
+  const i = ESTADOS.findIndex(e=>e.k===f.estado), up = ESTADOS[i+1];
+  const nexts = placed(f) ? figs().filter(x=>x.id!==f.id && active(x) && placed(x) && canFollow(f,x)).sort(socSort).slice(0,4) : [];
+  const meta = [pill(f.estado), tipoOf(f)!=="figura"?esc(TIPO[tipoOf(f)].t):"", f.baile && f.baile!=="Bachata"?esc(f.baile):"", f.profesor?esc(f.profesor):"", f.usos?`salió ${f.usos}×`:""].filter(Boolean);
+  const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${f.id}">
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${esc(f.nombre)}</h2><button type="button" class="btn ghost sm" data-edit="${f.id}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <p class="meta-line">${meta.join(`<span aria-hidden="true">·</span>`)}</p>
+    ${f.vid ? playerHTML(f) : ""}
+    ${isMove(f) ? (placed(f)
+      ? `<p class="route-big">${routeTxt(f, true)}</p>`
+      : `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${f.id}">Completar</button></div>`)
+      : (f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
+    ${(f.tiempo||f.tiempos) ? compas(f, true) : ""}
+    ${f.senal ? `<div><p class="lbl">Señal</p><p class="txt">${esc(f.senal)}</p></div>` : ""}
+    ${f.notas ? `<div><p class="lbl">Notas</p><p class="txt">${esc(f.notas)}</p></div>` : ""}
+    ${placed(f) ? `<div><p class="lbl">Y después, desde ${esc(f.salida)}</p>${nexts.length
+      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}"><span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
+      : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</div>` : ""}
+    ${up ? `<button type="button" class="btn" data-promote="${f.id}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
+  </div></div>`;
+  hydrateVideos($("#sheet-root"));
+  const s=$(".sheet"); if(s) s.scrollTop=0;
+  markClean();
+}
 function openFigure(id, opts={}){
   const quick = !!opts.quick && !id;
   const base = {id:uid(), nombre:"", tipo:"figura", baile:"Bachata", entrada:"", salida:"", agarreIn:"", agarreOut:"", estado: quick?"espera":"practica", profesor:""};
@@ -1354,6 +1390,7 @@ function openFigure(id, opts={}){
     justSaved = out.id; saveFigure(out);
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();
+    if(opts.fromView) openView(out.id);
     toast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
   };
   const cmpUpd = ()=>{ const el=$("#ff-cmp"); if(el) el.innerHTML = compas({tiempo:$("#ff-tiempo").value, tiempos:$("#ff-dur").value}, true); };
@@ -2056,7 +2093,7 @@ document.addEventListener("click", async e=>{
   }
   const wk = e.target.closest("[data-week]");
   if(wk){ progWeek=+wk.dataset.week; return render(); }
-  const t = e.target.closest("[data-tab],[data-act],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv]");
   if(!t) return;
   const d=t.dataset;
   if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); lastSal=d.sal; saveSel(); return render(); }
@@ -2068,14 +2105,15 @@ document.addEventListener("click", async e=>{
     return toast(f?`«${f.nombre}» marcada para el registro`:"Marcada para el registro", had?null:{label:"Deshacer", fn:()=>{ logSel.delete(id); saveSel(); render(); }});
   }
   if(d.tab) return go(d.tab);
-  if(d.edit) return openFigure(d.edit);
+  if(d.view) return openView(d.view);
+  if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
   if(d.grade) return grade(d.grade);
   if(d.pos!==undefined && !t.closest("form")){ linkPos=d.pos; linkHold=""; chain=null; return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.promote){
     const f=S.figures[d.promote] ? clone(S.figures[d.promote]) : null; const to=d.to||"disponible";
-    if(f){ f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`); if($('[aria-label="Registrar el social"]')) openLog(); else t.remove(); }
+    if(f){ f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`); if($('[aria-label="Registrar el social"]')) openLog(); else if($("#sheet-root [data-viewfig]")) openView(f.id); else t.remove(); }
     return;
   }
   if(d.logfig){ logSel.has(d.logfig) ? logSel.delete(d.logfig) : logSel.add(d.logfig); t.setAttribute("aria-pressed", logSel.has(d.logfig)); saveSel(); render(); return; }

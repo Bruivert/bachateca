@@ -169,6 +169,22 @@ button.card:active{background:var(--surface2)}
 .note.install span{flex:1}
 .note.install .btn{margin:0}
 .group-hint{margin:-4px 4px 10px}
+/* fin del repaso: cada figura con una barra del compás que se llena según cómo salió */
+.rv-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.rv-list li{display:flex;align-items:center;gap:12px}
+.rv-list i{flex:none;width:6px;height:30px;border-radius:2px;background:linear-gradient(to top,var(--accent-fg) var(--h,0%),var(--fill) var(--h,0%))}
+.rv-list .rv-fluida i{--h:100%}.rv-list .rv-dudas i{--h:50%}
+.rv-list .t{display:flex;flex-direction:column;min-width:0}
+.rv-list .t span{font-size:14px;color:var(--muted)}
+.rv-list .rv-no .t span{color:var(--warn)}
+.rv-list .rv-no i{background:none;box-shadow:inset 0 0 0 1.5px var(--warn)}
+/* fin del social */
+.tonight dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:10px 16px}
+.tonight dt{font-size:14px;color:var(--muted);padding-top:1px}
+.tonight dd{margin:0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tonight h3:focus{outline:none}
+.bk-line{display:flex;flex-direction:column;gap:6px;padding:0 4px}
+.bk-line p{margin:0}
 /* Ajustes: la copia arriba y el resto como filas que abren su propia pantalla */
 .menu{flex:none;display:flex;flex-direction:column;border-radius:var(--r);overflow:hidden;background:var(--surface)}
 .mrow{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:0 12px 0 16px;border:0;background:none;color:var(--fg);font-size:16px;text-align:left;position:relative}
@@ -636,7 +652,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.17";
+const APP_VERSION = "1.18";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -853,15 +869,22 @@ function renderRepasar(){
     const left = link ? dueLinks().length : dueFigs().length, t=todayStr();
     const nx = (link ? linkPositions().map(p=>S.linkRep[p]?.due) : figs().filter(active).map(f=>f.rep?.due)).filter(x=>x && x>t).sort()[0];
     const next = left ? `Quedan ${left} para hoy.` : nx ? `El siguiente repaso toca ${nx===todayStr(1)?"mañana":"el "+fmtDate(nx)}.` : "";
+    // Cada una con cómo salió y cuándo vuelve; primero las que hay que mirar.
+    const when = due => !due ? "" : due<=todayStr() ? "vuelve hoy" : due===todayStr(1) ? "vuelve mañana" : `vuelve el ${fmtDate(due)}`;
+    const GR = {fluida:"Fluida", dudas:"Con dudas", no:"Sin recordar"}, ORD = {no:0, dudas:1, fluida:2};
+    const items = session.ids.slice(0, d.length).map((id,i)=>({g:d[i], name: link ? id : S.figures[id]?.nombre, due: link ? S.linkRep[id]?.due : S.figures[id]?.rep?.due}))
+      .filter(x=>x.name).sort((a,b)=>ORD[a.g]-ORD[b.g]);
+    const allOk = d.length>=3 && c("fluida")===d.length;
     v.innerHTML = `
-      <h2>Repaso terminado</h2>
+      <h2>${allOk?"Todo a compás":"Repaso terminado"}</h2>
       <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
+      <ul class="rv-list">${items.map(x=>`<li class="rv-${x.g}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
       <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${i}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
       ${next?`<p class="small muted">${next}</p>`:""}
-      <button class="btn pri" data-act="end">Hecho</button>
-      ${left?`<button class="btn" data-act="start-${link?"link":"fig"}">Repasar ${Math.min(left,MAX_SESSION)} más</button>`:""}</div>`;
+      ${left?`<button class="btn pri" data-act="start-${link?"link":"fig"}">Repasar ${Math.min(left,MAX_SESSION)} más</button><button class="btn" data-act="end">Hecho por hoy</button>`
+        :`<button class="btn pri" data-act="end">Hecho</button>`}</div>`;
     return;
   }
   const pct = Math.round(session.i/session.ids.length*100);
@@ -1101,8 +1124,23 @@ const sheetBg = () => `sheet-bg${$("#sheet-root .sheet")?" still":""}`;
 // ---------- hoja: registro del social ----------
 // En el registro se ven las marcadas y las 6 que más te salen; «Ver todas» abre el resto con buscador.
 let logAll = false;
+// Registro recién guardado: en vez del formulario vacío, la hoja enseña lo que pasó esta noche.
+let logDone = null;
+function tonightHTML(l){
+  const names = (l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean).map(esc);
+  if(l.salio) names.push(esc(l.salio));
+  return `<div class="panel tonight"><h3 id="tonight-t" tabindex="-1">Esta noche</h3>
+    <dl>
+      <dt>Salieron</dt><dd>${names.length?joinY(names):`<span class="muted">Nada marcado</span>`}</dd>
+      <dt>Bloqueo</dt><dd>${l.bloqueo?`<b>${esc(l.bloqueo)}</b><span class="small muted">Pregunta en clase: «Desde ${esc(l.bloqueo)}, ¿qué figura sencilla puedo hacer?»</span>`:"Ninguno"}</dd>
+      ${l.proximo?`<dt>Próxima vez</dt><dd>${esc(l.proximo)}</dd>`:""}
+    </dl>
+    <div class="row"><button class="btn pri" data-act="close">Hecho</button><button class="btn ghost" data-act="log-again">Registrar otro social</button></div>
+  </div>`;
+}
 function openLog(fresh){
-  if(fresh) logAll=false;
+  if(fresh){ logAll=false; logDone=null; }
+  const done = logDone && S.logs[logDone];
   const LG=["lg-salio","lg-bloq","lg-prox"], keep = fresh ? null : LG.map(k=>$("#"+k)?.value||"");
   const bk = backupNudge ? backupInfo() : null;
   const cand = figs().filter(active).sort((a,b)=>((b.usos||0)-(a.usos||0)) || (ready(b)-ready(a)));
@@ -1114,11 +1152,12 @@ function openLog(fresh){
   const sc = $(".sheet")?.scrollTop || 0;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Registrar el social">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Registrar el social</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    ${bk && bk.stale?`<div class="panel"><p><b>${bk.at?`Tu última copia es de hace ${bk.days} días.`:"Aún no tienes ninguna copia."}</b> Tus figuras y registros solo están en este dispositivo. Guarda una copia en Archivos o en iCloud Drive.</p>
-      <div class="row"><button class="btn pri" data-act="export">Exportar copia</button><button class="btn ghost" data-act="nudge-off">Ahora no</button></div></div>`:""}
+    ${done ? tonightHTML(done) : ""}
     ${sug.length?`<div class="panel"><h3>Según tus socials</h3>
       ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${S.figures[s.id].usos}×</span></span><button class="btn sm" data-promote="${s.id}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
-    <div class="panel">
+    ${bk && bk.stale?`<div class="bk-line"><p class="small"><b>${bk.at?`Tu última copia es de hace ${bk.days} días.`:"Aún no tienes ninguna copia."}</b> <span class="muted">Tus figuras solo están en este dispositivo.</span></p>
+      <div class="row"><button class="btn sm" data-act="export">Exportar copia</button><button class="btn ghost sm" data-act="nudge-off">Ahora no</button></div></div>`:""}
+    ${done ? "" : `<div class="panel">
       <div class="f"><span>Figuras que te salieron</span>
         ${cand.length?`${logAll && cand.length>8?`<input type="search" id="lg-q" placeholder="Buscar figura" aria-label="Buscar figura">`:""}<div class="chips" id="lg-chips">${shown.map(f=>`<button type="button" class="chip sm" data-logfig="${f.id}" data-q="${esc(fold(f.nombre))}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>${shown.length<cand.length?`<button type="button" class="btn ghost sm" data-act="log-all">Ver todas (${cand.length})</button>`:""}`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
       </div>
@@ -1129,7 +1168,7 @@ function openLog(fresh){
       </label>
       <label class="f" for="lg-prox">Para practicar la próxima vez<input type="text" id="lg-prox" placeholder="Una sola cosa"></label>
       <button class="btn pri" data-act="log-save">Guardar registro</button>
-    </div>
+    </div>`}
     ${blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
     ${logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
       const names=(l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean);
@@ -1137,9 +1176,11 @@ function openLog(fresh){
       <div>${names.length?`<div>✓ ${names.map(esc).join(", ")}</div>`:""}${l.salio?`<div>✓ ${esc(l.salio)}</div>`:""}${l.bloqueo?`<div style="color:var(--warn)">✕ Bloqueo en ${esc(l.bloqueo)}</div>`:""}${l.proximo?`<div class="muted">→ ${esc(l.proximo)}</div>`:""}</div>
       <button class="btn ghost sm danger" data-dellog="${l.id}" aria-label="Borrar el registro del ${fmtDate(l.fecha)}">Borrar</button></div>`;}).join("")}</div>`:""}
   </div></div>`;
-  if(logBloq) $("#lg-bloq").value=logBloq;
-  if(keep) LG.forEach((k,i)=>{ if(keep[i]) $("#"+k).value=keep[i]; });
-  $("#lg-bloq").onchange=e=>{ logBloq=e.target.value; saveSel(); };
+  if(!done){
+    if(logBloq) $("#lg-bloq").value=logBloq;
+    if(keep) LG.forEach((k,i)=>{ if(keep[i]) $("#"+k).value=keep[i]; });
+    $("#lg-bloq").onchange=e=>{ logBloq=e.target.value; saveSel(); };
+  }
   const lq=$("#lg-q"); if(lq) lq.oninput=()=>{ const q=fold(lq.value.trim()); document.querySelectorAll("#lg-chips [data-q]").forEach(c=>{ c.hidden = !!q && !c.dataset.q.includes(q); }); };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
   markClean();
@@ -1156,13 +1197,14 @@ function saveLog(){
   });
   S.logs[l.id]=l; persist({t:"log",id:l.id});
   logSel = new Set(); logBloq = ""; saveSel(); setNight(false);
-  backupNudge = backupInfo().stale; render(); openLog(true); toast("Registro guardado");
+  backupNudge = backupInfo().stale; render(); logAll=false; logDone=l.id; openLog();
+  const s=$(".sheet"); if(s) s.scrollTop=0; $("#tonight-t")?.focus({preventScroll:true}); announce("Registro guardado");
 }
 function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
   const copy=clone(l);
   (l.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f && f.usos){ f.usos--; persist({t:"fig",id:fid}); } });
-  delete S.logs[id]; persist({t:"logdel",id}); render(); openLog();
+  delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(f.usos||0)+1; persist({t:"fig",id:fid}); } });
@@ -2048,6 +2090,7 @@ document.addEventListener("click", async e=>{
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
   if(a==="nudge-off"){ backupNudge=false; return openLog(); }
   if(a==="log-save") return saveLog();
+  if(a==="log-again"){ logDone=null; logSuggest=[]; backupNudge=false; return openLog(true); }
   if(a==="log-all"){ logAll=true; openLog(); return ($("#lg-q") || $("#lg-chips .chip:not([aria-pressed=true])"))?.focus(); }
   if(a==="del-fig"){
     const id=d.id, f=S.figures[id]; if(!f) return;

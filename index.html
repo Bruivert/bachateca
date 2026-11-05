@@ -91,6 +91,11 @@ header.top{position:sticky;top:0;z-index:20;margin:0 calc(-1 * max(16px,env(safe
 .mk-a{fill:var(--fg)} .mk-b{fill:var(--st-practica)} .mk-n{fill:var(--neon)}
 .sync{display:none}
 .bar .btn,.bar .icon-btn{flex-shrink:0;white-space:nowrap}
+.live{display:flex;align-items:center;margin-top:8px;padding-left:14px;border-radius:99px;background:var(--surface)}
+.live[hidden]{display:none}
+.live-go{flex:1;display:flex;align-items:center;gap:8px;border:0;background:none;padding:0;min-height:44px;color:var(--fg);font-size:15px;font-weight:600;text-align:left}
+.live-go i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--neon)}
+.live-end{border:0;background:none;padding:0 16px;min-height:44px;color:var(--link);font-size:15px;font-weight:600}
 .ltitle{font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:.005em;line-height:1.1;margin:14px 0 2px}
 
 /* botones */
@@ -479,6 +484,7 @@ details.info summary::after{inset:-10px -4px}
       <button class="icon-btn" id="btn-settings" aria-label="Ajustes"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <button class="btn pri sm" id="btn-new">+ Añadir</button>
     </div>
+    <div class="live" id="live" hidden><button type="button" class="live-go" data-tab="social"><i aria-hidden="true"></i>Social en curso</button><button type="button" class="live-end" data-act="night-off" aria-label="Terminar el social">Terminar</button></div>
   </header>
   <h1 class="ltitle" id="ltitle">Repertorio</h1>
 
@@ -551,7 +557,15 @@ const saveSel = () => lsSet(LS_SAL, {t:Date.now(), ids:[...logSel], bloq:logBloq
 const LS_NOCHE = "bachateca.noche", NIGHT_MS = 216e5;
 let nightAt = +lsGet(LS_NOCHE) || 0;
 const nightOn = () => Date.now()-nightAt < NIGHT_MS;
-const paintNight = () => document.documentElement.classList.toggle("night", tab==="social" || nightOn());
+// La noche vive en Social. Fuera de Social solo sigue con un social en curso: algo marcado, un bloqueo apuntado
+// o Social abierto de noche (de 20 h a 7 h). Mirar la chuleta por la mañana ya no oscurece el resto de la app.
+const lateAt = t => { const h=new Date(t).getHours(); return h>=20 || h<7; };
+const socialLive = () => nightOn() && (logSel.size>0 || !!logBloq || lateAt(nightAt));
+function paintNight(){
+  const live = socialLive();
+  document.documentElement.classList.toggle("night", tab==="social" || live);
+  const lv=$("#live"); if(lv) lv.hidden = tab==="social" || !live;
+}
 function setNight(on){ nightAt = on ? Date.now() : 0; lsSet(LS_NOCHE, nightAt); paintNight(); }
 let blockPos = null, blockHold = null;
 // Lo recién hecho, para animarlo una sola vez: figura guardada, fila marcada y registro guardado.
@@ -741,7 +755,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.26";
+const APP_VERSION = "1.27";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -823,7 +837,7 @@ function go(t){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
   TABS.forEach(k=> $("#v-"+k).hidden = k!==t);
   try{ history.replaceState(null,"","#"+t); }catch{}
-  if(t==="social") askWake(); else if(!busy) releaseWake();
+  if(t==="social" || socialLive()) askWake(); else if(!busy) releaseWake();
   render();
   window.scrollTo(0, same ? 0 : (scrollMem[t]||0));
   requestAnimationFrame(fixBottom); setTimeout(fixBottom, 350);
@@ -1187,7 +1201,7 @@ function renderSocial(){
     <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> Incluir las que están en práctica</label>
     <button class="btn pri block-btn" data-act="block">Me he bloqueado</button>
     <button class="btn wide" data-act="log-open">Registrar el social${pend?` · ${pend}`:(last?` · último ${fmtDate(last.fecha)}`:"")}</button>
-    ${nightOn()?`<button class="btn ghost wide" data-act="night-off">Terminar el social</button>`:""}`;
+    ${socialLive()?`<button class="btn ghost wide" data-act="night-off">Terminar el social</button>`:""}`;
   $("#soc-incl").onchange=e=>{socialIncl=e.target.checked; render();};
 }
 // Bloqueo: footwork o básico, el compás para recuperar el pulso, dónde estás y dos salidas desde ahí.
@@ -2215,6 +2229,7 @@ let focusAfter = null;
 function render(){
   const view = $("#v-"+tab), ae = document.activeElement;
   const fk = focusAfter || (view && view.contains(ae) && focusKey(ae)); focusAfter = null;
+  paintNight();   // marcar o desmarcar cambia si el social sigue en curso
   const due = dueFigs().length + dueLinks().length;
   const b=$("#due-badge"); b.textContent=due; b.hidden=!due; b.closest("button").setAttribute("aria-label", due ? `Repasar, ${due} pendientes` : "Repasar");
   if(!loaded){ $("#v-"+tab).innerHTML=`<p class="muted">Cargando tu repertorio…</p>`; return; }
@@ -2304,7 +2319,11 @@ document.addEventListener("click", async e=>{
   if(a==="bk-tap") return bkTap();
   if(a==="unblock") return closeBlock();
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
-  if(a==="night-off"){ setNight(false); releaseWake(); return go("repertorio"); }
+  if(a==="night-off"){
+    setNight(false); releaseWake();
+    if(tab==="social") go("repertorio"); else render();
+    return toast(logSel.size || logBloq ? "Social terminado. Lo que marcaste sigue en Social para registrarlo." : "Social terminado.");
+  }
   if(a==="bpos-back"){ blockPos=null; blockHold=null; return showBlock(); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
   if(a==="nudge-off"){ lsSet(LS_NUDGE, 0); return render(); }
@@ -2392,7 +2411,7 @@ $("#confirm-root").addEventListener("click", e=>{
   if(b.classList.contains("confirm-bg") && e.target!==b) return;
   confirmDone(b.dataset.cf==="ok");
 });
-document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy) askWake(); });
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy||socialLive()) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
 

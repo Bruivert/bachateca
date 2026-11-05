@@ -190,6 +190,9 @@ button.card:active{background:var(--surface2)}
 .tonight dt{font-size:14px;color:var(--muted);padding-top:1px}
 .tonight dd{margin:0;display:flex;flex-direction:column;gap:4px;min-width:0}
 .tonight h3:focus{outline:none}
+.tn-date{margin:-12px 0 0}
+.tn-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.tn-list li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
 .tonight.enter{animation:rise .42s cubic-bezier(.16,1,.3,1)}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}}
 .bk-line{display:flex;flex-direction:column;gap:6px;padding:0 4px}
@@ -298,11 +301,14 @@ button.card:active{background:var(--surface2)}
 .bk-foot .btn{flex:1}
 /* el compás del rescate: un tiempo se enciende cada 0,48 s (unos 125 golpes por minuto) para contar hasta el 1 */
 .bk-mid{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.bk-tap{border:0;background:none;padding:10px 0;margin:-10px 0;color:inherit;text-align:left;touch-action:manipulation}
+.bk-tap:active .bk-pulse i::before{filter:brightness(1.4)}
+#bk-tempo{margin:-6px 0 0}
 .bk-pulse{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;align-items:end;max-width:420px}
 .bk-pulse i{display:flex;flex-direction:column;align-items:center;gap:8px;font-style:normal}
-.bk-pulse i::before{content:"";display:block;width:100%;height:18px;border-radius:5px;background:var(--surface2);animation:beat 3.84s steps(1,end) infinite;animation-delay:calc(var(--b) * .48s)}
+.bk-pulse i::before{content:"";display:block;width:100%;height:18px;border-radius:5px;background:var(--surface2);animation:beat calc(var(--beat,.48s) * 8) steps(1,end) infinite;animation-delay:calc((var(--b) - var(--o,0)) * var(--beat,.48s))}
 .bk-pulse i.tap::before{height:34px}
-.bk-pulse span{font-size:17px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;animation:beat-n 3.84s steps(1,end) infinite;animation-delay:calc(var(--b) * .48s)}
+.bk-pulse span{font-size:17px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;animation:beat-n calc(var(--beat,.48s) * 8) steps(1,end) infinite;animation-delay:calc((var(--b) - var(--o,0)) * var(--beat,.48s))}
 .bk-pulse i.one span{animation:none;color:var(--fg)}
 .bk-count{margin:0;font-size:20px;font-weight:600;line-height:1.3;color:var(--fg)}
 @keyframes beat{0%{background:var(--neon)}12.5%,100%{background:var(--surface2)}}
@@ -517,6 +523,8 @@ let busy = false;
 let vstate = null;
 // Figuras marcadas como «salió» y dónde te bloqueaste durante el social: se guardan 12 h por si se cierra la app a mitad de noche.
 const LS_SAL = "bachateca.salieron";
+// Tras registrar un social con la copia antigua, el aviso espera a la próxima vez que abras la app (en Repertorio).
+const LS_NUDGE = "bachateca.nudge";
 const salInit = (()=>{ const s=lsGet(LS_SAL); return s && Date.now()-s.t < 432e5 ? s : {}; })();
 let logSel = new Set(Array.isArray(salInit.ids) ? salInit.ids : []);
 let logBloq = typeof salInit.bloq==="string" ? salInit.bloq : "";
@@ -535,7 +543,6 @@ let logSuggest = [];
 let editKey = null, confirmKey = null;
 let sheetBase = null;       // estado de la hoja al abrirla, para saber si hay cambios sin guardar
 let confirmDone = null;     // hoja de confirmación abierta
-let backupNudge = false;    // recordar la copia tras registrar un social
 let pendingReload = false;  // versión nueva esperando a que se cierre la hoja
 const BK_AT = "bachateca.backup.at", BK_CH = "bachateca.backup.ch";
 const safeUrl = u => /^https?:\/\//i.test(u||"") ? u : "";
@@ -636,8 +643,8 @@ function backupStatus(b){
 async function exportBackup(){
   const ok = await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"}));
   if(!ok) return;
-  lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); toast("Copia exportada");
-  if($('[aria-label="Ajustes"]')) openSettings(); else if($('[aria-label="Registrar el social"]')) openLog();
+  lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copia exportada"); render();
+  if($('[aria-label="Ajustes"]')) openSettings(); else if($('[data-sheet="log"]')) openLog();
 }
 function nextRep(r0,g){
   const r=Object.assign({step:0,aciertos:0,fallos:0}, r0||{});
@@ -691,7 +698,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.23";
+const APP_VERSION = "1.24";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -850,6 +857,7 @@ function renderRepertorio(){
   const v=$("#v-repertorio");
   v.innerHTML = `
     ${all.length ? `<p class="sum"><span><b>${all.length}</b> ${all.length===1?"figura":"figuras"}</span><span aria-hidden="true">·</span><span><b>${consN}</b> ${consN===1?"consolidada":"consolidadas"}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar"><b>${dueN}</b> ${dueN===1?"repaso hoy":"repasos hoy"}</button>`:""}</p>`:""}
+    ${nudgeHTML()}
     ${installHTML()}
     ${all.length ? `
     
@@ -1138,7 +1146,25 @@ function renderSocial(){
 const bkSort = pos => (a,b) => (ready(b)-ready(a)) || ((a.salida===pos)-(b.salida===pos)) || socSort(a,b);
 const blockExits = pos => exitsFrom(pos).sort(bkSort(pos)).slice(0,2);
 const nextOf = f => exitsFrom(f.salida, f.agarreOut, f.id).sort(bkSort(f.salida))[0];
-const BK_PULSE = `<div class="bk-pulse" aria-hidden="true">${[1,2,3,4,5,6,7,8].map(b=>`<i class="${b%4===0?"tap":""}${b===1?" one":""}" style="--b:${b-1}"><span>${b}</span></i>`).join("")}</div>`;
+// Pulso del rescate: 125 golpes por minuto hasta que lo marcas tocando el compás en 1, 2, 3, 4 al ritmo de la canción.
+let bkBeat = .48, bkTaps = [];
+const bkPulse = (o=0) => `<div class="bk-pulse" aria-hidden="true" style="--beat:${bkBeat}s;--o:${o}">${[1,2,3,4,5,6,7,8].map(b=>`<i class="${b%4===0?"tap":""}${b===1?" one":""}" style="--b:${b-1}"><span>${b}</span></i>`).join("")}</div>`;
+function bkTap(){
+  const now = performance.now();
+  if(bkTaps.length && now - bkTaps[bkTaps.length-1] > 2000) bkTaps = [];
+  bkTaps.push(now); bkTaps = bkTaps.slice(-4);
+  const hint = $("#bk-tempo");
+  if(bkTaps.length < 4){ if(hint) hint.textContent = `${bkTaps.length}…`; return; }
+  const iv = (bkTaps[3] - bkTaps[0]) / 3 / 1000;
+  bkTaps = [];
+  if(iv < .3 || iv > .8){ if(hint) hint.textContent = "No lo he cogido. Toca otra vez en 1, 2, 3, 4."; return; }
+  bkBeat = Math.round(iv*1000)/1000;
+  // El cuarto toque fue el 4: el compás sigue desde ahí, con el 5 en el siguiente golpe.
+  const pl = $(".bk-pulse"); if(pl) pl.outerHTML = bkPulse(3);
+  const bpm = Math.round(60/bkBeat);
+  if(hint) hint.textContent = `A tu ritmo: ${bpm} golpes por minuto.`;
+  announce(`Pulso a ${bpm} golpes por minuto`);
+}
 function bkExit(f){
   const nx = nextOf(f);
   return `<li><button type="button" class="bk-exit${ready(f)?"":" dim"}" data-bexit="${f.id}">
@@ -1164,7 +1190,7 @@ function showBlock(){
   $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
     <div class="bk-head"><h2 id="bk-t">Footwork o básico</h2>
       <p class="muted">${fw.length?`Para ganar tiempo: ${fw.slice(0,4).map(f=>`<b>${esc(f.nombre)}</b>`).join(", ")}.`:"Sigue bailando. No es un fallo, es tiempo para pensar."}</p></div>
-    <div class="bk-mid">${BK_PULSE}<p class="bk-count">Recupera el pulso: cuenta hasta el siguiente 1.</p></div>
+    <div class="bk-mid"><button type="button" class="bk-tap" data-act="bk-tap" aria-describedby="bk-tempo">${bkPulse()}<span class="sr">Marcar el pulso</span></button><p class="bk-count">Recupera el pulso: cuenta hasta el siguiente 1.</p><p class="small muted" id="bk-tempo" aria-live="polite">${bkBeat!==.48?`A tu ritmo: ${Math.round(60/bkBeat)} golpes por minuto.`:"Toca el compás en 1, 2, 3, 4 para seguir la canción."}</p></div>
     <div class="bk-body">${body}</div>
     <div class="bk-foot">${blockPos?`<button type="button" class="btn" data-act="bpos-back">Otra posición</button>`:""}<button type="button" class="btn bk-close" data-act="unblock">Cerrar</button></div></div>`;
   ($("#bk-from[tabindex]") || $(".bk-tile") || $(".bk-close"))?.focus({preventScroll:true});
@@ -1179,12 +1205,12 @@ let logAll = false;
 // Registro recién guardado: en vez del formulario vacío, la hoja enseña lo que pasó esta noche.
 let logDone = null;
 function tonightHTML(l){
-  const names = (l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean).map(esc);
-  if(l.salio) names.push(esc(l.salio));
-  return `<div class="panel tonight${tonightFresh?" enter":""}"><h3 id="tonight-t" tabindex="-1">Esta noche</h3>
+  const fs = (l.figs||[]).map(id=>S.figures[id]).filter(Boolean);
+  const items = [...fs.map(f=>`<li><b>${esc(f.nombre)}</b>${compas(f)}</li>`), ...(l.salio?[`<li><b>${esc(l.salio)}</b></li>`]:[])];
+  return `<div class="panel tonight${tonightFresh?" enter":""}">
     <dl>
-      <dt>Salieron</dt><dd>${names.length?joinY(names):`<span class="muted">Nada marcado</span>`}</dd>
-      <dt>Bloqueo</dt><dd>${l.bloqueo?`<b>${esc(l.bloqueo)}</b><span class="small muted">Pregunta en clase: «Desde ${esc(l.bloqueo)}, ¿qué figura sencilla puedo hacer?»</span>`:"Ninguno"}</dd>
+      <dt>Salieron</dt><dd>${items.length?`<ul class="tn-list">${items.join("")}</ul>`:`<span class="muted">Nada marcado</span>`}</dd>
+      <dt>Bloqueo</dt><dd>${l.bloqueo?`<b>${esc(l.bloqueo)}</b><span class="small muted">Tu pregunta para la próxima clase: «Desde ${esc(l.bloqueo)}, ¿qué figura sencilla puedo hacer?»</span>`:"Ninguno esta noche"}</dd>
       ${l.proximo?`<dt>Próxima vez</dt><dd>${esc(l.proximo)}</dd>`:""}
     </dl>
     <div class="row"><button class="btn pri" data-act="close">Hecho</button><button class="btn ghost" data-act="log-again">Registrar otro social</button></div>
@@ -1194,7 +1220,6 @@ function openLog(fresh){
   if(fresh){ logAll=false; logDone=null; }
   const done = logDone && S.logs[logDone];
   const LG=["lg-salio","lg-bloq","lg-prox"], keep = fresh ? null : LG.map(k=>$("#"+k)?.value||"");
-  const bk = backupNudge ? backupInfo() : null;
   const cand = figs().filter(active).sort((a,b)=>((b.usos||0)-(a.usos||0)) || (ready(b)-ready(a)));
   const shown = logAll ? cand : [...cand.filter(f=>logSel.has(f.id)), ...cand.filter(f=>!logSel.has(f.id)).slice(0,6)];
   const logs = Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"") || (b.creado||0)-(a.creado||0));
@@ -1202,13 +1227,12 @@ function openLog(fresh){
   const blockList = Object.entries(blocks).sort((a,b)=>b[1]-a[1]);
   const sug = logSuggest.filter(s=>S.figures[s.id] && S.figures[s.id].estado!==s.to);
   const sc = $(".sheet")?.scrollTop || 0;
-  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Registrar el social">
-    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Registrar el social</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-sheet="log">
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${done?"Esta noche":"Registrar el social"}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    ${done?`<p class="small muted tn-date">${fmtDate(done.fecha)}</p>`:""}
     ${done ? tonightHTML(done) : ""}
     ${sug.length?`<div class="panel"><h3>Según tus socials</h3>
       ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${S.figures[s.id].usos}×</span></span><button class="btn sm" data-promote="${s.id}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
-    ${bk && bk.stale?`<div class="bk-line"><p class="small"><b>${bk.at?`Tu última copia es de hace ${bk.days} días.`:"Aún no tienes ninguna copia."}</b> <span class="muted">Tus figuras solo están en este dispositivo.</span></p>
-      <div class="row"><button class="btn sm" data-act="export">Exportar copia</button><button class="btn ghost sm" data-act="nudge-off">Ahora no</button></div></div>`:""}
     ${done ? "" : `<div class="panel">
       <div class="f"><span>Figuras que te salieron</span>
         ${cand.length?`${logAll && cand.length>8?`<input type="search" id="lg-q" placeholder="Buscar figura" aria-label="Buscar figura">`:""}<div class="chips" id="lg-chips">${shown.map(f=>`<button type="button" class="chip sm" data-logfig="${f.id}" data-q="${esc(fold(f.nombre))}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>${shown.length<cand.length?`<button type="button" class="btn ghost sm" data-act="log-all">Ver todas (${cand.length})</button>`:""}`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
@@ -1221,8 +1245,8 @@ function openLog(fresh){
       <label class="f" for="lg-prox">Para practicar la próxima vez<input type="text" id="lg-prox" placeholder="Una sola cosa"></label>
       <button class="btn pri" data-act="log-save">Guardar registro</button>
     </div>`}
-    ${blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
-    ${logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
+    ${!done && blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
+    ${!done && logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
       const names=(l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean);
       return `<div class="log"><span class="d">${fmtDate(l.fecha)}</span>
       <div>${names.length?`<div>✓ ${names.map(esc).join(", ")}</div>`:""}${l.salio?`<div>✓ ${esc(l.salio)}</div>`:""}${l.bloqueo?`<div style="color:var(--warn)">✕ Bloqueo en ${esc(l.bloqueo)}</div>`:""}${l.proximo?`<div class="muted">→ ${esc(l.proximo)}</div>`:""}</div>
@@ -1249,8 +1273,9 @@ function saveLog(){
   });
   S.logs[l.id]=l; persist({t:"log",id:l.id});
   logSel = new Set(); logBloq = ""; saveSel(); setNight(false);
-  backupNudge = backupInfo().stale; render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
-  const s=$(".sheet"); if(s) s.scrollTop=0; $("#tonight-t")?.focus({preventScroll:true}); announce("Registro guardado");
+  if(backupInfo().stale) lsSet(LS_NUDGE, 1);
+  render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
+  const s=$(".sheet"); if(s) s.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); announce("Registro guardado");
 }
 function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
@@ -1260,7 +1285,7 @@ function deleteLog(id){
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(f.usos||0)+1; persist({t:"fig",id:fid}); } });
-    render(); if($('[aria-label="Registrar el social"]')) openLog();
+    render(); if($('[data-sheet="log"]')) openLog();
   }});
 }
 
@@ -1441,7 +1466,7 @@ function clearFieldError(){
 function closeSheet(){
   formApi = null;
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
-  const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; backupNudge=false; $("#sheet-root").innerHTML="";
+  const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
   if(pendingReload) setTimeout(()=>{ if(!$(".sheet") && !busy) location.reload(); }, 1500);
 }
@@ -1583,6 +1608,12 @@ async function shareOrDownload(file){
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click();
   setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return true;
+}
+function nudgeHTML(){
+  if(!lsGet(LS_NUDGE)) return "";
+  const b = backupInfo(); if(!b.stale) return "";
+  return `<div class="note"><b>${b.at?`Tu última copia es de hace ${b.days} días.`:"Aún no tienes ninguna copia."}</b> Tus figuras y registros solo están en este dispositivo.
+    <div class="row"><button class="btn sm" data-act="export">Exportar copia</button><button class="btn ghost sm" data-act="nudge-off">Ahora no</button></div></div>`;
 }
 function installHTML(){
   if(isStandalone() || lsGet("bachateca.install.hide")) return "";
@@ -2156,7 +2187,7 @@ document.addEventListener("click", async e=>{
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.promote){
     const f=S.figures[d.promote] ? clone(S.figures[d.promote]) : null; const to=d.to||"disponible";
-    if(f){ f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`); if($('[aria-label="Registrar el social"]')) openLog(); else if($("#sheet-root [data-viewfig]")) openView(f.id); else t.remove(); }
+    if(f){ f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`); if($('[data-sheet="log"]')) openLog(); else if($("#sheet-root [data-viewfig]")) openView(f.id); else t.remove(); }
     return;
   }
   if(d.logfig){ logSel.has(d.logfig) ? logSel.delete(d.logfig) : logSel.add(d.logfig); t.setAttribute("aria-pressed", logSel.has(d.logfig)); saveSel(); render(); return; }
@@ -2184,14 +2215,15 @@ document.addEventListener("click", async e=>{
   if(a==="end"){ session=null; return render(); }
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; return showBlock(); }
+  if(a==="bk-tap") return bkTap();
   if(a==="unblock"){ blockPos=null; return $("#overlay-root").innerHTML=""; }
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
   if(a==="night-off"){ setNight(false); releaseWake(); return go("repertorio"); }
   if(a==="bpos-back"){ blockPos=null; return showBlock(); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
-  if(a==="nudge-off"){ backupNudge=false; return openLog(); }
+  if(a==="nudge-off"){ lsSet(LS_NUDGE, 0); return render(); }
   if(a==="log-save") return saveLog();
-  if(a==="log-again"){ logDone=null; logSuggest=[]; backupNudge=false; return openLog(true); }
+  if(a==="log-again"){ logDone=null; logSuggest=[]; return openLog(true); }
   if(a==="log-all"){ logAll=true; openLog(); return ($("#lg-q") || $("#lg-chips .chip:not([aria-pressed=true])"))?.focus(); }
   if(a==="del-fig"){
     const id=d.id, f=S.figures[id]; if(!f) return;
@@ -2210,7 +2242,7 @@ document.addEventListener("click", async e=>{
   if(a==="ai-apply"){ const t=$("#ai-paste")?.value||""; if(!t.trim()){ toast("Pega primero la respuesta de Claude."); return; } return applySuggestion(cleanSug(parseReply(t))); }
   if(a==="copy"){
     const txt=exportData();
-    try{ await navigator.clipboard.writeText(txt); toast("Copiado. Pégalo en Notas o donde lo quieras guardar."); }
+    try{ await navigator.clipboard.writeText(txt); lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copiado. Pégalo en Notas o donde lo quieras guardar."); openSettings(); }
     catch{ const ta=$("#exp-text"); ta.hidden=false; ta.value=txt; ta.focus(); ta.select(); toast("No se pudo copiar solo. Mantén pulsado el recuadro y elige Copiar."); }
     return;
   }

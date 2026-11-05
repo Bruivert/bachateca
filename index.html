@@ -26,14 +26,16 @@
   --fg:#0a1a3f; --muted:#596989;
   --accent:#1e5eff; --accent-ink:#ffffff; --accent-fg:#1a4fd8; --accent-soft:rgba(30,94,255,.10);
   --neon:#c4f838; --neon-ink:#0a1a3f; --chip-on:#0a1a3f; --chip-on-ink:#ffffff;
-  --st-espera:#56637f; --st-practica:#1a4fd8; --st-disponible:#3d6600; --st-consolidada:#0a1a3f;
+  --st-espera:#56637f; --st-practica:#1a4fd8; --st-disponible:#3b7b00; --st-consolidada:#0a1a3f;
   --warn:#d70015;
   --bar:rgba(243,246,255,.84);
   --toast-act:#c4f838;
   /* acciones secundarias y marcas: azul en claro; en oscuro, azul suave y blanco para que el neón quede solo en lo principal */
   --link:#1a4fd8; --mark:#1a4fd8; --tab-on:#1a4fd8; --toast-bg:#0a1a3f; --toast-fg:#ffffff;
-  /* barras de la gráfica: el verde fosforito de la marca, con el verde oscuro para la semana elegida */
-  --c-bar:#a8d93a;
+  /* El verde es siempre «esto ya te sale»: estado Disponible, salidas seguras, la gráfica y su número.
+     En claro va más oscuro que el neón para leerse: texto a 5,2:1 y barras a 3,2:1 sobre blanco. */
+  --c-bar:#57a314; --ready-num:var(--st-disponible);
+  --cmp-off:#7d8bab;
   --ok:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --f-display:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
   --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
@@ -51,7 +53,7 @@
     --bar:rgba(7,19,48,.80);
     --toast-act:#a9c4ff;
     --link:#a9c4ff; --mark:#ffffff; --tab-on:#ffffff; --toast-bg:#1f3a7a; --toast-fg:#ffffff;
-    --c-bar:color-mix(in srgb,var(--st-disponible) 45%,var(--surface));
+    --c-bar:color-mix(in srgb,var(--st-disponible) 45%,var(--surface)); --ready-num:var(--fg); --cmp-off:#6680bb;
     color-scheme:dark;
   }
 }
@@ -66,7 +68,7 @@
   --bar:rgba(7,19,48,.80);
   --toast-act:#a9c4ff;
   --link:#a9c4ff; --mark:#ffffff; --tab-on:#ffffff; --toast-bg:#1f3a7a; --toast-fg:#ffffff;
-    --c-bar:color-mix(in srgb,var(--st-disponible) 45%,var(--surface));
+    --c-bar:color-mix(in srgb,var(--st-disponible) 45%,var(--surface)); --ready-num:var(--fg); --cmp-off:#6680bb;
   color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -437,7 +439,7 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 /* Compás de 8: la frase de bachata, con los taps (4 y 8) más altos, los tiempos que ocupa
    la figura rellenos y un punto en el tiempo en que empieza. */
 .cmp{display:inline-flex;align-items:flex-end;gap:2px;height:13px;vertical-align:-1px;position:relative}
-.cmp i{display:block;width:4px;height:7px;border-radius:1px;background:var(--line);position:relative;font-style:normal;transform-origin:bottom}
+.cmp i{display:block;width:4px;height:7px;border-radius:1px;background:var(--cmp-off);position:relative;font-style:normal;transform-origin:bottom}
 /* figura recién guardada: la tarjeta se ilumina y su compás se enciende del 1 al 8 */
 .card.lit{animation:lit 1.4s ease-out}
 @keyframes lit{from{background:color-mix(in srgb,var(--accent) 16%,var(--surface))}}
@@ -450,7 +452,7 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .cmp b{font-size:12px;font-weight:700;color:var(--muted);margin-left:4px;line-height:1}
 .cmp.lg{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;height:auto;width:100%;max-width:340px;align-items:end;vertical-align:baseline}
 .cmp.lg i{width:auto;height:auto;background:none;border-radius:0;display:flex;flex-direction:column;align-items:center;gap:6px}
-.cmp.lg i::before{content:"";display:block;width:100%;height:16px;border-radius:4px;background:var(--line)}
+.cmp.lg i::before{content:"";display:block;width:100%;height:16px;border-radius:4px;background:var(--cmp-off)}
 .cmp.lg i.tap::before{height:28px}
 .cmp.lg i.on::before{background:var(--mark)}
 .cmp.lg i.st::after{display:none}
@@ -775,7 +777,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.30";
+const APP_VERSION = "1.31";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -2092,7 +2094,7 @@ function progressHTML(){
   const first=weeks[0].ready, last=weeks[weeks.length-1].ready, w=weeks[sel];
   return `<div class="panel">
     <h3>Tu progreso</h3>
-    <p><b style="font-family:var(--f-display);font-size:22px">${last}</b> ${last===1?"figura segura":"figuras seguras"} para el social <span class="muted small">(${first===last?"igual que hace 8 semanas":(last>first?"+":"−")+Math.abs(last-first)+" en 8 semanas"})</span></p>
+    <p><b style="font-family:var(--f-display);font-size:22px;color:var(--ready-num)">${last}</b> ${last===1?"figura segura":"figuras seguras"} para el social <span class="muted small">(${first===last?"igual que hace 8 semanas":(last>first?"+":"−")+Math.abs(last-first)+" en 8 semanas"})</span></p>
     <figure class="chart">
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Figuras seguras (disponibles o consolidadas) al final de cada una de las últimas 8 semanas.">
         ${ticks.map(v=>`<line class="c-grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="c-ax" x="${L-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`).join("")}

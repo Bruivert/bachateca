@@ -165,6 +165,21 @@ button.card:active{background:var(--surface2)}
 .note{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:15px}
 .note.ok{background:color-mix(in srgb,var(--st-disponible) 14%,transparent)}
 .note .btn{margin-top:8px}
+.note.install{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 14px}
+.note.install span{flex:1}
+.note.install .btn{margin:0}
+.group-hint{margin:-4px 4px 10px}
+/* Ajustes: la copia arriba y el resto como filas que abren su propia pantalla */
+.menu{flex:none;display:flex;flex-direction:column;border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.mrow{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:0 12px 0 16px;border:0;background:none;color:var(--fg);font-size:16px;text-align:left;position:relative}
+.mrow+.mrow::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+.mrow:active{background:var(--fill)}
+.mrow span:first-child{flex:1}
+.mrow .mv{color:var(--muted);font-variant-numeric:tabular-nums}
+.mrow svg{flex:none;width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.menu-h{font-size:13px;font-weight:500;color:var(--muted);margin:4px 16px -8px}
+.sheet-head .back{padding-left:4px;padding-right:8px}
+.sub-t{font-size:22px;margin:-4px 0 0}
 .cov{display:grid;grid-template-columns:1fr auto auto;gap:6px 14px;align-items:center;font-size:15px}
 .cov .h{font-size:13px;color:var(--muted)}
 .cov .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -387,7 +402,7 @@ details.info summary::after{inset:-10px -4px}
     <div class="bar">
       <div class="brand"><img class="mark" src="icon-192.png" alt="" width="26" height="26"><span class="logo">bachateca</span></div>
       <span class="sync" id="sync"></span>
-      <button class="icon-btn" id="btn-settings" aria-label="Ajustes"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+      <button class="icon-btn" id="btn-settings" aria-label="Ajustes"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <button class="btn pri sm" id="btn-new">+ Añadir</button>
     </div>
   </header>
@@ -538,7 +553,7 @@ function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
   if(sheetBase.carried) return true;
-  if([...document.querySelectorAll("#sheet-root input:not([type=file]),#sheet-root select,#sheet-root textarea:not([readonly])")].some(fieldDirty)) return true;
+  if([...document.querySelectorAll("#sheet-root input:not([type=file]):not([type=search]),#sheet-root select,#sheet-root textarea:not([readonly])")].some(fieldDirty)) return true;
   return pressSig()!==sheetBase.press || vSig()!==sheetBase.v;
 }
 async function requestClose(){
@@ -621,7 +636,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.16";
+const APP_VERSION = "1.17";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -761,7 +776,6 @@ function renderRepertorio(){
   const all = figs();
   const dueN = dueFigs().length + dueLinks().length;
   const consN = all.filter(f=>f.estado==="consolidada").length;
-  const incN = all.filter(incomplete).length;
   const bailes = [...new Set(all.map(f=>f.baile||"Bachata"))];
   const q = fold(filt.q.trim());
   const list = all.filter(f =>
@@ -773,10 +787,10 @@ function renderRepertorio(){
   let body = "";
   if(filt.vista==="pos"){
     const groups = [];
-    const inc = list.filter(incomplete); if(inc.length) groups.push(["Sin completar", inc]);
+    const inc = list.filter(incomplete); if(inc.length) groups.push(["Sin completar", inc, inc.length===1?"Añade dónde empieza y dónde acaba para que salga en Enlazar.":"Añade dónde empiezan y dónde acaban para que salgan en Enlazar."]);
     allPositions().forEach(p=>{ const it=list.filter(f=>placed(f)&&f.entrada===p); if(it.length) groups.push(["Desde "+p, it]); });
     const fw = list.filter(f=>!isMove(f)); if(fw.length) groups.push(["Footwork y styling", fw]);
-    body = groups.map(([t,it])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${it.map(f=>figCard(f, t.startsWith("Desde "))).join("")}</div>`).join("");
+    body = groups.map(([t,it,hint])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${hint?`<p class="small muted group-hint">${hint}</p>`:""}${it.map(f=>figCard(f, t.startsWith("Desde "))).join("")}</div>`).join("");
   } else body = `<div class="list">${list.map(f=>figCard(f,false)).join("")}</div>`;
   const v=$("#v-repertorio");
   v.innerHTML = `
@@ -784,7 +798,6 @@ function renderRepertorio(){
     ${installHTML()}
     ${all.length ? `
     
-    ${incN && filt.estado!=="incompletas" ? `<div class="note">${incN===1?"1 figura sin completar. Añade dónde empieza y dónde acaba para que salga en Enlazar.":incN+" figuras sin completar. Añade dónde empiezan y dónde acaban para que salgan en Enlazar."}<br><button class="btn sm" data-act="show-inc">${incN===1?"Verla":"Verlas"}</button></div>`:""}
     <div class="filters">
       <input type="search" class="full" id="f-q" placeholder="Buscar figura, posición, agarre, clase…" value="${esc(filt.q)}" aria-label="Buscar">
       ${bailes.length>1?`<select id="f-baile" aria-label="Baile"><option value="todos">Baile: todos</option>${bailes.map(b=>`<option ${filt.baile===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
@@ -1086,10 +1099,14 @@ function showBlock(){
 const sheetBg = () => `sheet-bg${$("#sheet-root .sheet")?" still":""}`;
 
 // ---------- hoja: registro del social ----------
+// En el registro se ven las marcadas y las 6 que más te salen; «Ver todas» abre el resto con buscador.
+let logAll = false;
 function openLog(fresh){
+  if(fresh) logAll=false;
   const LG=["lg-salio","lg-bloq","lg-prox"], keep = fresh ? null : LG.map(k=>$("#"+k)?.value||"");
   const bk = backupNudge ? backupInfo() : null;
-  const cand =figs().filter(active).sort((a,b)=>(ready(b)-ready(a)) || ((b.usos||0)-(a.usos||0)));
+  const cand = figs().filter(active).sort((a,b)=>((b.usos||0)-(a.usos||0)) || (ready(b)-ready(a)));
+  const shown = logAll ? cand : [...cand.filter(f=>logSel.has(f.id)), ...cand.filter(f=>!logSel.has(f.id)).slice(0,6)];
   const logs = Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"") || (b.creado||0)-(a.creado||0));
   const blocks = {}; logs.forEach(l=>{ if(l.bloqueo) blocks[l.bloqueo]=(blocks[l.bloqueo]||0)+1; });
   const blockList = Object.entries(blocks).sort((a,b)=>b[1]-a[1]);
@@ -1103,7 +1120,7 @@ function openLog(fresh){
       ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${S.figures[s.id].usos}×</span></span><button class="btn sm" data-promote="${s.id}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
     <div class="panel">
       <div class="f"><span>Figuras que te salieron</span>
-        ${cand.length?`<div class="chips">${cand.map(f=>`<button type="button" class="chip sm" data-logfig="${f.id}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
+        ${cand.length?`${logAll && cand.length>8?`<input type="search" id="lg-q" placeholder="Buscar figura" aria-label="Buscar figura">`:""}<div class="chips" id="lg-chips">${shown.map(f=>`<button type="button" class="chip sm" data-logfig="${f.id}" data-q="${esc(fold(f.nombre))}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>${shown.length<cand.length?`<button type="button" class="btn ghost sm" data-act="log-all">Ver todas (${cand.length})</button>`:""}`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
       </div>
       <label class="f" for="lg-salio">Otra cosa que salió (opcional)<input type="text" id="lg-salio" placeholder="Ej.: un giro que improvisé"></label>
       <label class="f" for="lg-bloq">Me bloqueé en
@@ -1113,7 +1130,7 @@ function openLog(fresh){
       <label class="f" for="lg-prox">Para practicar la próxima vez<input type="text" id="lg-prox" placeholder="Una sola cosa"></label>
       <button class="btn pri" data-act="log-save">Guardar registro</button>
     </div>
-    ${blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><div class="chips">${blockList.map(([p,n])=>`<span class="chip warn">${esc(p)}<span class="n">×${n}</span></span>`).join("")}</div><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
+    ${blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
     ${logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
       const names=(l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean);
       return `<div class="log"><span class="d">${fmtDate(l.fecha)}</span>
@@ -1123,6 +1140,7 @@ function openLog(fresh){
   if(logBloq) $("#lg-bloq").value=logBloq;
   if(keep) LG.forEach((k,i)=>{ if(keep[i]) $("#"+k).value=keep[i]; });
   $("#lg-bloq").onchange=e=>{ logBloq=e.target.value; saveSel(); };
+  const lq=$("#lg-q"); if(lq) lq.oninput=()=>{ const q=fold(lq.value.trim()); document.querySelectorAll("#lg-chips [data-q]").forEach(c=>{ c.hidden = !!q && !c.dataset.q.includes(q); }); };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
   markClean();
 }
@@ -1446,7 +1464,8 @@ async function shareOrDownload(file){
 function installHTML(){
   if(isStandalone() || lsGet("bachateca.install.hide")) return "";
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
-  return `<div class="note"><b>Instala Bachateca en tu iPhone.</b> ${ios?"En Safari, pulsa Compartir y después «Añadir a pantalla de inicio».":"Abre esta página con Safari en el iPhone y pulsa Compartir → «Añadir a pantalla de inicio»."} Se abrirá a pantalla completa y funcionará sin conexión.<br><button class="btn sm ghost" data-act="install-hide">Ahora no</button></div>`;
+  if(!ios) return "";
+  return `<div class="note install"><span>Instálala: Compartir → «Añadir a pantalla de inicio».</span><button class="btn sm ghost" data-act="install-hide">Ahora no</button></div>`;
 }
 function refreshTrim(){ // re-render conservando la posición del reproductor
   const pv=$("#ff-prev"); const t=pv?pv.currentTime:0;
@@ -1846,10 +1865,10 @@ function renameItem(kind, i, nw){
   const nu=usage(kind,nw); saveMeta(); toast(nu ? `Renombrado en ${pl(nu,"figura","figuras")}` : "Renombrado");
   return true;
 }
-function listHTML(kind){
+function listHTML(kind, bare){
   const L=LISTS[kind], list=S[L.key];
   return `<div class="panel">
-    <h3>${L.title}</h3><p class="small muted">${L.help}</p>
+    ${bare?"":`<h3>${L.title}</h3>`}<p class="small muted">${L.help}</p>
     <div class="poslist">${list.map((v,i)=>{
       const k=kind+i, n=usage(kind,v);
       if(editKey===k) return `<div><input type="text" id="ren-${k}" value="${esc(v)}" aria-label="Nuevo nombre" style="flex:1"><button class="btn sm pri" data-lsave="${kind}" data-i="${i}">Guardar</button><button class="btn ghost sm" data-lcancel="1">Cancelar</button></div>`;
@@ -1862,45 +1881,56 @@ function listHTML(kind){
     ${kind!=="cls"?`<p class="small muted">Quitar no cambia las figuras que ya lo usan. Para cambiar el nombre en todas a la vez, usa el lápiz.</p>`:""}
   </div>`;
 }
+// Pantalla de Ajustes abierta: null es el menú; si no, una de SET_VIEWS.
+let setView = null;
+const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos"};
+function setGo(v){ setView=v; confirmKey=null; editKey=null; openSettings(); const sh=$(".sheet"); if(sh) sh.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); }
 function openSettings(){
   const sc = $(".sheet")?.scrollTop || 0;
   const exN = figs().filter(f=>f.ejemplo).length;
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   const bk = backupInfo(), bs = backupStatus(bk);
-  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajustes">
-    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Ajustes</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    <div class="panel">
+  const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
+  const row = (v, t, val) => `<button type="button" class="mrow" data-setv="${v}"><span>${t}</span>${val!==""?`<span class="mv">${val}</span>`:""}${CHEV}</button>`;
+  const head = setView
+    ? `<div class="sheet-head"><button type="button" class="btn ghost back" data-act="set-back">‹ Ajustes</button><span style="margin-right:auto"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+       <h2 id="sheet-t" class="sub-t" tabindex="-1">${SET_VIEWS[setView]}</h2>`
+    : `<div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Ajustes</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>`;
+  let body;
+  if(setView==="pos" || setView==="hold" || setView==="cls") body = listHTML(setView, true);
+  else if(setView==="importar") body = `<div class="panel">
+      <p class="small muted">Para recuperar una copia, elige el archivo exportado. Si usabas Bachateca dentro de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
+      <div class="row"><label class="btn" for="imp-file" style="display:inline-flex">Elegir archivo de copia</label><input type="file" id="imp-file" accept="application/json,.json" hidden></div>
+      <textarea id="imp-text" placeholder="…o pega aquí el texto de una copia" aria-label="Texto de la copia"></textarea>
+      <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">Reemplazar todo</button></div>
+    </div>`;
+  else if(setView==="espacio") body = `<div class="panel">
+      <p class="small muted" id="vid-usage">Calculando…</p>
+      <p class="small muted" id="persist-st"></p>
+      <button class="btn sm" data-act="persist">Proteger mis datos</button>
+    </div>`;
+  else if(setView==="ejemplos") body = `<div class="panel">
+      <p class="small muted">${exN?"Las figuras de muestra llevan la etiqueta «ejemplo». Quítalas cuando ya tengas las tuyas.":"Figuras de muestra para ver cómo funciona la app. Llevan la etiqueta «ejemplo»."}</p>
+      <div class="row">${exN?`<button class="btn danger" data-act="clear-examples">Quitar ${exN} ejemplos</button>`:`<button class="btn" data-act="examples">Cargar ejemplos</button>`}</div>
+    </div>`;
+  else body = `<div class="panel">
       <h3>Copia de seguridad</h3>
       <p><b class="bk-st${bk.stale?" due":""}">${esc(bs.main)}</b>${bs.since?` <span class="muted">${esc(bs.since)}</span>`:""}</p>
       <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»).</p>
       <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar como texto</button></div>
       <textarea id="exp-text" readonly hidden aria-label="Texto de tu copia"></textarea>
     </div>
-    <div class="panel">
-      <h3>Espacio en este dispositivo</h3>
-      <p class="small muted" id="vid-usage">Calculando…</p>
-      <p class="small muted" id="persist-st"></p>
-      <button class="btn sm" data-act="persist">Proteger mis datos</button>
-    </div>
-    ${listHTML("pos")}
-    ${listHTML("hold")}
-    ${listHTML("cls")}
-    <div class="panel">
-      <h3>Restaurar o importar</h3>
-      <p class="small muted">Para recuperar una copia, elige el archivo exportado. Si usabas Bachateca dentro de Claude, pulsa allí «Copiar JSON» y pégalo aquí.</p>
-      <div class="row"><label class="btn" for="imp-file" style="display:inline-flex">Elegir archivo de copia</label><input type="file" id="imp-file" accept="application/json,.json" hidden></div>
-      <textarea id="imp-text" placeholder="…o pega aquí el texto de una copia" aria-label="Texto de la copia"></textarea>
-      <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">Reemplazar todo</button></div>
-    </div>
-    <div class="panel">
-      <h3>Ejemplos</h3>
-      <p class="small muted">${exN?"Las figuras de muestra llevan la etiqueta «ejemplo». Quítalas cuando ya tengas las tuyas.":"Figuras de muestra para ver cómo funciona la app. Llevan la etiqueta «ejemplo»."}</p>
-      <div class="row">${exN?`<button class="btn danger" data-act="clear-examples">Quitar ${exN} ejemplos</button>`:`<button class="btn" data-act="examples">Cargar ejemplos</button>`}</div>
-    </div>
-    <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</span></details>
+    <p class="menu-h">Listas</p>
+    <div class="menu">${row("pos","Posiciones",S.positions.length)}${row("hold","Agarres",S.holds.length)}${row("cls","Tus clases",S.classes.length)}</div>
+    <p class="menu-h">Datos</p>
+    <div class="menu">${row("importar","Restaurar o importar","")}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
+    <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</span></details>`;
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajustes">
+    ${head}
+    ${body}
   </div></div>`;
-  $("#imp-file").onchange = async e=>{ const file=e.target.files[0]; if(!file) return; try{ $("#imp-text").value = await file.text(); toast("Archivo cargado. Elige «Añadir al repertorio» o «Reemplazar todo»."); }catch{ toast("No se pudo leer el archivo."); } };
+  const fi=$("#imp-file"); if(fi) fi.onchange = async e=>{ const file=e.target.files[0]; if(!file) return; try{ $("#imp-text").value = await file.text(); toast("Archivo cargado. Elige «Añadir al repertorio» o «Reemplazar todo»."); }catch{ toast("No se pudo leer el archivo."); } };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
   markClean();
@@ -1964,10 +1994,11 @@ document.addEventListener("click", async e=>{
   }
   const wk = e.target.closest("[data-week]");
   if(wk){ progWeek=+wk.dataset.week; return render(); }
-  const t = e.target.closest("[data-tab],[data-act],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit]");
+  const t = e.target.closest("[data-tab],[data-act],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv]");
   if(!t) return;
   const d=t.dataset;
   if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); saveSel(); return render(); }
+  if(d.setv) return setGo(d.setv);
   if(d.bpos!==undefined){ blockPos=d.bpos; logBloq=d.bpos; saveSel(); return showBlock(); }
   if(d.bexit){
     const id=d.bexit, had=logSel.has(id), f=S.figures[id];
@@ -2001,7 +2032,6 @@ document.addEventListener("click", async e=>{
   if(a==="examples"){ closeSheet(); return loadExamples(); }
   if(a==="clear-examples"){ figs().filter(f=>f.ejemplo).forEach(f=>deleteFigure(f.id)); toast("Ejemplos quitados"); return openSettings(); }
   if(a==="coach") return runCoach();
-  if(a==="show-inc"){ filt.estado="incompletas"; return render(); }
   if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; return render(); }
   if(a==="start-fig") return startSession("fig", false);
   if(a==="start-fig-any") return startSession("fig", true);
@@ -2012,11 +2042,13 @@ document.addEventListener("click", async e=>{
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; return showBlock(); }
   if(a==="unblock"){ blockPos=null; return $("#overlay-root").innerHTML=""; }
+  if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
   if(a==="night-off"){ setNight(false); releaseWake(); return go("repertorio"); }
   if(a==="bpos-back"){ blockPos=null; return showBlock(); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
   if(a==="nudge-off"){ backupNudge=false; return openLog(); }
   if(a==="log-save") return saveLog();
+  if(a==="log-all"){ logAll=true; openLog(); return ($("#lg-q") || $("#lg-chips .chip:not([aria-pressed=true])"))?.focus(); }
   if(a==="del-fig"){
     const id=d.id, f=S.figures[id]; if(!f) return;
     const ok = await askConfirm({title:`¿Borrar «${f.nombre}»?`, msg: f.vid ? "También se borra su vídeo guardado en la app. Tendrás unos segundos para deshacerlo." : "Tendrás unos segundos para deshacerlo.", ok:"Borrar figura"});
@@ -2097,7 +2129,7 @@ $("#confirm-root").addEventListener("click", e=>{
 });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
-$("#btn-settings").onclick=()=>{ confirmKey=null; editKey=null; openSettings(); };
+$("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
 
 // arranque
 const h=(location.hash||"").slice(1);

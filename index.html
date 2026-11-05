@@ -32,6 +32,9 @@
   --toast-act:#c4f838;
   /* acciones secundarias y marcas: azul en claro; en oscuro, azul suave y blanco para que el neón quede solo en lo principal */
   --link:#1a4fd8; --mark:#1a4fd8; --tab-on:#1a4fd8; --toast-bg:#0a1a3f; --toast-fg:#ffffff;
+  /* barras de la gráfica: el verde fosforito de la marca, con el verde oscuro para la semana elegida */
+  --c-bar:#a8d93a;
+  --ok:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --f-display:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
   --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   --r:14px;
@@ -48,6 +51,7 @@
     --bar:rgba(7,19,48,.80);
     --toast-act:#a9c4ff;
     --link:#a9c4ff; --mark:#ffffff; --tab-on:#ffffff; --toast-bg:#1f3a7a; --toast-fg:#ffffff;
+    --c-bar:color-mix(in srgb,var(--st-disponible) 45%,var(--surface));
     color-scheme:dark;
   }
 }
@@ -62,6 +66,7 @@
   --bar:rgba(7,19,48,.80);
   --toast-act:#a9c4ff;
   --link:#a9c4ff; --mark:#ffffff; --tab-on:#ffffff; --toast-bg:#1f3a7a; --toast-fg:#ffffff;
+    --c-bar:color-mix(in srgb,var(--st-disponible) 45%,var(--surface));
   color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -233,7 +238,7 @@ button.card:active{background:var(--surface2)}
 .chain .step:first-child{border-top:0}
 .chain .k{font-family:var(--f-display);font-weight:800;color:var(--link);font-variant-numeric:tabular-nums}
 .seg2{display:grid;grid-template-columns:1fr 1fr;background:var(--fill);border-radius:10px;padding:2px}
-.seg2 button{background:none;border:0;border-radius:8px;padding:7px;min-height:42px;font-size:14px;font-weight:600;color:var(--fg)}
+.seg2 button{background:none;border:0;border-radius:8px;padding:7px;min-height:44px;font-size:14px;font-weight:600;color:var(--fg)}
 .seg2 button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 
 /* repaso */
@@ -246,6 +251,7 @@ button.card:active{background:var(--surface2)}
 .exits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .exits li{display:flex;flex-direction:column;font-size:16px}
 .exits li .to{font-size:14px;color:var(--muted)}
+.exits li.dim>span:first-child{color:var(--muted)}
 .grade{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .grade .btn{padding:12px 6px;font-size:15px}
 .progress{height:4px;background:var(--fill);border-radius:99px;overflow:hidden}
@@ -287,6 +293,12 @@ button.card:active{background:var(--surface2)}
 .bk-tile{min-height:72px;border:0;border-radius:var(--r);background:var(--surface);color:var(--fg);font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.15;padding:12px 14px;text-align:left}
 .bk-tile:active{background:var(--surface2)}
 .bk-from{font-family:var(--f-display);font-weight:800;font-size:22px;margin:0;color:var(--muted)}
+.overlay.picked{gap:14px}
+.overlay.picked .bk-head p{display:none}
+.overlay.picked .bk-mid{gap:10px}
+.overlay.picked .bk-body{gap:12px}
+.bk-holds{align-items:center}
+.bk-holds .chip{min-height:44px;font-size:16px}
 .bk-exits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .bk-exit{width:100%;border:0;border-radius:var(--r);background:var(--surface);color:var(--fg);text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
 .bk-exit:active{background:var(--surface2)}
@@ -333,6 +345,10 @@ button.card:active{background:var(--surface2)}
 .seg.neutral button{color:var(--fg)}
 .seg button[aria-pressed="true"]{background:var(--sc);color:var(--bg)}
 .seg.neutral button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+/* Estados en 2×2 con la marca de elegido: «Lista de espera» elegida ya no parece desactivada. */
+.seg.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.seg.states button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.seg.states button[aria-pressed="true"]::before{content:"";flex:none;width:14px;height:14px;background:currentColor;-webkit-mask:var(--ok) center/contain no-repeat;mask:var(--ok) center/contain no-repeat}
 details summary{cursor:pointer;color:var(--link);font-weight:600;font-size:16px;padding:4px 0;list-style:none}
 details summary::-webkit-details-marker{display:none}
 details summary::before{content:"+ ";font-weight:700}
@@ -367,7 +383,7 @@ details .inner{display:flex;flex-direction:column;gap:12px}
 .g-lbl{fill:var(--muted);font:600 13px var(--f-body)}
 .c-grid{stroke:var(--line);stroke-width:1}
 .c-ax{fill:var(--muted);font:500 12px var(--f-body);font-variant-numeric:tabular-nums}
-.c-bar{fill:color-mix(in srgb,var(--st-disponible) 45%,var(--surface))}
+.c-bar{fill:var(--c-bar)}
 .c-sel{fill:var(--st-disponible)}
 .c-hit{fill:transparent;cursor:pointer}
 .dtab{border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;width:100%}
@@ -425,7 +441,8 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .cmp-row{display:flex;flex-direction:column;gap:8px}
 /* zona táctil de al menos 44 pt en controles pequeños, sin cambiar su aspecto */
 .icon-btn,.chip,.btn.sm,.bar .btn.pri,.toast .undo,.sum .lnk,.pctl button,details summary{position:relative}
-.icon-btn::after,.btn.sm::after,.bar .btn.pri::after,.sum .lnk::after{content:"";position:absolute;inset:-6px -3px}
+.btn.sm::after,.bar .btn.pri::after,.sum .lnk::after{content:"";position:absolute;inset:-6px -3px}
+.icon-btn::after{content:"";position:absolute;inset:-6px}
 .pctl button::after{content:"";position:absolute;inset:-7px -3px}
 details summary::after{content:"";position:absolute;inset:-8px -4px}
 details.info summary::after{inset:-10px -4px}
@@ -536,7 +553,7 @@ let nightAt = +lsGet(LS_NOCHE) || 0;
 const nightOn = () => Date.now()-nightAt < NIGHT_MS;
 const paintNight = () => document.documentElement.classList.toggle("night", tab==="social" || nightOn());
 function setNight(on){ nightAt = on ? Date.now() : 0; lsSet(LS_NOCHE, nightAt); paintNight(); }
-let blockPos = null;
+let blockPos = null, blockHold = null;
 // Lo recién hecho, para animarlo una sola vez: figura guardada, fila marcada y registro guardado.
 let justSaved = null, lastSal = null, tonightFresh = false;
 let logSuggest = [];
@@ -579,13 +596,39 @@ const isDue = f => active(f) && (!f.rep || !f.rep.due || f.rep.due <= todayStr()
 const dueFigs = () => figs().filter(isDue).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||"") || (a.rep?.step||0)-(b.rep?.step||0));
 const linkPositions = () => allPositions().filter(p=>exitsFrom(p).length);
 const dueLinks = () => { const t=todayStr(); return linkPositions().filter(p=>{ const r=S.linkRep[p]; return !r || !r.due || r.due<=t; }); };
-let toastT;
-function toast(msg, action){
-  let t=$(".toast"); if(!t){t=document.createElement("div");t.className="toast";t.setAttribute("role","status");document.body.appendChild(t);}
-  t.textContent=msg;
-  if(action){ const b=document.createElement("button"); b.type="button"; b.className="undo"; b.textContent=action.label; b.onclick=()=>{ t.hidden=true; clearTimeout(toastT); action.fn(); }; t.appendChild(b); }
-  t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; if(action && action.onExpire) action.onExpire(); }, action ? 10000 : Math.min(6000, Math.max(2400, msg.length*55)));
+let toastT, toastEl = null, toastEnd = null;
+// Con una hoja abierta, el aviso va dentro de ella: fuera, VoiceOver no puede llegar a «Deshacer».
+const toastHost = () => $("#sheet-root [role=dialog]") || document.body;
+// Si el foco estaba en el aviso cuando se va, vuelve al título de la hoja o de la pantalla.
+function focusHome(){
+  const el = $("#sheet-root #sheet-t") || $(`#v-${tab} h2`) || $(`[data-tab="${tab}"]`); if(!el) return;
+  if(!el.matches("button,a,input,select,textarea,[tabindex]")) el.tabIndex=-1;
+  el.focus({preventScroll:true});
 }
+function toast(msg, action){
+  if(toastEnd) toastEnd();   // el aviso anterior termina: si tenía algo pendiente al caducar, se hace ya
+  const ae=document.activeElement, lost = !ae || ae===document.body || !ae.isConnected;
+  let t=toastEl; if(!t){ t=toastEl=document.createElement("div"); t.className="toast"; t.setAttribute("role","status"); }
+  if(t.parentNode!==toastHost()) toastHost().appendChild(t);
+  t.textContent=msg;
+  let done=false;
+  const hide = ()=>{ const had=t.contains(document.activeElement); t.hidden=true; if(had) focusHome(); };
+  const end = ()=>{ if(done) return; done=true; toastEnd=null; if(action && action.onExpire) action.onExpire(); };
+  if(action){ const b=document.createElement("button"); b.type="button"; b.className="undo"; b.textContent=action.label; b.onclick=()=>{ done=true; toastEnd=null; clearTimeout(toastT); hide(); action.fn(); }; t.appendChild(b); }
+  // Mientras «Deshacer» tiene el foco (VoiceOver, teclado), el aviso se queda, hasta 30 segundos.
+  const t0 = Date.now();
+  const later = ms => { clearTimeout(toastT); toastT=setTimeout(()=>{
+    if(!done && t.contains(document.activeElement) && Date.now()-t0 < 30000) return later(4000);
+    hide(); end(); }, ms); };
+  t.hidden=false; toastEnd = action ? end : null;
+  later(action ? 10000 : Math.min(6000, Math.max(2400, msg.length*55)));
+  // Si lo que hiciste dejó el foco en el vacío (la figura borrada ya no está), pasa a «Deshacer».
+  if(action && lost) t.querySelector(".undo").focus({preventScroll:true});
+}
+// Al cerrar o volver a pintar la hoja, el aviso visible se muda a donde toque y no se pierde.
+new MutationObserver(()=>{ const t=toastEl; if(t && !t.hidden && t.parentNode!==toastHost()) toastHost().appendChild(t); }).observe($("#sheet-root"), {childList:true});
+// Si tocas en otro sitio, «Deshacer» suelta el foco y el aviso se va a su hora.
+document.addEventListener("pointerdown", e=>{ const t=toastEl; if(t && !t.contains(e.target) && t.contains(document.activeElement)) document.activeElement.blur(); }, true);
 // Avisos para VoiceOver sin cambiar la pantalla.
 const announce = m => { const r=$("#sr-live"); if(!r) return; r.textContent=""; setTimeout(()=>{ r.textContent=m; }, 60); };
 // Para lo que cambia mientras escribes: avisa solo cuando paras.
@@ -698,7 +741,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.24";
+const APP_VERSION = "1.25";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -830,7 +873,7 @@ function figCard(f, inGroup){
   </button>`;
 }
 function exitLi(f, opts={}){
-  return `<li class="${opts.dim?"dim":""}"><span>${esc(f.nombre)}</span><span class="to">${routeTxt(f)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}</span></li>`;
+  return `<li class="${opts.dim?"dim":""}"><span>${esc(f.nombre)}</span><span class="to">${routeTxt(f)}${opts.dim?" · en práctica":""}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}</span></li>`;
 }
 
 // ---------- vista: repertorio ----------
@@ -915,7 +958,10 @@ function renderRepasar(){
     // Qué viene después: lo que queda hoy o cuándo toca el siguiente.
     const left = link ? dueLinks().length : dueFigs().length, t=todayStr();
     const nx = (link ? linkPositions().map(p=>S.linkRep[p]?.due) : figs().filter(active).map(f=>f.rep?.due)).filter(x=>x && x>t).sort()[0];
-    const next = left ? `Quedan ${left} para hoy.` : nx ? `El siguiente repaso toca ${nx===todayStr(1)?"mañana":"el "+fmtDate(nx)}.` : "";
+    const other = left ? 0 : (link ? dueFigs().length : dueLinks().length);
+    const next = left ? `Quedan ${left} para hoy.`
+      : other ? (link ? `También ${other===1?"toca":"tocan"} hoy ${pl(other,"figura","figuras")}.` : `En enlaces también ${other===1?"toca":"tocan"} hoy ${pl(other,"posición","posiciones")}.`)
+      : nx ? `El siguiente repaso toca ${nx===todayStr(1)?"mañana":"el "+fmtDate(nx)}.` : "";
     // Cada una con cómo salió y cuándo vuelve; primero las que hay que mirar.
     const when = due => !due ? "" : due<=todayStr() ? "vuelve hoy" : due===todayStr(1) ? "vuelve mañana" : `vuelve el ${fmtDate(due)}`;
     const GR = {fluida:"Fluida", dudas:"Con dudas", no:"Sin recordar"}, ORD = {no:0, dudas:1, fluida:2};
@@ -931,6 +977,7 @@ function renderRepasar(){
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
       ${next?`<p class="small muted">${next}</p>`:""}
       ${left?`<button class="btn pri" data-act="start-${link?"link":"fig"}">Repasar ${Math.min(left,MAX_SESSION)} más</button><button class="btn" data-act="end">Hecho por hoy</button>`
+        : other?`<button class="btn pri" data-act="start-${link?"fig":"link"}">${link?"Repasar figuras":"Repasar enlaces"}</button><button class="btn" data-act="end">Hecho por hoy</button>`
         :`<button class="btn pri" data-act="end">Hecho</button>`}</div>`;
     return;
   }
@@ -1144,7 +1191,7 @@ function renderSocial(){
 // Bloqueo: footwork o básico, el compás para recuperar el pulso, dónde estás y dos salidas desde ahí.
 // Primero las seguras; si falta alguna, una en práctica. Mejor las que te llevan a otra posición.
 const bkSort = pos => (a,b) => (ready(b)-ready(a)) || ((a.salida===pos)-(b.salida===pos)) || socSort(a,b);
-const blockExits = pos => exitsFrom(pos).sort(bkSort(pos)).slice(0,2);
+const blockExits = (pos, hold) => exitsFrom(pos, hold).sort(bkSort(pos)).slice(0,2);
 const nextOf = f => exitsFrom(f.salida, f.agarreOut, f.id).sort(bkSort(f.salida))[0];
 // Pulso del rescate: 125 golpes por minuto hasta que lo marcas tocando el compás en 1, 2, 3, 4 al ritmo de la canción.
 let bkBeat = .48, bkTaps = [];
@@ -1178,16 +1225,18 @@ function showBlock(){
   const tiles = allPositions().filter(p=>exitsFrom(p).length);
   let body;
   if(blockPos){
-    const ex = blockExits(blockPos);
+    const ex = blockExits(blockPos, blockHold);
+    const hs = [...new Set(exitsFrom(blockPos).map(f=>f.agarreIn).filter(Boolean))];
     body = `<h3 class="bk-from" id="bk-from" tabindex="-1">${ex.length>1?"Elige una salida desde":"Tu salida desde"} ${esc(blockPos)}</h3>
+      ${hs.length>1?`<div class="chips bk-holds" role="group" aria-label="Agarre que llevas"><span class="muted">Agarre</span>${hs.map(h=>`<button type="button" class="chip" aria-pressed="${blockHold===h}" data-bhold="${esc(h)}">${esc(h)}</button>`).join("")}</div>`:""}
       <ul class="bk-exits">${ex.map(bkExit).join("")}</ul>
-      <p class="small muted">Toca la que hagas: quedará marcada para el registro.</p>`;
+      <p class="small muted">Tócala y quedará marcada en el registro.</p>`;
   } else {
     body = tiles.length
       ? `<h3 class="bk-from">¿Dónde estás?</h3><div class="bk-tiles">${tiles.map(p=>`<button type="button" class="bk-tile" data-bpos="${esc(p)}">${esc(p)}</button>`).join("")}</div>`
       : `<p class="muted">Aún no tienes salidas desde ninguna posición. Sigue con el básico hasta el final de la frase.</p>`;
   }
-  $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
+  $("#overlay-root").innerHTML = `<div class="overlay${blockPos?" picked":""}" role="dialog" aria-modal="true" aria-labelledby="bk-t">
     <div class="bk-head"><h2 id="bk-t">Footwork o básico</h2>
       <p class="muted">${fw.length?`Para ganar tiempo: ${fw.slice(0,4).map(f=>`<b>${esc(f.nombre)}</b>`).join(", ")}.`:"Sigue bailando. No es un fallo, es tiempo para pensar."}</p></div>
     <div class="bk-mid"><button type="button" class="bk-tap" data-act="bk-tap" aria-describedby="bk-tempo">${bkPulse()}<span class="sr">Marcar el pulso</span></button><p class="bk-count">Recupera el pulso: cuenta hasta el siguiente 1.</p><p class="small muted" id="bk-tempo" aria-live="polite">${bkBeat!==.48?`A tu ritmo: ${Math.round(60/bkBeat)} golpes por minuto.`:"Toca el compás en 1, 2, 3, 4 para seguir la canción."}</p></div>
@@ -1325,13 +1374,15 @@ function openFigure(id, opts={}){
   if(!quick && !id && f.estado==="espera" && !opts.keepState) f.estado="practica";
   const optList=(list,sel,empty)=>`<option value="">${empty}</option>${[...new Set([...list, sel].filter(Boolean))].map(p=>`<option ${p===sel?"selected":""}>${esc(p)}</option>`).join("")}`;
   let tipo = tipoOf(f), estado = f.estado, prof = f.profesor||"", baile = f.baile||"Bachata";
+  const hasCls = S.classes.length>0, otherCls = !quick && !!prof && !S.classes.includes(prof);
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="fig-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${quick?"Captura rápida":(id?"Editar figura":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${quick?`<p class="small muted">Guarda el vídeo y un nombre al salir de clase. Se queda en lista de espera y completas el resto un día libre.</p>
     <div class="vidbox" id="vidbox"></div>`:""}
     <label class="f" for="ff-nombre">${quick?"Nombre (opcional)":"Nombre fácil de recordar"}<input type="text" id="ff-nombre" value="${esc(f.nombre)}" placeholder="${quick?"Si lo dejas vacío: clase y fecha":"Ej.: vuelta con hammerlock"}"></label>
     <div class="f"><span>Tipo</span><div class="seg neutral" id="ff-tipo">${TIPOS.map(t=>`<button type="button" aria-pressed="${tipo===t.k}" data-tipo="${t.k}">${t.t}</button>`).join("")}</div></div>
-    ${S.classes.length?`<div class="f"><span>Clase</span><div class="chips scroll" id="ff-cls">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}</div></div>`:""}
+    ${hasCls?`<div class="f"><span id="ff-cls-l">Clase</span><div class="chips scroll" id="ff-cls" role="group" aria-labelledby="ff-cls-l">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}${quick?"":`<button type="button" class="chip sm" aria-pressed="${otherCls}" id="ff-cls-other" aria-controls="ff-prof">Otra…</button>`}</div>
+      ${quick?"":`<input type="text" id="ff-prof" value="${esc(prof)}" placeholder="Otra clase o profesor" aria-label="Otra clase o profesor"${otherCls?"":" hidden"}>`}</div>`:""}
     ${quick?"":`
     <div class="grid2">
       <label class="f" for="ff-in"><span id="ff-in-l">Empieza en</span><select id="ff-in">${optList(S.positions,f.entrada,"Elige…")}</select></label>
@@ -1340,10 +1391,10 @@ function openFigure(id, opts={}){
       <label class="f" for="ff-agout" id="ff-agout-wrap">Agarre al terminar<select id="ff-agout">${optList(S.holds,f.agarreOut,"Sin indicar")}</select></label>
     </div>
     <p class="small muted">Agarre: tu mano–su mano. «Izq–der» es tu izquierda con su derecha.</p>
-    <div class="f"><span>Estado</span><div class="seg" id="ff-estado">${ESTADOS.map(e=>`<button type="button" class="st-${e.k}" aria-pressed="${estado===e.k}" data-est="${e.k}" title="${esc(e.d)}">${e.t}</button>`).join("")}</div>
+    <div class="f"><span>Estado</span><div class="seg states" id="ff-estado">${ESTADOS.map(e=>`<button type="button" class="st-${e.k}" aria-pressed="${estado===e.k}" data-est="${e.k}" title="${esc(e.d)}">${e.t}</button>`).join("")}</div>
       <span class="small" id="ff-est-d">${esc(EST[estado].d)}</span></div>`}
     ${quick?"":`<div class="vidbox" id="vidbox"></div>
-    <details ${id && (f.senal||f.profesor||f.video||f.tiempos||f.notas)?"open":""}><summary>Más detalles (opcional)</summary><div class="inner">
+    <details ${id && (f.senal||(!hasCls && f.profesor)||f.video||f.tiempos||f.notas)?"open":""}><summary>Más detalles (opcional)</summary><div class="inner">
       <label class="f" for="ff-senal">Señal clave del leader<input type="text" id="ff-senal" value="${esc(f.senal)}" placeholder="Ej.: preparo en el 4, giro con la izquierda en el 5"></label>
       <div class="grid2">
         <label class="f" for="ff-tiempo">Empieza en el tiempo<select id="ff-tiempo"><option value="">—</option>${["1","5"].map(t=>`<option ${f.tiempo===t?"selected":""}>${t}</option>`).join("")}</select></label>
@@ -1351,7 +1402,7 @@ function openFigure(id, opts={}){
         <label class="f" for="ff-baile">Baile<select id="ff-baile">${["Bachata","Salsa"].map(b=>`<option ${baile===b?"selected":""}>${b}</option>`).join("")}</select></label>
       </div>
       <div id="ff-cmp">${compas(f,true)}</div>
-      <label class="f" for="ff-prof">Clase o profesor<input type="text" id="ff-prof" value="${esc(prof)}" placeholder="Ej.: Brotons · Parejas 1"></label>
+      ${hasCls?"":`<label class="f" for="ff-prof">Clase o profesor<input type="text" id="ff-prof" value="${esc(prof)}" placeholder="Ej.: Brotons · Parejas 1"></label>`}
       <label class="f" for="ff-video">Nombre del vídeo en Fotos<input type="text" id="ff-video" value="${esc(f.video)}" placeholder="Sugerido al guardar"></label>
       <label class="f" for="ff-enlace">Enlace al vídeo (Drive, Instagram…)<input type="text" id="ff-enlace" value="${esc(f.enlace)}" inputmode="url" placeholder="https://"></label>
       <label class="f" for="ff-notas">Notas<textarea id="ff-notas" placeholder="Correcciones del profe, errores típicos…">${esc(f.notas)}</textarea></label>
@@ -1375,16 +1426,25 @@ function openFigure(id, opts={}){
   document.querySelectorAll("#ff-tipo button").forEach(b=> b.onclick=()=>{
     tipo=b.dataset.tipo; document.querySelectorAll("#ff-tipo button").forEach(x=>x.setAttribute("aria-pressed", x===b)); applyTipo();
   });
-  document.querySelectorAll("#ff-cls button").forEach(b=> b.onclick=()=>{
+  document.querySelectorAll("#ff-cls button[data-cls]").forEach(b=> b.onclick=()=>{
     const c=b.dataset.cls; prof = prof===c ? "" : c;
     document.querySelectorAll("#ff-cls button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.cls===prof));
-    const pi=$("#ff-prof"); if(pi) pi.value=prof;
+    const pi=$("#ff-prof"); if(pi){ pi.value=prof; if(hasCls) pi.hidden=true; }
     if(prof){
       baile = /salsa/i.test(prof) ? "Salsa" : "Bachata";
       const bs=$("#ff-baile"); if(bs) bs.value=baile;
       if(!id && /footwork/i.test(prof) && tipo==="figura"){ tipo="footwork"; document.querySelectorAll("#ff-tipo button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.tipo===tipo)); applyTipo(); }
     }
   });
+  const oc=$("#ff-cls-other"); if(oc) oc.onclick=()=>{
+    const pi=$("#ff-prof"), on=oc.getAttribute("aria-pressed")!=="true";
+    document.querySelectorAll("#ff-cls button[data-cls]").forEach(x=>x.setAttribute("aria-pressed", false));
+    oc.setAttribute("aria-pressed", on); pi.hidden=!on;
+    if(S.classes.includes(pi.value)) pi.value="";
+    prof = on ? pi.value.trim() : ""; if(!on) pi.value="";
+    if(on) pi.focus();
+  };
+  const pin=$("#ff-prof"); if(pin && hasCls) pin.oninput=()=>{ prof=pin.value.trim(); };
   document.querySelectorAll("#ff-estado button").forEach(b=> b.onclick=()=>{
     estado=b.dataset.est; document.querySelectorAll("#ff-estado button").forEach(x=>x.setAttribute("aria-pressed", x===b)); $("#ff-est-d").textContent=EST[estado].d;
   });
@@ -1892,7 +1952,8 @@ function graphHTML(cov){
   if(nodes.length<2) return "";
   const n=nodes.length;
   // El tamaño se ajusta al número de posiciones: con pocas, un mapa compacto.
-  const W=400, H = n<=2 ? 130 : n===3 ? 230 : n<=5 ? 280 : 320;
+  // El ancho es el que ocupa en pantalla, para que los nombres se lean a 14 px y no encogidos.
+  const W = Math.round(Math.min(520, Math.max(300, ($("#v-enlazar")?.clientWidth || 343) - 32))), H = n<=2 ? 130 : n===3 ? 230 : n<=5 ? 280 : 320;
   // El radio deja sitio al nodo más ancho para que ninguno se salga por los lados.
   const hw = p => Math.min(136, p.length*7.7+22)/2, mw = Math.max(...nodes.map(hw));
   const cx=W/2, cy = n<=2 ? H/2+12 : H/2+14, rx = Math.min(n<=2 ? 120 : 138, W/2-mw-4), ry = n<=2 ? 0 : (H/2 - 48);
@@ -1921,7 +1982,7 @@ function graphHTML(cov){
   const node = p=>{ const N=P[p];
     return `<g class="g-node${p===linkPos?" g-sel":""}${gaps.has(p)?" g-gap":""}" data-pos="${esc(p)}"><rect x="${f1(N.x-N.w)}" y="${f1(N.y-N.h)}" width="${f1(N.w*2)}" height="${N.h*2}" rx="${N.h}"/><text x="${f1(N.x)}" y="${f1(N.y+5)}" text-anchor="middle"${p.length>16?' class="long"':""}>${esc(p)}</text></g>`; };
   return `<figure class="graph">
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de salidas: cada flecha va de la posición donde empieza una figura a la posición donde acaba, sin contar la lista de espera.">
+    <svg viewBox="0 0 ${W} ${H}" style="max-width:${W}px;margin:0 auto" role="img" aria-label="Mapa de salidas: cada flecha va de la posición donde empieza una figura a la posición donde acaba, sin contar la lista de espera.">
       <defs>
         <marker id="g-arr-r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="g-head-r"/></marker>
         <marker id="g-arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="g-head-p"/></marker>
@@ -2080,7 +2141,7 @@ function openSettings(){
     <p class="menu-h">Datos</p>
     <div class="menu">${row("importar","Restaurar o importar","")}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
     <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</span></details>`;
-  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajustes">
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     ${head}
     ${body}
   </div></div>`;
@@ -2095,19 +2156,25 @@ async function importData(replace){
   if(!raw){ toast("Elige un archivo de copia o pega su texto primero."); return; }
   let d; try{ d=JSON.parse(raw); }catch{ toast("Ese texto no es una copia completa. Pega todo el contenido o elige el archivo."); return; }
   if(!d || !d.figures || typeof d.figures!=="object"){ toast("Ese archivo no es una copia de Bachateca."); return; }
-  const nIn=Object.keys(d.figures).length;
+  const inc=Object.values(d.figures).filter(f=>f&&f.id&&f.nombre), nIn=inc.length;
+  if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."); return; }
+  if(!nIn && !Object.keys(d.logs||{}).length){ toast("Esa copia no tiene figuras ni registros que añadir."); return; }
+  const nNew=inc.filter(f=>!S.figures[f.id]).length, nOld=nIn-nNew;
   if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Las figuras, registros y vídeos que no estén en ella se borran y no se puede deshacer.`, ok:"Reemplazar todo"}))) return;
   if(replace){
     Object.keys(S.figures).forEach(id=>{ if(!d.figures[id]) deleteFigure(id); });
     Object.keys(S.logs).forEach(id=>{ if(!(d.logs||{})[id]){ delete S.logs[id]; persist({t:"logdel",id}); } });
   }
-  Object.values(d.figures).forEach(f=>{ if(f&&f.id&&f.nombre){ S.figures[f.id]=f; persist({t:"fig",id:f.id}); } });
+  inc.forEach(f=>{ S.figures[f.id]=f; persist({t:"fig",id:f.id}); });
   Object.values(d.logs||{}).forEach(l=>{ if(l&&l.id){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
   const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
   S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
   if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
   saveMeta();
-  confirmKey=null; openSettings(); toast(nIn===1 ? "1 figura importada" : `${nIn} figuras importadas`);
+  confirmKey=null; openSettings();
+  toast(replace ? `Repertorio restaurado: ${pl(nIn,"figura","figuras")}`
+    : !nNew ? (nIn ? `Ninguna figura nueva: ${nIn===1?"la de la copia ya estaba":`las ${nIn} de la copia ya estaban`}` : "Registros añadidos")
+    : `${pl(nNew,"figura añadida","figuras añadidas")}${nOld?` · ${nOld} ya ${nOld===1?"estaba":"estaban"}`:""}`);
 }
 function loadExamples(){
   const ex = [
@@ -2163,13 +2230,14 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bexit],[data-setv],[data-lview]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
   if(d.sal){ logSel.has(d.sal) ? logSel.delete(d.sal) : logSel.add(d.sal); lastSal=d.sal; saveSel(); return render(); }
   if(d.setv) return setGo(d.setv);
-  if(d.bpos!==undefined){ blockPos=d.bpos; logBloq=d.bpos; saveSel(); return showBlock(); }
+  if(d.bpos!==undefined){ blockPos=d.bpos; blockHold=null; logBloq=d.bpos; saveSel(); return showBlock(); }
+  if(d.bhold!==undefined){ blockHold = blockHold===d.bhold ? null : d.bhold; showBlock(); return $(`[data-bhold="${CSS.escape(d.bhold)}"]`)?.focus({preventScroll:true}); }
   if(d.bexit){
     const id=d.bexit, had=logSel.has(id), f=S.figures[id];
     logSel.add(id); lastSal=id; saveSel(); blockPos=null; $("#overlay-root").innerHTML=""; render();
@@ -2214,12 +2282,12 @@ document.addEventListener("click", async e=>{
   if(a==="reveal"){ session.revealed=true; render(); const an=$("#v-repasar .answer"); if(an){ an.tabIndex=-1; an.focus({preventScroll:true}); } return; }
   if(a==="end"){ session=null; return render(); }
   if(a==="chain"){ chain=makeChain(linkPos); return render(); }
-  if(a==="block"){ blockPos=null; return showBlock(); }
+  if(a==="block"){ blockPos=null; blockHold=null; return showBlock(); }
   if(a==="bk-tap") return bkTap();
   if(a==="unblock"){ blockPos=null; return $("#overlay-root").innerHTML=""; }
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
   if(a==="night-off"){ setNight(false); releaseWake(); return go("repertorio"); }
-  if(a==="bpos-back"){ blockPos=null; return showBlock(); }
+  if(a==="bpos-back"){ blockPos=null; blockHold=null; return showBlock(); }
   if(a==="log-open"){ logSuggest=[]; confirmKey=null; return openLog(true); }
   if(a==="nudge-off"){ lsSet(LS_NUDGE, 0); return render(); }
   if(a==="log-save") return saveLog();

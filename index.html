@@ -95,10 +95,10 @@ img,video{max-width:100%}
 /* barra superior translúcida */
 header.top{position:sticky;top:0;z-index:20;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:calc(8px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--line)}
 .bar{display:flex;align-items:center;gap:10px;min-height:36px}
-.brand{display:flex;align-items:center;gap:8px;margin-right:auto}
-.logo{font-family:var(--f-display);font-weight:800;font-size:min(1.1177rem,23px);letter-spacing:-.01em}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;flex:1;min-width:0}
+.logo{font-family:var(--f-display);font-weight:800;font-size:min(1.1177rem,23px);letter-spacing:-.02em;white-space:nowrap;line-height:1}
 .logo i{font-style:normal;color:var(--neon)}
-.mark{width:26px;height:26px;display:block;border-radius:7px}
+.mark{width:26px;height:26px;display:block;border-radius:7px;flex:none}
 .mk-a{fill:var(--fg)} .mk-b{fill:var(--st-practica)} .mk-n{fill:var(--neon)}
 .sync{display:none}
 .bar .btn,.bar .icon-btn{flex-shrink:0;white-space:nowrap}
@@ -1050,7 +1050,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.39";
+const APP_VERSION = "1.40";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1077,6 +1077,22 @@ function fixBottom(){
   const v = shift + "px";
   if(document.documentElement.style.getPropertyValue("--nav-shift") !== v) document.documentElement.style.setProperty("--nav-shift", v);
 }
+// Marca grande: «bachateca.» y su icono crecen hasta llenar el hueco libre de la barra (hasta la rueda de Ajustes).
+// Se mide en el propio iPhone porque el ancho del texto depende de la letra y del tamaño de texto de iOS.
+function fitBrand(){
+  const br=$(".brand"), lg=$(".logo"), mk=$(".mark"); if(!br||!lg||!mk) return;
+  lg.style.fontSize="20px"; mk.style.width=mk.style.height="";
+  const gap=10, base=lg.scrollWidth/20;                 // ancho del texto por cada px de letra
+  // En Social no está «+ Añadir»: se reserva su hueco para que la marca tenga el mismo tamaño en todas las pestañas.
+  const nb=$("#btn-new"); if(nb && !nb.hidden && nb.offsetWidth) fitBrand.add=nb.offsetWidth+10;
+  const avail=br.clientWidth - 4 - (nb && nb.hidden ? (fitBrand.add||120) : 0);   // margen para no tocar la rueda
+  // icono = 1,2 veces la letra: avail = fs*base + gap + 1.2*fs
+  const fs=Math.max(18, Math.min(46, (avail-gap)/(base+1.2)));
+  lg.style.fontSize=fs.toFixed(1)+"px";
+  const m=Math.round(fs*1.2); mk.style.width=mk.style.height=m+"px"; mk.style.borderRadius=Math.round(m*0.24)+"px";
+}
+window.addEventListener("resize", ()=>requestAnimationFrame(fitBrand));
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitBrand);
 let fbT=null;
 function fixBottomSoon(){ if(fbT) return; fbT=setTimeout(()=>{ fbT=null; fixBottom(); }, 120); }
 window.addEventListener("resize", fixBottomSoon);
@@ -1136,6 +1152,7 @@ function go(t){
   const lt=$("#ltitle"); if(lt) lt.textContent={inicio:"Hoy",repertorio:"Repertorio",repasar:"Repasar",enlazar:"Enlazar",social:"Social"}[t];
   if(t==="social") setNight(true); else paintNight();
   $("#btn-new").hidden = t==="social";
+  fitBrand();
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
   TABS.forEach(k=> $("#v-"+k).hidden = k!==t);
   try{ history.replaceState(null,"","#"+t); }catch{}

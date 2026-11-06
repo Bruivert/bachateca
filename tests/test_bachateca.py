@@ -356,9 +356,9 @@ def ficha_y_filtros(browser):
     ctx, p, errors = open_app(browser, seed=repertorio_inicio())
     p.click('nav.tabs [data-tab="repertorio"]')
     p.click('[data-fest="espera"]')
-    assert p.locator("#v-repertorio .card").count() == 1, "chip «Lista de espera» filtra"
+    assert p.locator("#v-repertorio .gcard").count() == 1, "chip «Lista de espera» filtra"
     p.click('[data-fest="todos"]')
-    assert p.locator("#v-repertorio .card").count() == 5
+    assert p.locator("#v-repertorio .gcard").count() == 5
     p.click('#v-repertorio [data-view="f2"]')
     sheet = p.locator(".sheet")
     assert "Memoria" in sheet.inner_text() and "Olvidada" in sheet.inner_text()
@@ -367,6 +367,30 @@ def ficha_y_filtros(browser):
     assert p.locator("#v-repasar").is_visible() and "1 de 1" in p.locator("#v-repasar").inner_text()
     p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
     assert "Repaso terminado" in p.locator("#v-repasar").inner_text() or "a compás" in p.locator("#v-repasar").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def portadas_desde_el_video(browser):
+    """Con un vídeo real, la app saca miniatura y portada grande y la galería la muestra."""
+    import base64
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    data = base64.b64encode(open(os.path.join(ROOT, "tests", "fixtures", "prueba-vertical.mp4"), "rb").read()).decode()
+    p.evaluate("""async b64 => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const db = await new Promise(r => { const q = indexedDB.open("bachateca", 1); q.onsuccess = () => r(q.result); });
+      await new Promise(r => { const t = db.transaction("videos", "readwrite"); t.objectStore("videos").put(new Blob([bin], {type: "video/mp4"}), "v1"); t.oncomplete = r; }); db.close(); }""", data)
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.wait_for_function("window.__bachateca.covers().includes('v1')", timeout=20000)
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    st = stored_state(p)
+    assert st["figures"]["f1"].get("thumb", "").startswith("data:image/jpeg"), "miniatura"
+    assert "cover" not in json.dumps(st), "la portada no va en los datos ni en la copia"
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.wait_for_selector("#v-repertorio img.gm.has-cover", timeout=5000)
+    w = p.evaluate("() => document.querySelector('#v-repertorio img.gm').naturalWidth")
+    assert w >= 300, f"portada grande ({w} px)"
     assert not errors, errors
     ctx.close()
 

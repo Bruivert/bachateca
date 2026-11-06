@@ -1120,6 +1120,18 @@ function hydrateCovers(root){
   });
 }
 async function vidObjUrl(id){ if(vidCache.has(id)) return vidCache.get(id); const b=await vidGet(id); if(!b) return null; const u=URL.createObjectURL(b); vidCache.set(id,u); return u; }
+// Si Safari deja de poder leer la dirección guardada (p. ej. tras un rato con la app en segundo plano), se lee el vídeo otra vez.
+async function vidFreshUrl(id){ const old=vidCache.get(id); vidCache.delete(id); if(old) try{ URL.revokeObjectURL(old); }catch{} return vidObjUrl(id); }
+// Los vídeos que desaparecen de la pantalla sueltan el archivo en seguida (salvo los auxiliares, data-aux, que se
+// usan fuera de la pantalla para la miniatura o para reducir el vídeo y se limpian solos): Safari solo deja cargar unos pocos a la vez
+// y, si se acumulan (el de Inicio se crea de nuevo en cada repintado), los siguientes no cargan y sale el play tachado.
+function releaseVideo(v){ try{ v.pause(); }catch{} if(v.hasAttribute("src")){ v.removeAttribute("src"); try{ v.load(); }catch{} } }
+new MutationObserver(ms=>{
+  for(const m of ms) for(const n of m.removedNodes){
+    if(n.nodeType!==1) continue;
+    (n.tagName==="VIDEO" ? [n] : n.querySelectorAll("video")).forEach(v=>{ if(!v.isConnected && !v.dataset.aux) releaseVideo(v); });
+  }
+}).observe(document.body, {childList:true, subtree:true});
 let saveT = null;
 function persist(op){
   if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); } vidDel(op.id).catch(()=>{});
@@ -1138,7 +1150,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.44";
+const APP_VERSION = "1.45";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1479,7 +1491,11 @@ function renderInicio(){
     </section>`;
   // iOS no dibuja el fotograma de un <video> sin cargarlo: se carga del almacén y se coloca en el inicio de la figura.
   const hv = v.querySelector("video[data-hvid]");
-  if(hv) vidObjUrl(hv.dataset.hvid).then(u=>{ if(u && hv.isConnected) hv.src = u + "#t=" + Math.max(0.1, +hv.dataset.s||0); }).catch(()=>{});
+  if(hv){
+    const at = u => u + "#t=" + Math.max(0.1, +hv.dataset.s||0);
+    hv.addEventListener("error", ()=>{ if(hv.dataset.retry || !hv.isConnected || !hv.getAttribute("src")) return; hv.dataset.retry="1"; vidFreshUrl(hv.dataset.hvid).then(u=>{ if(u && hv.isConnected) hv.src = at(u); }).catch(()=>{}); });
+    vidObjUrl(hv.dataset.hvid).then(u=>{ if(u && hv.isConnected) hv.src = at(u); }).catch(()=>{});
+  }
 }
 
 // ---------- vista: repertorio ----------
@@ -2756,7 +2772,15 @@ function hydrateVideos(root){
     v.addEventListener("timeupdate",()=>{ if(e>0 && v.currentTime>=e){ const loop=v.closest(".player")?.dataset.loop==="1"; v.currentTime=s; if(!loop) v.pause(); } });
     v.addEventListener("play",()=>{ if(v.currentTime<s-0.25 || (e>0 && v.currentTime>=e)) v.currentTime=s; });
     // En la ficha, «#t=» hace que Safari cargue y dibuje el primer fotograma de la figura sin pulsar play.
-    v.src = v.closest(".fv-media") ? url + "#t=" + Math.max(0.05, s) : url;
+    const srcOf = u => v.closest(".fv-media") ? u + "#t=" + Math.max(0.05, s) : u;
+    // Si no carga, una segunda vez con el vídeo leído de nuevo; si tampoco, se dice en vez del play tachado.
+    v.addEventListener("error", async ()=>{
+      if(!v.isConnected || !v.getAttribute("src")) return;
+      const code = v.error ? v.error.code : 0;
+      if(!v.dataset.retry){ v.dataset.retry="1"; const u=await vidFreshUrl(id).catch(()=>null); if(u && v.isConnected){ v.src=srcOf(u); return; } }
+      const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted vid-err">No se puede reproducir este vídeo en este dispositivo (error ${code}). Cierra la app del todo y vuelve a abrirla; si sigue igual, dímelo con este número.</p>`;
+    });
+    v.src = srcOf(url);
   });
 }
 async function shareOrDownload(file){
@@ -2863,7 +2887,7 @@ function refreshTrim(){ // re-render conservando la posición del reproductor
 // Se llama de forma síncrona en el gesto de guardar: crea el reproductor y el audio
 // mientras iOS todavía considera que hay interacción del usuario.
 function primeMedia(url){
-  const v=document.createElement("video");
+  const v=document.createElement("video"); v.dataset.aux="1";
   v.playsInline=true; v.setAttribute("playsinline",""); v.preload="auto"; v.src=url;
   v.style.cssText="position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1";
   document.body.appendChild(v);
@@ -3606,7 +3630,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

@@ -888,6 +888,56 @@ def service_worker_no_confunde_las_paginas(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- vídeos que no cargan (play tachado en Safari)
+def ficha_video(p):
+    return p.evaluate("""() => { const v = document.querySelector('.fv-media video'); return v && {src: v.getAttribute('src'), rs: v.readyState, err: v.error && v.error.code}; }""")
+
+
+@test
+def video_de_la_ficha_se_recupera(browser):
+    """Si la dirección guardada del vídeo deja de valer, la ficha lo vuelve a leer en vez de quedarse con el play tachado."""
+    ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}})
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1")
+    first = ficha_video(p)["src"]
+    p.evaluate("() => { window._old = document.querySelector('.fv-media video'); }")
+    p.click('[data-act="close"]'); p.wait_for_timeout(200)
+    assert p.evaluate("() => window._old.getAttribute('src')") is None, "el vídeo que se va de la pantalla suelta el archivo"
+    assert p.evaluate("() => window.__bachateca.dropVidUrl('v1')"), "había dirección guardada"
+    p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
+    again = ficha_video(p)
+    assert again["src"] != first and again["err"] is None, again
+    assert p.locator(".vid-err").count() == 0
+    ctx.close()
+
+
+@test
+def video_roto_lo_dice(browser):
+    """Un vídeo que no se puede reproducir avisa con el código del error."""
+    ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}, videos=["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_selector(".vid-err", timeout=10000)
+    assert "error 4" in p.locator(".vid-err").inner_text(), p.locator(".vid-err").inner_text()
+    ctx.close()
+
+
+@test
+def inicio_no_acumula_videos(browser):
+    """El vídeo grande de Inicio se repinta a menudo: los anteriores tienen que soltar el archivo."""
+    seed = repertorio_inicio()
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.evaluate("() => { window._seen = []; new MutationObserver(() => document.querySelectorAll('video[data-hvid]').forEach(v => { if (!window._seen.includes(v)) window._seen.push(v); })).observe(document.body, {childList: true, subtree: true}); }")
+    for _ in range(4):
+        p.click('nav.tabs [data-tab="repertorio"]'); p.click('nav.tabs [data-tab="inicio"]')
+    p.wait_for_timeout(300)
+    r = p.evaluate("() => ({n: window._seen.length, loaded: window._seen.filter(v => !v.isConnected && v.getAttribute('src')).length})")
+    assert r["n"] >= 2 and r["loaded"] == 0, r
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     srv = serve()
     failed = 0

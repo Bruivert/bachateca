@@ -665,6 +665,34 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .block-btn{border-radius:20px}
 .empty{border:1px solid var(--edge);border-radius:20px}
 .menu{border:1px solid var(--edge)}
+
+/* ---------- 1.39: galería con portadas ---------- */
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px}
+.gcard{position:relative;display:block;aspect-ratio:4/5;border:0;padding:0;border-radius:20px;overflow:hidden;background:var(--surface2);color:#fff;text-align:left;isolation:isolate;box-shadow:0 0 0 1px var(--edge)}
+.gcard:active{transform:scale(.98)}
+.gcard.lit{box-shadow:0 0 0 2px var(--neon)}
+.gm{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transition:filter .3s}
+.gm:not(.has-cover){filter:blur(1.5px) saturate(1.1)}
+.gm-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(120% 90% at 70% 10%,#24407e 0%,#0f1a30 60%,#0b1428 100%);color:#c4f838}
+.gm-ph .ico{width:34px;height:34px}
+.gm-ph .cmp{transform:scale(1.8);transform-origin:center}
+.gm-ph em{font-style:normal;font-size:0.7059rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a3b5dc}
+.gshade{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,12,26,.55) 0%,rgba(6,12,26,0) 28%,rgba(6,12,26,0) 42%,rgba(6,12,26,.92) 100%)}
+.gtop{position:absolute;left:10px;right:10px;top:10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.gtop .tagx{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(6,12,26,.6)}
+.gtop .st-tag.st-disponible,.gtop .st-tag.st-consolidada{background:#c4f838;color:#060c1a}
+.gtop .st-tag.st-practica{color:#8cc4ff}
+.gtop .st-tag.st-espera{color:#c3cce0}
+.gtop .t-red{color:#ff8f9b}
+.gplay{margin-left:auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.gbody{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px}
+.gname{font-family:var(--f-display);font-size:1.0588rem;font-weight:800;line-height:1.15;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 8px rgba(0,0,0,.35)}
+.groute{font-size:0.7648rem;color:#dfe6f5;font-weight:600}
+.groute .arrow{color:#c4f838}
+.gbody .cmp{--cmp-off:rgba(255,255,255,.35);--mark:#c4f838}
+.gusos{font-size:0.7059rem;color:#c3cce0}
+.group{gap:12px}
+.group-h b{font-size:1.3rem}
 </style>
 </head>
 <body>
@@ -982,10 +1010,32 @@ const vidPut = (id,b) => idb ? tx("videos","readwrite",s=>s.put(b,id)) : Promise
 const vidGet = id => idb ? tx("videos","readonly",s=>s.get(id)) : Promise.resolve(undefined);
 const vidDel = id => idb ? tx("videos","readwrite",s=>s.delete(id)) : Promise.resolve();
 const vidCache = new Map();
+// Portadas: un fotograma grande (hasta 720 px) de cada vídeo, guardado junto a los vídeos con la clave «cover:<id del vídeo>».
+// No viajan en la copia (se rehacen solas a partir del vídeo) y no engordan los datos que se guardan en cada cambio.
+const COVER = id => "cover:" + id;
+const coverSet = new Set(), coverCache = new Map();
+async function loadCoverKeys(){
+  if(!idb) return;
+  try{ const ks = await tx("videos","readonly",st=>st.getAllKeys()); (ks||[]).forEach(k=>{ if(typeof k==="string" && k.startsWith("cover:")) coverSet.add(k.slice(6)); }); }catch{}
+}
+async function coverUrl(vid){
+  if(!vid || !coverSet.has(vid)) return null;
+  if(coverCache.has(vid)) return coverCache.get(vid);
+  const b = await vidGet(COVER(vid)).catch(()=>null); if(!b) return null;
+  const u = URL.createObjectURL(b); coverCache.set(vid, u); return u;
+}
+// Las imágenes con data-cover se pintan primero con la miniatura y se cambian por la portada en cuanto está.
+function hydrateCovers(root){
+  (root||document).querySelectorAll("img[data-cover]:not([data-ch])").forEach(async im=>{
+    im.dataset.ch="1"; const u = await coverUrl(im.dataset.cover);
+    if(u && im.isConnected){ im.src = u; im.classList.add("has-cover"); }
+  });
+}
 async function vidObjUrl(id){ if(vidCache.has(id)) return vidCache.get(id); const b=await vidGet(id); if(!b) return null; const u=URL.createObjectURL(b); vidCache.set(id,u); return u; }
 let saveT = null;
 function persist(op){
-  if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); } vidDel(op.id).catch(()=>{}); return; }
+  if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); } vidDel(op.id).catch(()=>{});
+    const cu=coverCache.get(op.id); if(cu){ try{URL.revokeObjectURL(cu);}catch{} coverCache.delete(op.id); } if(coverSet.delete(op.id)) vidDel(COVER(op.id)).catch(()=>{}); return; }
   clearTimeout(saveT); saveT=setTimeout(saveNow, 150);
   lsSet(BK_CH, (+lsGet(BK_CH)||0)+1);
 }
@@ -1000,7 +1050,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.38";
+const APP_VERSION = "1.39";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1049,6 +1099,7 @@ async function initStore(){
   assetsApi = idb ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
+  await loadCoverKeys(); render();
   setTimeout(genMissingThumbs, 1200);
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") setTimeout(genMissingThumbs, 800); });
 }
@@ -1063,6 +1114,7 @@ function saveFigure(f){
   }
   if(!S.figures[f.id]){ f.creado=f.creado||Date.now(); f.rep = f.rep || {step:0, due: todayStr(), aciertos:0, fallos:0}; }
   S.figures[f.id]=f; persist({t:"fig",id:f.id}); render();
+  if(f.vid && !coverSet.has(f.vid)) setTimeout(genMissingThumbs, 600);
 }
 function deleteFigureUndo(id){
   const f=S.figures[id]; if(!f) return;
@@ -1119,6 +1171,21 @@ function compas(f, big){
   const label = compasTxt(f);
   if(big) return `<div><span class="cmp lg" role="img" aria-label="${esc(label)}">${cells}</span><p class="cmp-cap" aria-hidden="true">${esc(label.charAt(0).toUpperCase()+label.slice(1))}${reps>1?` (${reps} frases de 8)`:""}</p></div>`;
   return `<span class="cmp" role="img" aria-label="${esc(label)}">${cells}${reps>1?`<b>×${reps}</b>`:""}</span>`;
+}
+// Tarjeta de galería: la portada a todo color, el estado encima y el nombre sobre un degradado.
+function galCard(f, inGroup){
+  const ms = memState(f);
+  const media = f.vid ? `<img class="gm" data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="" loading="lazy">`
+    : f.thumb ? `<img class="gm" src="${esc(f.thumb)}" alt="" loading="lazy">`
+    : `<span class="gm gm-ph" aria-hidden="true">${(+f.tiempos||+f.tiempo) ? compas(f) : ico("music")}<em>${esc(TIPO[tipoOf(f)].t)}</em></span>`;
+  let sub;
+  if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
+  else if(f.entrada && f.salida) sub = inGroup ? `<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}` : `${esc(f.entrada)} <span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}`;
+  else sub = `<span class="warnc">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
+  return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${f.id}">${media}<span class="gshade" aria-hidden="true"></span>
+    <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"?`<span class="tagx t-red">Olvidada</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
+    <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${f.usos?`<span class="gusos">salió ${f.usos}×</span>`:""}</span>
+  </button>`;
 }
 function figCard(f, inGroup){
   // Siempre con miniatura: la del vídeo o, si no tiene, el compás de la figura sobre fondo azul.
@@ -1239,7 +1306,8 @@ function renderInicio(){
   const dF=dueFigs(), dueN=dF.length+dueLinks().length;
   // Portada: un fotograma real del vídeo de la figura que más toca repasar.
   const heroFig = [fStep && S.figures[fStep.ids[0]], ...dF, ...all].find(f=>f && (f.vid || f.thumb));
-  const heroMedia = heroFig && heroFig.vid ? `<video class="hero-media" data-hvid="${esc(heroFig.vid)}" data-s="${+(heroFig.vidTrim?.start)||0}" muted playsinline preload="metadata" ${heroFig.thumb?`poster="${esc(heroFig.thumb)}"`:""} aria-hidden="true" tabindex="-1"></video>`
+  const heroMedia = heroFig && heroFig.vid && (coverSet.has(heroFig.vid) || heroFig.thumb) ? `<img class="hero-media" data-cover="${esc(heroFig.vid)}" ${heroFig.thumb?`src="${esc(heroFig.thumb)}"`:""} alt="">`
+    : heroFig && heroFig.vid ? `<video class="hero-media" data-hvid="${esc(heroFig.vid)}" data-s="${+(heroFig.vidTrim?.start)||0}" muted playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>`
     : heroFig && heroFig.thumb ? `<img class="hero-media" src="${esc(heroFig.thumb)}" alt="">` : "";
   const names = ids => { const n=ids.map(id=>S.figures[id]?.nombre).filter(Boolean); return n.length>2 ? `${n.slice(0,2).join(", ")} y ${n.length-2} más` : joinY(n); };
   const items = [
@@ -1283,7 +1351,7 @@ function renderInicio(){
     </section>` : ""}
     ${carr.length ? `<section aria-labelledby="in-due" class="in-sec">
       <div class="in-h"><h2 id="in-due">Repasar hoy <span class="muted">${dF.length}</span></h2><button class="lnk" data-tab="repasar">Ver todo</button></div>
-      <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${f.id}">${f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
+      <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${f.id}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
     </section>` : ""}
     ${next ? `<section class="in-next" aria-labelledby="in-next"><span class="eyebrow">${ico("spark")}Tu siguiente paso</span>${next}</section>` : ""}
     <div class="in-two">
@@ -1324,8 +1392,8 @@ function renderRepertorio(){
     const inc = list.filter(incomplete); if(inc.length) groups.push(["Sin completar", inc, inc.length===1?"Añade dónde empieza y dónde acaba para que salga en Enlazar.":"Añade dónde empiezan y dónde acaban para que salgan en Enlazar."]);
     allPositions().forEach(p=>{ const it=list.filter(f=>placed(f)&&f.entrada===p); if(it.length) groups.push(["Desde "+p, it]); });
     const fw = list.filter(f=>!isMove(f)); if(fw.length) groups.push(["Footwork y styling", fw]);
-    body = groups.map(([t,it,hint])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${hint?`<p class="small muted group-hint">${hint}</p>`:""}${it.map(f=>figCard(f, t.startsWith("Desde "))).join("")}</div>`).join("");
-  } else body = `<div class="list">${list.map(f=>figCard(f,false)).join("")}</div>`;
+    body = groups.map(([t,it,hint])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${hint?`<p class="small muted group-hint">${hint}</p>`:""}<div class="gal">${it.map(f=>galCard(f, t.startsWith("Desde "))).join("")}</div></div>`).join("");
+  } else body = `<div class="gal">${list.map(f=>galCard(f,false)).join("")}</div>`;
   const v=$("#v-repertorio");
   v.innerHTML = `
     ${all.length ? `<p class="sum"><span><b>${all.length}</b> ${all.length===1?"figura":"figuras"}</span><span aria-hidden="true">·</span><span><b>${consN}</b> ${consN===1?"consolidada":"consolidadas"}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar"><b>${dueN}</b> ${dueN===1?"repaso hoy":"repasos hoy"}</button>`:""}</p>`:""}
@@ -2100,6 +2168,12 @@ async function makeThumb(v, t){
   if(frameIsBlank(ctx)) return null;
   return c.toDataURL("image/jpeg",0.72);
 }
+async function makeCover(v){
+  const W=v.videoWidth, H=v.videoHeight; if(!W||!H) return null;
+  const sc=Math.min(1, 720/Math.max(W,H)), c=document.createElement("canvas"); c.width=Math.round(W*sc); c.height=Math.round(H*sc);
+  const ctx=c.getContext("2d"); ctx.drawImage(v,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(r,"image/jpeg",0.8));
+}
 function frameIsBlank(ctx){
   try{ const d=ctx.getImageData(0,0,160,160).data; let sum=0, n=0; for(let i=0;i<d.length;i+=4*97){ sum+=d[i]+d[i+1]+d[i+2]; n++; } return sum/(n*3) < 6; }catch{ return false; }
 }
@@ -2108,7 +2182,7 @@ let thumbsRunning=false;
 async function genMissingThumbs(){
   if(thumbsRunning || !idb) return; thumbsRunning=true;
   try{
-    for(const f of Object.values(S.figures).filter(x=>x.vid && !x.thumb)){
+    for(const f of Object.values(S.figures).filter(x=>x.vid && (!x.thumb || !coverSet.has(x.vid)))){
       const url=await vidObjUrl(f.vid).catch(()=>null); if(!url) continue;
       const v=document.createElement("video");
       v.muted=true; v.defaultMuted=true; v.playsInline=true; v.setAttribute("playsinline",""); v.setAttribute("muted",""); v.preload="auto"; v.src=url;
@@ -2118,7 +2192,10 @@ async function genMissingThumbs(){
         try{ await v.play(); await new Promise(r=>{ const ok=()=>r(); v.addEventListener("timeupdate",ok,{once:true}); setTimeout(ok,2500); }); }catch{}
         v.pause();
         const th=await makeThumb(v,(f.vidTrim&&f.vidTrim.start)||0);
-        if(th && S.figures[f.id] && !S.figures[f.id].thumb){ S.figures[f.id].thumb=th; persist({t:"fig",id:f.id}); render(); }
+        if(th && S.figures[f.id] && !S.figures[f.id].thumb){ S.figures[f.id].thumb=th; persist({t:"fig",id:f.id}); }
+        // makeThumb deja el vídeo en el inicio de la figura: la portada sale del mismo fotograma.
+        if(th && !coverSet.has(f.vid)){ const cb=await makeCover(v); if(cb){ await vidPut(COVER(f.vid), cb); coverSet.add(f.vid); } }
+        render();
       }catch{} finally{ v.removeAttribute("src"); v.load(); v.remove(); }
     }
   } finally { thumbsRunning=false; }
@@ -2782,7 +2859,7 @@ function render(){
   else if(tab==="repasar") renderRepasar();
   else if(tab==="enlazar") renderEnlazar();
   else if(tab==="social") renderSocial();
-  hydrateVideos($("#v-"+tab));
+  hydrateVideos($("#v-"+tab)); hydrateCovers($("#v-"+tab));
   justSaved = null; lastSal = null;
   if(fk && !$("#sheet-root .sheet") && !$("#overlay-root").firstElementChild){ const el=$("#v-"+tab).querySelector(fk); if(el && el!==document.activeElement) el.focus({preventScroll:true}); }
 }
@@ -2980,7 +3057,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  state: ()=>S, ready: ()=>loaded, flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

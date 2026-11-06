@@ -467,6 +467,7 @@ details.info{font-size:0.8236rem;color:var(--muted)}
 details.info summary{color:var(--muted);font-weight:500;font-size:0.8236rem;padding:2px 0}
 details.info summary::before{content:"ⓘ ";font-weight:400}
 details.info[open] summary::before{content:"ⓘ "}
+details.info .lnk{display:inline-flex;align-items:center;min-height:44px;margin-top:4px;color:var(--link);font-weight:700}
 details.info[open] summary{margin-bottom:6px}
 .sheet.dragging{transition:none!important}
 .sheet.snap{transition:transform .25s cubic-bezier(.2,.9,.25,1)}
@@ -1137,7 +1138,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.43";
+const APP_VERSION = "1.44";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -3316,7 +3317,7 @@ function openSettings(){
     <div class="seg2 seg3" role="group" aria-label="Apariencia">${[["oscuro","Oscuro"],["auto","Como el sistema"],["claro","Claro"]].map(([k,t])=>`<button type="button" data-tema="${k}" aria-pressed="${temaActual()===k}">${t}</button>`).join("")}</div>
     <p class="menu-h">Datos</p>
     <div class="menu">${row("importar","Restaurar o importar","")}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
-    <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</span></details>`;
+    <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</span><a class="lnk" href="conteo.html">Prueba del conteo al grabar</a></details>`;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     ${head}
     ${body}

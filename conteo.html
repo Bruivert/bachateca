@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060c1a">
+<title>Prueba del conteo</title>
+<link rel="icon" href="icon-192.png">
+<style>
+/* Prueba aparte de la app: ¿puede sonar el conteo 1–8 mientras te grabas, y quedar grabado en el vídeo? */
+:root{--bg:#f4f6fb;--surface:#fff;--surface2:#eef1f7;--fg:#0a1a3f;--muted:#5b6785;--line:#d9dfeb;--pri:#0a1a3f;--pri-ink:#fff;--ok:#2f7d1f;--warn:#b3261e;--r:16px}
+@media (prefers-color-scheme:dark){:root{--bg:#060c1a;--surface:#0f1a30;--surface2:#16233f;--fg:#f2f5ff;--muted:#9aa6c4;--line:#233355;--pri:#c4f838;--pri-ink:#060c1a;--ok:#c4f838;--warn:#ff8a80}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+a{color:inherit}
+h1{font-size:1.6rem;line-height:1.15;margin:4px 0 0}
+h2{font-size:1.1rem;margin:0}
+p{margin:0}
+.muted{color:var(--muted)}.small{font-size:.875rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit;color:inherit}
+.btn{min-height:48px;padding:0 16px;border-radius:14px;border:0;background:var(--surface2);font-weight:650;touch-action:manipulation}
+.btn.pri{background:var(--pri);color:var(--pri-ink)}
+.btn:disabled{opacity:.45}
+.btn.wide{width:100%}
+.row>.btn{flex:1 1 auto}
+.seg{display:flex;background:var(--surface2);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;min-height:40px;border:0;border-radius:9px;background:none;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:.875rem;color:var(--muted)}
+select,input[type=number]{min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);padding:0 12px}
+video{width:100%;max-height:50vh;border-radius:12px;background:#000;display:block}
+.beat{font-size:3rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;min-height:3rem}
+.ok{color:var(--ok)}.warn{color:var(--warn)}
+ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+#log{font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;background:var(--surface2);border-radius:12px;padding:10px;max-height:40vh;overflow:auto;margin:0}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<main>
+  <a href="./" class="small">← Volver a Bachateca</a>
+  <h1>Prueba del conteo al grabar</h1>
+  <p class="muted">Suena «1, 2, 3… 8» al pulso que elijas mientras te grabas. Hay tres maneras de hacerlo; esta página prueba cuáles funcionan en tu iPhone. No guarda nada en la app.</p>
+
+  <section class="card" aria-labelledby="h-ritmo">
+    <h2 id="h-ritmo">1 · Ritmo y sonido</h2>
+    <label class="f" for="c-fig">Al pulso de una figura (las que tienen el pulso marcado)
+      <select id="c-fig"><option value="">Elegir el ritmo a mano</option></select></label>
+    <div class="row">
+      <label class="f" for="c-bpm" style="flex:1">Golpes por minuto<input type="number" id="c-bpm" min="75" max="200" step="1" value="125" inputmode="numeric"></label>
+      <button type="button" class="btn" id="c-tap" style="align-self:flex-end">Marcar tocando</button>
+    </div>
+    <p class="small muted" id="c-tap-msg" aria-live="polite"></p>
+    <div class="seg" role="group" aria-label="Sonido"><button type="button" data-snd="voz" aria-pressed="true">Voz</button><button type="button" data-snd="pitido" aria-pressed="false">Pitidos</button></div>
+    <div class="seg" role="group" aria-label="Cómo suena"><button type="button" data-eng="webaudio" aria-pressed="true">Web Audio</button><button type="button" data-eng="audio" aria-pressed="false">Archivo de audio</button></div>
+    <p class="small muted">«Web Audio» es exacto. «Archivo de audio» toca el mismo conteo como una canción, y a lo mejor sigue sonando aunque la página quede en segundo plano.</p>
+    <div class="row"><button type="button" class="btn" id="c-try">Escuchar 8 tiempos</button><button type="button" class="btn" id="c-stop">Parar el conteo</button></div>
+    <div class="beat" id="c-beat" aria-live="off"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-a">
+    <h2 id="h-a">2 · Tu idea: conteo y «Grabarme»</h2>
+    <p class="small muted">Lo mismo que el botón de la app: empieza el conteo y se abre la cámara a la vez. Graba 15 segundos y pulsa «Usar vídeo».</p>
+    <input type="file" id="a-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true">
+    <button type="button" class="btn pri wide" id="a-go">Empezar el conteo y abrir la cámara</button>
+    <div id="a-out"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-b">
+    <h2 id="h-b">3 · Conteo y la app Cámara</h2>
+    <ol class="small">
+      <li>Comprueba que está activado Ajustes → Cámara → Grabar sonido → <b>Permitir reproducción de audio</b>, que viene activado por defecto desde iOS 18.</li>
+      <li>Pulsa «Empezar el conteo» y, sin pararlo, abre la app Cámara.</li>
+      <li>Graba 15 segundos en modo Vídeo y vuelve aquí.</li>
+      <li>Pulsa «Elegir el vídeo» y escúchalo.</li>
+    </ol>
+    <input type="file" id="b-lib" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">
+    <div class="row"><button type="button" class="btn pri" id="b-go">Empezar el conteo</button><button type="button" class="btn" id="b-pick">Elegir el vídeo</button></div>
+    <div id="b-out"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-c">
+    <h2 id="h-c">4 · Grabar dentro de la app</h2>
+    <p class="small muted">La app graba con la cámara y suena el conteo a la vez. Como sabe cuándo suena cada número, saca el pulso del vídeo sola, sin tocar.</p>
+    <video id="c-live" playsinline muted autoplay hidden></video>
+    <div class="row"><button type="button" class="btn" id="c-cam">Encender la cámara</button><button type="button" class="btn pri" id="c-rec" disabled>Grabar</button></div>
+    <div id="c-out"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-log">
+    <h2 id="h-log">5 · Informe</h2>
+    <p class="small muted">Lo que ha pasado en cada prueba. Cópialo y pégamelo en el chat, y dime en qué vídeos se oía el conteo.</p>
+    <pre id="log" aria-live="polite"></pre>
+    <div class="row"><button type="button" class="btn" id="log-copy">Copiar informe</button></div>
+  </section>
+</main>
+<script>
+(()=>{
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const T0 = performance.now();
+const lines = [];
+function log(m){ const t = ((performance.now()-T0)/1000).toFixed(1).padStart(6); lines.push(`${t} s  ${m}`); const el=$("#log"); if(el){ el.textContent = lines.join("\n"); el.scrollTop = el.scrollHeight; } }
+const standalone = (matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true;
+log(`Equipo: ${navigator.userAgent}`);
+log(`Abierta ${standalone ? "como app instalada" : "en Safari"}.`);
+
+// ---------- ritmo ----------
+const BEAT_MIN = .3, BEAT_MAX = .8;   // igual que en la app: de 75 a 200 golpes por minuto
+const st = {bpm:125, snd:"voz", eng:"webaudio"};
+const beatSec = () => 60/st.bpm;
+// Lee (sin tocar nada) las figuras con el pulso marcado, para contar a su ritmo.
+function readFigures(){
+  return new Promise(res=>{
+    if(!("indexedDB" in window)) return res([]);
+    const q = indexedDB.open("bachateca", 1);
+    q.onupgradeneeded = () => { q.transaction.abort(); res([]); };   // no hay datos: no crea la base
+    q.onerror = () => res([]);
+    q.onsuccess = () => { try{
+      const g = q.result.transaction("kv").objectStore("kv").get("state");
+      g.onsuccess = () => { q.result.close(); res(Object.values((g.result && g.result.figures) || {})); };
+      g.onerror = () => { q.result.close(); res([]); };
+    }catch{ q.result.close(); res([]); } };
+  });
+}
+function bpmOf(p, vid){
+  const ms = (p && p.vid===vid && Array.isArray(p.marcas)) ? [...p.marcas].sort((a,b)=>a.b-b.b) : [];
+  if(ms.length<2) return null; const a=ms[0], z=ms[ms.length-1]; return Math.round(60*(z.b-a.b)/(z.s-a.s));
+}
+readFigures().then(fs=>{
+  const opts = fs.map(f=>({f, bpm: bpmOf(f.pulso, f.vid)})).filter(x=>x.bpm).sort((a,b)=>String(a.f.nombre).localeCompare(b.f.nombre));
+  $("#c-fig").insertAdjacentHTML("beforeend", opts.map(x=>`<option value="${x.bpm}">${esc(x.f.nombre)} · ${x.bpm} bpm</option>`).join(""));
+  if(!opts.length) $("#c-fig").options[0].textContent = "Ninguna figura tiene el pulso marcado: elige el ritmo a mano";
+});
+function setBpm(b, why){
+  st.bpm = Math.max(75, Math.min(200, Math.round(b)||125)); $("#c-bpm").value = st.bpm;
+  if(why) log(`Ritmo: ${st.bpm} bpm (${why}).`);
+  wavUrl = null; prepWav();
+}
+$("#c-fig").onchange = e=>{ if(e.target.value) setBpm(+e.target.value, e.target.selectedOptions[0].textContent); };
+$("#c-bpm").onchange = e=>{ $("#c-fig").value = ""; setBpm(+e.target.value, "a mano"); };
+let taps = [];
+$("#c-tap").onpointerdown = e=>{
+  e.preventDefault(); const now = performance.now();
+  if(taps.length && now - taps[taps.length-1] > 2000) taps = [];
+  taps.push(now); taps = taps.slice(-4);
+  if(taps.length<4){ $("#c-tap-msg").textContent = `${taps.length}… toca al ritmo en 1, 2, 3, 4`; return; }
+  const iv = (taps[3]-taps[0])/3/1000; taps = [];
+  if(iv<BEAT_MIN || iv>BEAT_MAX){ $("#c-tap-msg").textContent = "No lo he cogido. Toca otra vez en 1, 2, 3, 4."; return; }
+  $("#c-fig").value = ""; setBpm(60/iv, "marcado tocando"); $("#c-tap-msg").textContent = `${st.bpm} golpes por minuto.`;
+};
+document.querySelectorAll("[data-snd]").forEach(b=> b.onclick=()=>{ st.snd=b.dataset.snd; document.querySelectorAll("[data-snd]").forEach(x=>x.setAttribute("aria-pressed", x===b)); wavUrl=null; prepWav(); });
+document.querySelectorAll("[data-eng]").forEach(b=> b.onclick=()=>{ st.eng=b.dataset.eng; document.querySelectorAll("[data-eng]").forEach(x=>x.setAttribute("aria-pressed", x===b)); prepWav(); });
+
+// ---------- sonidos ----------
+// Los números son archivos cortos (voz «Mónica» de macOS). Se mide dónde empieza la voz dentro de cada uno
+// para que el número caiga justo en el golpe y no un poco después.
+let ctx = null;
+const voz = {}, onset = {};
+let soundsP = null;
+function audioCtx(){
+  if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC();
+    ctx.onstatechange = () => log(`Sonido (Web Audio): ${ctx.state}`); }
+  return ctx;
+}
+function loadSounds(){
+  if(soundsP) return soundsP;
+  const c = audioCtx();
+  soundsP = Promise.all([1,2,3,4,5,6,7,8].map(async n=>{
+    const ab = await (await fetch(`sonidos/conteo/${n}.m4a`)).arrayBuffer();
+    const buf = await new Promise((res, rej)=>{ const p = c.decodeAudioData(ab, res, rej); if(p && p.then) p.then(res, rej); });
+    const d = buf.getChannelData(0); let i = 0; while(i<d.length && Math.abs(d[i])<.02) i++;
+    voz[n] = buf; onset[n] = i / buf.sampleRate;
+  })).then(()=>log("Voz cargada."), e=>{ log(`No se pudo cargar la voz: ${e && e.message || e}`); soundsP = null; throw e; });
+  return soundsP;
+}
+// Pitido: más agudo en el 1 y en el 5, para no perderse.
+function beep(c, dest, at, n){
+  const o = c.createOscillator(), g = c.createGain();
+  o.frequency.value = n===1 ? 1320 : n===5 ? 990 : 760;
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(.6, at+.004); g.gain.exponentialRampToValueAtTime(.001, at+.09);
+  o.connect(g).connect(dest); o.start(at); o.stop(at+.1); return o;
+}
+function playNum(c, dest, at, n){
+  if(st.snd==="pitido" || !voz[n]) return beep(c, dest, at, n);
+  const s = c.createBufferSource(); s.buffer = voz[n]; s.connect(dest);
+  s.start(Math.max(c.currentTime, at - onset[n]), Math.max(0, onset[n] - at + Math.max(c.currentTime, at - onset[n])));
+  return s;
+}
+
+// ---------- el conteo ----------
+// Se programa entero de antemano (3 minutos): así no depende de temporizadores, que iOS frena en segundo plano.
+const LONG = 180;
+let run = null;   // {eng, t0 (s de Web Audio o de reloj), beat, nodes, audio, startedAt}
+function stopCount(why){
+  if(!run) return;
+  if(run.nodes) run.nodes.forEach(n=>{ try{ n.stop(); }catch{} });
+  if(run.audio){ run.audio.pause(); }
+  log(`Conteo parado${why?` (${why})`:""}${run.audio?` · el archivo iba por el segundo ${run.audio.currentTime.toFixed(1)}`:""}.`);
+  run = null; $("#c-beat").textContent = "";
+}
+// Arranca el conteo. Tiene que llamarse directamente desde el toque (iOS solo deja sonar después de tocar).
+// dest: dónde suena (los altavoces, o además la grabación en la prueba 4). Devuelve el momento del primer 1.
+function startCount(dur, dest){
+  stopCount();
+  if(st.eng==="audio" && !dest){
+    const a = wavAudio; if(!a || !wavUrl){ log("El archivo de audio aún no está listo: vuelve a pulsar en un momento."); return null; }
+    a.currentTime = 0; const p = a.play(); if(p && p.catch) p.catch(e=>log(`El archivo de audio no pudo sonar: ${e.name}`));
+    run = {eng:"audio", audio:a, beat:beatSec(), t0:performance.now()/1000 + WAV_LEAD, startedAt:Date.now()};
+    log(`Conteo con archivo de audio a ${st.bpm} bpm.`);
+    tickBeat(); return run.t0;
+  }
+  const c = audioCtx(); if(c.state!=="running") c.resume();
+  const t0 = c.currentTime + .25, b = beatSec(), nodes = [], n = Math.ceil(dur / b);
+  for(let k=0; k<n; k++) nodes.push(playNum(c, dest || c.destination, t0 + k*b, k%8+1));
+  if(dest && dest!==c.destination) for(let k=0; k<n; k++) nodes.push(playNum(c, c.destination, t0 + k*b, k%8+1));
+  run = {eng:"webaudio", nodes, beat:b, t0, startedAt:Date.now()};
+  log(`Conteo con Web Audio a ${st.bpm} bpm (${n} tiempos programados).`);
+  tickBeat(); return t0;
+}
+function nowFor(r){ return r.eng==="audio" ? (r.audio.currentTime + 0) : audioCtx().currentTime; }
+function tickBeat(){
+  if(!run) return;
+  const t = run.eng==="audio" ? run.audio.currentTime - WAV_LEAD : audioCtx().currentTime - run.t0;
+  $("#c-beat").textContent = t<0 ? "" : String(Math.floor(t/run.beat)%8+1);
+  requestAnimationFrame(tickBeat);
+}
+$("#c-try").onclick = ()=>{ loadSounds().catch(()=>{}).finally(()=>{}); if(st.eng==="webaudio" && st.snd==="voz" && !voz[1]){ log("Cargando la voz… vuelve a pulsar."); return; }
+  startCount(8*beatSec() + .3); setTimeout(()=>{ if(run && Date.now()-run.startedAt > 8*beatSec()*1000) stopCount("prueba de 8 tiempos"); }, (8*beatSec()+.6)*1000); };
+$("#c-stop").onclick = ()=>stopCount("a mano");
+
+// Archivo de audio: el conteo de 3 minutos ya mezclado en un WAV, para tocarlo con un <audio> normal.
+const WAV_LEAD = .25, WAV_RATE = 22050;
+let wavUrl = null, wavAudio = null, wavP = null;
+function prepWav(){
+  if(st.eng!=="audio" || wavUrl || wavP) return;
+  $("#c-try").disabled = true;
+  wavP = (async()=>{
+    if(st.snd==="voz") await loadSounds();
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const oc = new OAC(1, Math.ceil((LONG+WAV_LEAD)*WAV_RATE), WAV_RATE), b = beatSec();
+    for(let k=0; k*b<LONG; k++) playNum(oc, oc.destination, WAV_LEAD + k*b, k%8+1);
+    const buf = await new Promise(res=>{ const p = oc.startRendering(); if(p && p.then) p.then(res); else oc.oncomplete = e=>res(e.renderedBuffer); });
+    const wav = toWav(buf.getChannelData(0), WAV_RATE);
+    if(wavAudio && wavAudio.src) URL.revokeObjectURL(wavAudio.src);
+    wavAudio = wavAudio || new Audio(); wavAudio.preload = "auto"; wavAudio.setAttribute("playsinline","");
+    wavUrl = URL.createObjectURL(wav); wavAudio.src = wavUrl;
+    log(`Archivo de audio listo (${(wav.size/1048576).toFixed(1)} MB, ${LONG/60} min a ${st.bpm} bpm).`);
+  })().catch(e=>log(`No se pudo preparar el archivo de audio: ${e && e.message || e}`)).finally(()=>{ wavP = null; $("#c-try").disabled = false; });
+}
+function toWav(data, rate){
+  const n = data.length, buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+  const w = (o, s) => { for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4, 36+n*2, true); w(8,"WAVE"); w(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,"data"); v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){ const x = Math.max(-1, Math.min(1, data[i])); v.setInt16(44+i*2, x<0 ? x*0x8000 : x*0x7fff, true); }
+  return new Blob([buf], {type:"audio/wav"});
+}
+loadSounds().catch(()=>{});
+
+// ---------- qué pasa mientras la cámara está abierta ----------
+// Al volver se compara cuánto ha avanzado el conteo con el reloj: si se paró, avanzó menos.
+let hiddenAt = 0, hiddenCount = 0;
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){ hiddenAt = Date.now(); hiddenCount = run ? nowFor(run) : 0; log(`La página queda en segundo plano${run?" con el conteo sonando":""}.`); }
+  else if(hiddenAt){
+    const real = (Date.now()-hiddenAt)/1000;
+    if(run){ const adv = nowFor(run) - hiddenCount;
+      log(`La página vuelve tras ${real.toFixed(1)} s. El conteo avanzó ${adv.toFixed(1)} s: ${adv > real*.9 ? "siguió sonando" : adv < .5 ? "se paró mientras tanto" : "se paró una parte del tiempo"}.`); }
+    else log(`La página vuelve tras ${real.toFixed(1)} s.`);
+    hiddenAt = 0;
+  }
+});
+window.addEventListener("pagehide", ()=>log("La página se oculta (pagehide)."));
+window.addEventListener("blur", ()=>{ if(run) log("La página pierde el foco con el conteo sonando."); });
+window.addEventListener("focus", ()=>{ if(run) log(`La página recupera el foco. Sonido: ${run.eng==="audio" ? (run.audio.paused ? "archivo en pausa" : "archivo sonando") : audioCtx().state}.`); });
+
+function showVideo(box, file, label){
+  const u = URL.createObjectURL(file);
+  $(box).innerHTML = `<p class="small"><b>${esc(label)}</b> · ${(file.size/1048576).toFixed(1)} MB · ${esc(file.type||"sin tipo")}</p>
+    <video controls playsinline src="${u}"></video>
+    <p class="small muted">Dale a reproducir con el volumen alto. ¿Se oye el conteo en el vídeo? Apúntalo en el informe.</p>
+    <div class="row"><button type="button" class="btn" data-heard="sí">Se oye el conteo</button><button type="button" class="btn" data-heard="no">No se oye</button></div>`;
+  const v = $(box).querySelector("video");
+  v.onloadedmetadata = () => log(`${label}: dura ${v.duration.toFixed(1)} s.`);
+  $(box).querySelectorAll("[data-heard]").forEach(b=> b.onclick=()=>{ log(`${label}: ${b.dataset.heard==="sí" ? "SÍ se oye el conteo" : "NO se oye el conteo"}.`); b.parentNode.innerHTML = `<p class="small ${b.dataset.heard==="sí"?"ok":"warn"}">Apuntado.</p>`; });
+}
+
+// ---------- prueba 2: conteo + «Grabarme» ----------
+$("#a-go").onclick = ()=>{
+  if(st.eng==="webaudio" && st.snd==="voz" && !voz[1]){ log("Cargando la voz… vuelve a pulsar."); loadSounds().catch(()=>{}); return; }
+  const t = startCount(LONG); if(t===null) return;
+  log("Prueba 2: se abre la cámara con el conteo sonando.");
+  $("#a-cam").value = ""; $("#a-cam").click();   // en el mismo toque, como en la app
+};
+$("#a-cam").onchange = ()=>{ const f = $("#a-cam").files[0]; if(!f) return; log(`Prueba 2: vídeo recibido${run?" y el conteo sigue programado":""}.`); stopCount("vídeo recibido"); showVideo("#a-out", f, "Prueba 2 (Grabarme)"); };
+$("#a-cam").addEventListener("cancel", ()=>{ log("Prueba 2: cámara cancelada."); stopCount("cámara cancelada"); });
+
+// ---------- prueba 3: conteo + la app Cámara ----------
+$("#b-go").onclick = ()=>{
+  if(st.eng==="webaudio" && st.snd==="voz" && !voz[1]){ log("Cargando la voz… vuelve a pulsar."); loadSounds().catch(()=>{}); return; }
+  if(startCount(LONG)!==null) log("Prueba 3: conteo en marcha; ahora abre la app Cámara.");
+};
+$("#b-pick").onclick = ()=>{ $("#b-lib").value = ""; $("#b-lib").click(); };
+$("#b-lib").onchange = ()=>{ const f = $("#b-lib").files[0]; if(!f) return; stopCount("vídeo elegido"); showVideo("#b-out", f, "Prueba 3 (app Cámara)"); };
+
+// ---------- prueba 4: grabar dentro de la app ----------
+// El conteo va a los altavoces y, además, directo a la grabación (sin pasar por el aire): así se oye seguro
+// en el vídeo y la app sabe en qué segundo cae cada número.
+let stream = null, rec = null;
+$("#c-cam").onclick = async ()=>{
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; $("#c-live").hidden = true; $("#c-rec").disabled = true; $("#c-cam").textContent = "Encender la cámara"; log("Prueba 4: cámara apagada."); return; }
+  try{
+    audioCtx().resume();
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment", width:{ideal:1280}, height:{ideal:720}},
+      audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    const v = $("#c-live"); v.srcObject = stream; v.hidden = false; v.play().catch(()=>{});
+    $("#c-rec").disabled = false; $("#c-cam").textContent = "Apagar la cámara";
+    const vt = stream.getVideoTracks()[0], s = vt && vt.getSettings ? vt.getSettings() : {};
+    log(`Prueba 4: cámara encendida (${s.width||"?"}×${s.height||"?"}). Sonido: ${audioCtx().state}.`);
+  }catch(e){ log(`Prueba 4: no se pudo encender la cámara: ${e.name} ${e.message||""}`); }
+};
+$("#c-rec").onclick = ()=>{
+  if(rec){ rec.stop(); return; }
+  if(!stream) return;
+  if(typeof MediaRecorder==="undefined"){ log("Prueba 4: este navegador no puede grabar (sin MediaRecorder)."); return; }
+  if(st.snd==="voz" && !voz[1]){ log("Cargando la voz… vuelve a pulsar."); loadSounds().catch(()=>{}); return; }
+  const c = audioCtx(); if(c.state!=="running") c.resume();
+  // Grabación = vídeo de la cámara + (micrófono + conteo) mezclados.
+  const mix = c.createMediaStreamDestination();
+  const mic = stream.getAudioTracks().length ? c.createMediaStreamSource(stream) : null; if(mic) mic.connect(mix);
+  const out = new MediaStream([...stream.getVideoTracks(), ...mix.stream.getAudioTracks()]);
+  const cands = ["video/mp4;codecs=avc1,mp4a.40.2","video/mp4","video/webm;codecs=vp8,opus","video/webm"];
+  const mime = cands.find(m=>{ try{ return MediaRecorder.isTypeSupported(m); }catch{ return false; } }) || "";
+  const chunks = []; let recAt = null;
+  rec = new MediaRecorder(out, mime ? {mimeType:mime} : undefined);
+  rec.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  rec.onstart = ()=>{ recAt = c.currentTime; log(`Prueba 4: grabando (${rec.mimeType||mime||"formato por defecto"}).`); };
+  rec.onstop = ()=>{
+    const t0 = cnt, b = run ? run.beat : beatSec(); stopCount("fin de la grabación");
+    const blob = new Blob(chunks, {type: rec.mimeType || mime || "video/mp4"}); rec = null; $("#c-rec").textContent = "Grabar";
+    const first = t0 - (recAt ?? t0);
+    showVideo("#c-out", blob, "Prueba 4 (dentro de la app)");
+    const marcas = [0,1,2,3,4,5,6,7].map(k=>({b:k+1, s: +(first + k*b).toFixed(3)}));
+    log(`Prueba 4: pulso automático · el 1 cae en el segundo ${first.toFixed(2)} del vídeo y cada tiempo dura ${b.toFixed(3)} s (${Math.round(60/b)} bpm). Marcas: ${marcas.map(m=>m.s).join(", ")}.`);
+    window.__conteo.lastAuto = {first, beat:b, marcas, size:blob.size};
+    $("#c-out").insertAdjacentHTML("beforeend", `<p class="small ok">Pulso sacado solo: el 1 en el segundo ${first.toFixed(2).replace(".",",")} y ${Math.round(60/b)} golpes por minuto. En la app se guardaría así, sin marcar tocando.</p>`);
+  };
+  rec.start(1000);
+  const cnt = startCount(LONG, mix);
+  $("#c-rec").textContent = "Parar";
+};
+
+$("#log-copy").onclick = async ()=>{
+  const txt = lines.join("\n");
+  try{ await navigator.clipboard.writeText(txt); log("Informe copiado."); }
+  catch{ const r = document.createRange(); r.selectNodeContents($("#log")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); log("No se pudo copiar solo: el informe está seleccionado, cópialo a mano."); }
+};
+
+// Para las pruebas automáticas (tests/).
+window.__conteo = { st, setBpm, loadSounds, startCount, stopCount, lines, onset, voz, run: ()=>run, toWav, lastAuto:null };
+})();
+</script>
+</body>
+</html>

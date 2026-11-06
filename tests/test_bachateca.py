@@ -796,12 +796,106 @@ def marcas_y_errores_que_cometo(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- prueba del conteo al grabar (conteo.html)
+def open_conteo(browser, seed=None):
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.goto(URL.replace("index.html?test", "conteo.html"))
+    p.wait_for_function("window.__conteo && window.__conteo.lines.some(l => l.includes('Voz cargada'))", timeout=15000)
+    return ctx, p, errors
+
+
+def log_has(p, text, timeout=15000):
+    p.wait_for_function("t => window.__conteo.lines.some(l => l.includes(t))", arg=text, timeout=timeout)
+
+
+@test
+def conteo_carga_la_voz_y_el_ritmo_de_las_figuras(browser):
+    f = fig(1, "Cerrada", "Sombra", vid="v1", nombre="Entrada a sombra",
+            pulso={"vid": "v1", "modo": "extremos", "marcas": [{"b": 1, "s": 0}, {"b": 8, "s": 3.5}]})
+    ctx, p, errors = open_conteo(browser, seed={"schema": 5, "figures": {"f1": f, "f2": fig(2, "Sombra", "Cerrada")}, "logs": {}})
+    ons = p.evaluate("() => Object.values(window.__conteo.onset)")
+    assert len(ons) == 8 and all(0 <= o < 0.2 for o in ons), ons            # dónde empieza la voz en cada número
+    opts = p.locator("#c-fig option").all_inner_texts()
+    assert opts[1:] == ["Entrada a sombra · 120 bpm"], opts                   # solo las figuras con pulso
+    p.select_option("#c-fig", "120")
+    assert p.evaluate("() => window.__conteo.st.bpm") == 120
+    # Marcar el ritmo tocando: 4 toques a 0,4 s → 150 bpm.
+    for _ in range(4):
+        p.dispatch_event("#c-tap", "pointerdown"); p.wait_for_timeout(400)
+    assert 140 <= p.evaluate("() => window.__conteo.st.bpm") <= 160, p.evaluate("() => window.__conteo.st.bpm")
+    # Leer las figuras no cambia los datos de la app.
+    assert stored_state(p)["figures"]["f1"]["pulso"]["marcas"][1]["s"] == 3.5
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def conteo_suena_con_los_dos_motores(browser):
+    ctx, p, errors = open_conteo(browser)
+    p.click("#c-try")
+    log_has(p, "Conteo con Web Audio a 125 bpm")
+    p.wait_for_function("document.querySelector('#c-beat').textContent !== ''", timeout=3000)
+    p.click("#c-stop")
+    assert p.evaluate("() => window.__conteo.run()") is None
+    p.click('[data-eng="audio"]')
+    log_has(p, "Archivo de audio listo")
+    p.click("#c-try")
+    log_has(p, "Conteo con archivo de audio")
+    p.wait_for_timeout(800)
+    assert p.evaluate("() => { const r = window.__conteo.run(); return r && r.eng === 'audio' && !r.audio.paused && r.audio.currentTime > 0.3; }")
+    p.click("#c-stop")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def conteo_grabar_dentro_de_la_app_saca_el_pulso(browser):
+    ctx, p, errors = open_conteo(browser)
+    p.click("#c-cam")
+    log_has(p, "cámara encendida")
+    p.click("#c-rec")
+    log_has(p, "grabando")
+    p.wait_for_timeout(2500)
+    p.click("#c-rec")
+    p.wait_for_function("window.__conteo.lastAuto", timeout=10000)
+    a = p.evaluate("() => window.__conteo.lastAuto")
+    assert a["size"] > 0 and abs(a["beat"] - 0.48) < 1e-9, a                 # 125 bpm
+    assert 0 <= a["first"] < 0.6, a                                           # el 1 suena al poco de empezar a grabar
+    assert [m["b"] for m in a["marcas"]] == list(range(1, 9)), a
+    assert p.locator("#c-out video").count() == 1 and "Pulso sacado solo" in p.locator("#c-out").inner_text()
+    p.click('#c-out [data-heard="sí"]')
+    assert "SÍ se oye el conteo" in p.locator("#log").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def service_worker_no_confunde_las_paginas(browser):
+    """Abrir conteo.html no puede guardarse como si fuera la app: sin conexión se abriría la prueba."""
+    ctx = browser.new_context(service_workers="allow", viewport={"width": 390, "height": 844})
+    p = ctx.new_page()
+    app = URL.replace("?test", "")
+    p.goto(app)
+    p.wait_for_function("navigator.serviceWorker && navigator.serviceWorker.controller", timeout=15000) if p.evaluate("!!navigator.serviceWorker.controller") else None
+    p.evaluate("() => navigator.serviceWorker.ready")
+    p.reload(); p.wait_for_function("!!navigator.serviceWorker.controller", timeout=15000)
+    p.goto(URL.replace("index.html?test", "conteo.html")); p.wait_for_timeout(500)
+    r = p.evaluate("""async () => { const ks = await caches.keys(), c = await caches.open(ks.find(k => k.startsWith("bachateca-")));
+      const app = await c.match("./index.html"), lab = await c.match(location.href);
+      return {app: app ? await app.text() : "", lab: lab ? await lab.text() : ""}; }""")
+    assert "<title>Bachateca</title>" in r["app"], r["app"][:200]
+    assert "<title>Prueba del conteo</title>" in r["lab"], r["lab"][:200]
+    ctx.close()
+
+
 def main():
     srv = serve()
     failed = 0
     with sync_playwright() as pw:
         exe = os.environ.get("CHROME")
-        browser = pw.chromium.launch(**({"executable_path": exe} if exe else {}))
+        # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
+        args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+        browser = pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
         for fn in results:
             try:
                 fn(browser)

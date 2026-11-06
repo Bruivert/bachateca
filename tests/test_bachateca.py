@@ -695,7 +695,7 @@ def migracion_5_marcas_y_errores(browser):
       const old = {schema: 4, figures: {a: {id: "a", nombre: "A", intentos: [{id: "i1", vid: "x"}]}, b: {id: "b", nombre: "B", errores: [{id: "e", nota: "n"}]}}};
       const m = B.migrate(old); return {m, same: JSON.stringify(B.migrate(m)) === JSON.stringify(m), S: B.SCHEMA}; }""")
     m = r["m"]["figures"]
-    assert r["S"] == 5 and r["m"]["schema"] == 5 and r["same"], r
+    assert r["S"] >= 5 and r["m"]["schema"] == r["S"] and r["same"], r
     assert m["a"]["errores"] == [] and m["a"]["intentos"][0]["marcadores"] == [], m
     assert m["b"]["errores"] == [{"id": "e", "nota": "n"}], m
     ctx.close()
@@ -824,6 +824,143 @@ def marcas_y_errores_que_cometo(browser):
     assert len(p.evaluate("() => window.__bachateca.state().figures.f1.errores")) == 1
     p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
     assert len(stored_state(p)["figures"]["f1"]["intentos"][0]["marcadores"]) == 3
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- figuras incompletas (se enseñan por partes)
+def inc_fig(**kw):
+    """Una figura que aún nos están enseñando: sin salida conocida y con el vídeo de la última clase."""
+    f = fig(1, "Cerrada", "", estado="incompleta", vid="v1", vidTrim={"start": 0, "end": 0}, parteFecha="2026-10-30",
+            rep={"step": 0, "due": "2026-10-30", "aciertos": 0, "fallos": 0}, partes=[], intentos=[], errores=[])
+    f.update(kw)
+    return f
+
+
+@test
+def migracion_6_partes(browser):
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 5, figures: {a: {id: "a", nombre: "A"}, b: {id: "b", nombre: "B", partes: [{id: "x", fecha: "2026-11-01"}]}}};
+      const m = B.migrate(old); return {m, same: JSON.stringify(B.migrate(m)) === JSON.stringify(m), S: B.SCHEMA}; }""")
+    assert r["S"] >= 6 and r["m"]["schema"] == r["S"] and r["same"], r
+    assert r["m"]["figures"]["a"]["partes"] == [] and r["m"]["figures"]["b"]["partes"][0]["id"] == "x", r["m"]
+    ctx.close()
+
+
+@test
+def incompleta_por_partes(browser):
+    """Cada clase trae un vídeo que junta lo anterior y lo nuevo: pasa a ser el de la figura y el anterior queda en Partes."""
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": {"f1": inc_fig()}, "logs": {}})
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('[data-fest="incompleta"]')
+    assert p.locator("#v-repertorio .gcard").count() == 1 and "Incompleta" in p.locator("#v-repertorio .gcard").inner_text()
+    assert p.locator('[data-fest="incompletas"]').inner_text() == "Sin entrada/salida", "el filtro de antes cambia de nombre"
+    p.click('#v-repertorio [data-view="f1"]')
+    card = p.locator("section:has(#fv-pt)")
+    assert "Partes · 1" in card.inner_text() and "Parte 1 · 30 oct" in card.inner_text(), card.inner_text()
+    assert p.locator('[data-act="inc-done"]').count() == 1 and p.locator('[data-promote="f1"]').count() == 0
+    assert "Falta dónde acaba" not in p.locator(".sheet").inner_text(), "una incompleta no pide la salida"
+    # Parte 2: el vídeo de hoy, con nota.
+    p.click('[data-act="pt-new"]')
+    assert p.locator('[data-vid="ai"]').count() == 0 and p.locator("#ff-cam").count() == 1
+    p.set_input_files("#ff-file", FIXTURE)
+    p.wait_for_selector("#pt-form #ff-prev")
+    p.wait_for_function("document.querySelector('#ff-prev').readyState >= 1")
+    p.fill("#pt-nota", "el giro final")
+    p.click('#pt-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]', timeout=15000)
+    assert "Parte 2 guardada" in p.locator(".toast").inner_text()
+    card = p.locator("section:has(#fv-pt)").inner_text()
+    assert "Partes · 2" in card and "Parte 2 ·" in card and "el giro final" in card and "Parte 1 · 30 oct" in card, card
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    hoy = p.evaluate("() => window.__bachateca.todayStr()")
+    assert f["vid"] != "v1" and f["parteFecha"] == hoy and f["parteNota"] == "el giro final", f
+    assert [(x["vid"], x["fecha"]) for x in f["partes"]] == [("v1", "2026-10-30")], f["partes"]
+    assert f["rep"]["due"] == hoy, "lo nuevo se repasa hoy"
+    assert sorted(stored_video_sizes(p)) == sorted(["v1", f["vid"]]), "los dos vídeos siguen guardados"
+    assert {x.get("parte") for x in p.evaluate("() => window.__bachateca.vidsUnsaved()")} == {None, f["partes"][0]["id"]}, "las partes cuentan en el aviso de copias"
+    # Ver la parte 1 y borrarla, con Deshacer.
+    pid = f["partes"][0]["id"]
+    p.click(f'[data-act="pt-open"][data-pt="{pid}"]')
+    p.wait_for_selector(f'[data-viewpt="{pid}"] video')
+    assert "Parte 1 · 30 oct" in p.locator(".sheet").inner_text()
+    p.click('[data-act="pt-del"]'); p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector('[data-viewfig="f1"]')
+    assert "Partes · 1" in p.locator("section:has(#fv-pt)").inner_text()
+    p.click(".toast .undo")
+    assert "Partes · 2" in p.locator("section:has(#fv-pt)").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def incompleta_se_repasa_cada_dia(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": {"f1": inc_fig(rep={"step": 3, "due": "2026-10-30", "aciertos": 3, "fallos": 0})}, "logs": {}})
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="rev-one"]')
+    p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    r = p.evaluate("() => ({f: window.__bachateca.state().figures.f1, t1: window.__bachateca.todayStr(1)})")
+    assert r["f"]["rep"]["due"] == r["t1"], r["f"]["rep"]                     # mañana otra vez, aunque fuera fluida
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def incompleta_fuera_de_social_y_enlazar(browser):
+    figs = {"f1": inc_fig(salida="Sombra"), "f2": fig(2, "Cerrada", "Sombra", estado="disponible"), "f3": fig(3, "Sombra", "Cerrada")}
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": figs, "logs": {}})
+    ids = p.evaluate("() => window.__bachateca.exitsFrom('Cerrada').map(f => f.id)")
+    assert ids == ["f2"], ids
+    p.click('nav.tabs [data-tab="social"]')
+    p.check("#soc-incl")                                                        # ni con «Incluir las que están en práctica»
+    txt = p.locator("#v-social").inner_text()
+    assert "Figura 2" in txt and "Figura 3" in txt and "Figura 1" not in txt, txt
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ya_esta_completa(browser):
+    """Termina: pasa a Disponible, entra en el repaso normal y puede borrar los vídeos de las partes anteriores."""
+    f = inc_fig(salida="Sombra", partes=[{"id": "p1", "fecha": "2026-10-23", "creado": 1, "vid": "v0"}])
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": {"f1": f}, "logs": {}}, videos=["v0", "v1"])
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="inc-done"]')
+    assert "el vídeo de la parte anterior" in p.locator("#inc-form").inner_text()
+    p.click('[data-incto="disponible"]')
+    p.check("#inc-del")
+    p.click('#inc-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]')
+    g = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert g["estado"] == "disponible" and g["partes"] == [] and g["vid"] == "v1", g
+    assert p.locator("section:has(#fv-pt)").count() == 0, "sin partes no hay tarjeta"
+    p.wait_for_timeout(300)
+    assert sorted(stored_video_sizes(p)) == ["v1"], stored_video_sizes(p)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ya_esta_completa_pide_la_salida(browser):
+    """Si aún no pone dónde acaba, se abre la ficha para completarlo; las partes se quedan (no se marcó borrarlas)."""
+    f = inc_fig(partes=[{"id": "p1", "fecha": "2026-10-23", "creado": 1, "vid": "v0"}])
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": {"f1": f}, "logs": {}}, videos=["v0", "v1"])
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="inc-done"]'); p.click('#inc-form button[type="submit"]')
+    p.wait_for_selector("#fig-form")
+    assert "indica dónde empieza y dónde acaba" in p.locator("#fig-form").inner_text()
+    assert p.locator('#ff-estado [data-est="practica"]').get_attribute("aria-pressed") == "true"
+    p.select_option("#ff-out", "Sombra")
+    p.click('#fig-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]')
+    g = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert g["estado"] == "practica" and g["salida"] == "Sombra" and len(g["partes"]) == 1, g
+    assert "Partes de la clase · 2" in p.locator("section:has(#fv-pt)").inner_text(), "terminada, las partes siguen en la ficha"
     assert not errors, errors
     ctx.close()
 

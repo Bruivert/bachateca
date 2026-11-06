@@ -428,7 +428,8 @@ def migracion_3_intentos(browser):
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), S: B.SCHEMA}; }""")
     assert r["S"] >= 3 and r["m"]["schema"] == r["S"], r
     assert r["m"]["figures"]["a"]["intentos"] == [], "cada figura empieza con la lista vacía"
-    assert r["m"]["figures"]["b"]["intentos"] == [{"id": "i1", "vid": "x"}], "no toca los intentos que ya hay"
+    i1 = r["m"]["figures"]["b"]["intentos"]
+    assert len(i1) == 1 and i1[0]["id"] == "i1" and i1[0]["vid"] == "x", "no toca los intentos que ya hay"
     assert r["same"], "repetir la migración no cambia nada"
     ctx.close()
 
@@ -585,7 +586,7 @@ def migracion_4_pulso(browser):
     r = p.evaluate("""() => { const B = window.__bachateca;
       const old = {schema: 3, figures: {a: {id: "a", nombre: "A", intentos: [], pulso: {vid: "v", marcas: [{b: 1, s: 0}, {b: 2, s: .5}]}}}};
       const m = B.migrate(old); return {m, same: JSON.stringify(B.migrate(m)) === JSON.stringify(m), S: B.SCHEMA}; }""")
-    assert r["S"] == 4 and r["m"]["schema"] == 4 and r["same"], r
+    assert r["S"] >= 4 and r["m"]["schema"] == r["S"] and r["same"], r
     assert r["m"]["figures"]["a"]["pulso"]["marcas"][1]["s"] == 0.5, "conserva el pulso"
     ctx.close()
 
@@ -665,6 +666,132 @@ def marcar_pulso_de_un_intento_solo_extremos(browser):
     p.click("#pk-del")
     p.wait_for_selector('[data-viewatt="i1"]')
     assert "pulso" not in p.evaluate("() => window.__bachateca.state().figures.f1.intentos[0]")
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- comparar por tiempos
+def cmp_seed(**kw):
+    """La clase a 0,5 s por tiempo (120 bpm) y el intento a 0,3 s (200 bpm): otro pulso, que no es un fallo."""
+    a = att(1, "a1", pulso={"vid": "a1", "modo": "todos", "marcas": [{"b": 1, "s": 0.1}, {"b": 2, "s": 0.4}, {"b": 3, "s": 0.7}, {"b": 4, "s": 1.0}]}, marcadores=[])
+    f = fig(1, "Cerrada", "Sombra", vid="v1", tiempo="1", tiempos="4", errores=[], intentos=[a],
+            pulso={"vid": "v1", "modo": "extremos", "marcas": [{"b": 1, "s": 0.2}, {"b": 4, "s": 1.7}]})
+    f.update(kw)
+    return {"schema": 5, "figures": {"f1": f}, "logs": {}}
+
+
+def times(page):
+    return page.evaluate("() => [document.querySelector('#cmp-t').currentTime, document.querySelector('#cmp-m').currentTime]")
+
+
+def wait_seeked(page):
+    page.wait_for_function("!document.querySelector('#cmp-t').seeking && !document.querySelector('#cmp-m').seeking")
+
+
+@test
+def migracion_5_marcas_y_errores(browser):
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 4, figures: {a: {id: "a", nombre: "A", intentos: [{id: "i1", vid: "x"}]}, b: {id: "b", nombre: "B", errores: [{id: "e", nota: "n"}]}}};
+      const m = B.migrate(old); return {m, same: JSON.stringify(B.migrate(m)) === JSON.stringify(m), S: B.SCHEMA}; }""")
+    m = r["m"]["figures"]
+    assert r["S"] == 5 and r["m"]["schema"] == 5 and r["same"], r
+    assert m["a"]["errores"] == [] and m["a"]["intentos"][0]["marcadores"] == [], m
+    assert m["b"]["errores"] == [{"id": "e", "nota": "n"}], m
+    ctx.close()
+
+
+@test
+def comparar_falta_el_pulso(browser):
+    seed = cmp_seed(pulso=None)
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    assert p.locator('[data-act="cmp-open"]').count() == 0
+    txt = p.locator("section:has(#fv-cmp)").inner_text()
+    assert "falta marcar el pulso del vídeo de la clase" in txt and "de este intento" not in txt, txt
+    assert p.locator('section:has(#fv-cmp) [data-act="pk-open"]').count() == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def comparar_por_tiempos(browser):
+    """El 3 de la clase con tu 3: cada vídeo en su segundo, aunque vayan a otro pulso."""
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="cmp-open"]')
+    p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    wait_seeked(p)
+    assert "200 bpm" in p.locator("#cmp-tempo").inner_text() and "120" in p.locator("#cmp-tempo").inner_text()
+    assert "no un fallo" in p.locator("#cmp-tempo").inner_text(), "el pulso es un dato"
+    assert [round(x, 2) for x in times(p)] == [0.2, 0.1], times(p)            # los dos en su 1
+    assert p.locator("#cmp-line [data-cb]").all_inner_texts() == ["1", "2", "3", "4"]
+    p.click('#cmp-line [data-cb="3"]'); wait_seeked(p)
+    assert [round(x, 2) for x in times(p)] == [1.2, 0.7], times(p)            # el 3 de la clase y tu 3
+    assert p.locator("#cmp-b").inner_text() == "3" and "cur" in p.locator('#cmp-line [data-cb="3"]').get_attribute("class")
+    p.click("#cmp-next"); wait_seeked(p)
+    assert [round(x, 2) for x in times(p)] == [1.7, 1.0] and p.locator("#cmp-b").inner_text() == "4", times(p)
+    p.click("#cmp-prev"); p.click("#cmp-prev"); wait_seeked(p)
+    assert p.locator("#cmp-b").inner_text() == "2", "tiempo a tiempo hacia atrás"
+    p.click("#cmp-mirror")
+    assert "mirror" in p.locator("#cmp-t").get_attribute("class"), "espejo de la clase"
+    # Tramo del 2 al 3 en bucle, a 1×: tu vídeo sigue a la clase tiempo a tiempo.
+    p.click("#cmp-range"); p.click('#cmp-line [data-cb="2"]'); p.click('#cmp-line [data-cb="3"]')
+    assert p.locator("#cmp-range").inner_text() == "Tramo: 2–3" and "out" in p.locator('#cmp-line [data-cb="1"]').get_attribute("class")
+    p.click("#cmp-play")
+    p.wait_for_timeout(1600)                                                   # más de una vuelta del tramo (1 s)
+    r = p.evaluate("""() => { const B = window.__bachateca, S = B.state().figures.f1, t = document.querySelector('#cmp-t').currentTime, m = document.querySelector('#cmp-m').currentTime;
+      const b = B.secToBeat(S.pulso, t); return {b, err: m - B.beatToSec(S.intentos[0].pulso, b), st: B.cmpState()}; }""")
+    assert r["st"]["playing"] and 1.9 <= r["b"] < 4.05, r                     # dentro del tramo (vuelve al 2)
+    assert abs(r["err"]) < 0.2, r                                              # tu vídeo en el mismo tiempo que la clase
+    p.click("#cmp-play")
+    assert not p.evaluate("() => window.__bachateca.cmpState().playing")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def marcas_y_errores_que_cometo(browser):
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.click('#cmp-line [data-cb="4"]')
+    p.click('[data-cmk="error"]')
+    assert "Error en el 4" in p.locator("#cmp-form").inner_text()
+    p.fill("#cmp-nota", "el brazo izquierdo se queda bajo")
+    p.check("#cmp-toerr")
+    p.click("#cmp-fsave")
+    p.click('#cmp-line [data-cb="2"]')
+    p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    p.click('[data-cmk="error"]'); p.fill("#cmp-nota", "me adelanto"); p.click("#cmp-fsave")
+    assert "mk" in p.locator('#cmp-line [data-cb="4"]').get_attribute("class"), "la marca se ve en la línea"
+    items = p.locator("#cmp-marks li").all_inner_texts()
+    assert len(items) == 3 and "en el 2" in items[0] and "en el 4" in items[2] and "En tus errores" in items[2], items
+    # Un error que no estaba en tus errores puede pasar después.
+    p.click("#cmp-marks [data-cerr]")
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert [m["tipo"] for m in sorted(f["intentos"][0]["marcadores"], key=lambda m: m["b"])] == ["bien", "error", "error"], f["intentos"][0]["marcadores"]
+    assert sorted(e["nota"] for e in f["errores"]) == ["el brazo izquierdo se queda bajo", "me adelanto"], f["errores"]
+    assert all(e["desde"] == "i1" for e in f["errores"])
+    # Las marcas se ven en el intento; los errores, en la ficha y al repasar la figura.
+    p.click('[data-act="cmp-back"]')
+    assert "Tus marcas" in p.locator('[data-viewatt="i1"]').inner_text()
+    p.click('[data-viewatt] [data-view="f1"]')
+    assert "el brazo izquierdo se queda bajo" in p.locator("section:has(#fv-e)").inner_text()
+    p.click('[data-act="rev-one"]')
+    assert "Ojo con" in p.locator("#v-repasar").inner_text() and "me adelanto" in p.locator("#v-repasar").inner_text()
+    # Quitar un error desde la ficha.
+    p.click('[data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('section:has(#fv-e) [data-act="err-del"] >> nth=0')
+    assert len(p.evaluate("() => window.__bachateca.state().figures.f1.errores")) == 1
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    assert len(stored_state(p)["figures"]["f1"]["intentos"][0]["marcadores"]) == 3
     assert not errors, errors
     ctx.close()
 

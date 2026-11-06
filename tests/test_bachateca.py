@@ -426,7 +426,7 @@ def migracion_3_intentos(browser):
       const old = {schema: 2, figures: {a: {id: "a", nombre: "A"}, b: {id: "b", nombre: "B", intentos: [{id: "i1", vid: "x"}]}}};
       const m = B.migrate(old), m2 = B.migrate(m);
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), S: B.SCHEMA}; }""")
-    assert r["S"] == 3 and r["m"]["schema"] == 3, r
+    assert r["S"] >= 3 and r["m"]["schema"] == r["S"], r
     assert r["m"]["figures"]["a"]["intentos"] == [], "cada figura empieza con la lista vacía"
     assert r["m"]["figures"]["b"]["intentos"] == [{"id": "i1", "vid": "x"}], "no toca los intentos que ya hay"
     assert r["same"], "repetir la migración no cambia nada"
@@ -529,6 +529,142 @@ def importar_conserva_intentos_locales(browser):
     f = p.evaluate("() => window.__bachateca.state().figures.f1")
     assert f["nombre"] == "Renombrada", "se aplica la copia"
     assert [a["id"] for a in f["intentos"]] == ["i1"], "el intento que solo está en este dispositivo se queda"
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- pulso de cada vídeo
+def put_fixture(page, vid_ids):
+    """Guarda el vídeo de prueba real con esos ids (para reproducirlo en la app) y recarga."""
+    import base64
+    data = base64.b64encode(open(FIXTURE, "rb").read()).decode()
+    page.evaluate("""async ([b64, ids]) => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const db = await new Promise(r => { const q = indexedDB.open("bachateca", 1); q.onsuccess = () => r(q.result); });
+      await new Promise(r => { const t = db.transaction("videos", "readwrite");
+        ids.forEach(id => t.objectStore("videos").put(new Blob([bin], {type: "video/mp4"}), id)); t.oncomplete = r; }); db.close(); }""", [data, vid_ids])
+    page.reload(); page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+
+
+def tap_at(page, sec):
+    """Pausa el vídeo de la hoja en ese segundo y toca «Toca en el…»."""
+    page.evaluate("""s => new Promise(r => { const v = document.querySelector('[data-pulso] video'); v.pause();
+      if (Math.abs(v.currentTime - s) < 0.001) return r(); v.addEventListener('seeked', () => r(), {once: true}); v.currentTime = s; })""", sec)
+    page.click("#pk-tap")
+
+
+@test
+def pulso_correspondencia(browser):
+    """Tiempo de la música ↔ segundo del vídeo, por tramos rectos entre las marcas."""
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, P = {vid: "v", marcas: [{b: 5, s: 4}, {b: 1, s: 2}, {b: 8, s: 5.8}]};
+      return {b3: B.beatToSec(P, 3), b65: B.beatToSec(P, 6.5), b9: B.beatToSec(P, 9), b0: B.beatToSec(P, 0),
+              s3: B.secToBeat(P, 3), s49: B.secToBeat(P, 4.9), back: B.secToBeat(P, B.beatToSec(P, 7.25)), bpm: B.pulsoBpm(P),
+              ok: B.pulsoOk(P, "v"), otro: B.pulsoOk(P, "w"), uno: B.beatToSec({marcas: [{b: 1, s: 1}]}, 2),
+              bien: B.checkMarcas(P.marcas), solo: B.checkMarcas([{b: 1, s: 1}]),
+              hueco: B.checkMarcas([{b: 1, s: 1}, {b: 2, s: 1.5}, {b: 3, s: 2.5}]),
+              doble: B.checkMarcas([{b: 1, s: 1}, {b: 2, s: 1.1}]),
+              atras: B.checkMarcas([{b: 1, s: 2}, {b: 2, s: 1.5}]),
+              extremos: B.checkMarcas([{b: 1, s: 1}, {b: 8, s: 4.5}]),
+              lento: B.checkMarcas([{b: 1, s: 1}, {b: 8, s: 9}])}; }""")
+    approx = lambda a, b: abs(a - b) < 1e-9
+    assert approx(r["b3"], 3) and approx(r["b65"], 4.9), r            # 0,5 s por tiempo del 1 al 5; 0,6 s del 5 al 8
+    assert approx(r["b9"], 6.4) and approx(r["b0"], 1.5), r           # fuera de las marcas, con el ritmo del tramo más cercano
+    assert approx(r["s3"], 3) and approx(r["s49"], 6.5) and approx(r["back"], 7.25), r
+    assert r["bpm"] == 111, r                                         # 7 tiempos en 3,8 s: 110,5
+    assert r["ok"] and not r["otro"], "el pulso solo vale para su vídeo"
+    assert r["uno"] is None, "con una marca no hay correspondencia"
+    assert r["bien"] is None and r["extremos"] is None, r
+    assert "al menos" in r["solo"] and "saltado" in r["hueco"] and "2 y el 3" in r["hueco"], r
+    assert "dos veces" in r["doble"] and "hacia delante" in r["atras"] and "lento" in r["lento"], r
+    ctx.close()
+
+
+@test
+def migracion_4_pulso(browser):
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 3, figures: {a: {id: "a", nombre: "A", intentos: [], pulso: {vid: "v", marcas: [{b: 1, s: 0}, {b: 2, s: .5}]}}}};
+      const m = B.migrate(old); return {m, same: JSON.stringify(B.migrate(m)) === JSON.stringify(m), S: B.SCHEMA}; }""")
+    assert r["S"] == 4 and r["m"]["schema"] == 4 and r["same"], r
+    assert r["m"]["figures"]["a"]["pulso"]["marcas"][1]["s"] == 0.5, "conserva el pulso"
+    ctx.close()
+
+
+@test
+def marcar_pulso_del_video_de_la_clase(browser):
+    seed = {"schema": 4, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", tiempo="1", tiempos="4")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    card = p.locator("section:has(#fv-p)")
+    assert "Sin marcar" in card.inner_text()
+    p.click('[data-act="pk-open"]')
+    p.wait_for_function("document.querySelector('[data-pulso] video').readyState >= 1")
+    assert p.evaluate("() => document.querySelector('[data-pulso] video').playbackRate") == 0.5, "se marca a 0,5×"
+    assert "Toca en el 1" in " ".join(p.locator("#pk-tap").inner_text().split())
+    assert p.locator("#pk-save").is_disabled()
+    # Un hueco (te saltas un tiempo) se avisa y no deja guardar; Deshacer lo arregla.
+    tap_at(p, 0.2); tap_at(p, 1.2)
+    assert "saltado" in p.locator("#pk-st").inner_text() and p.locator("#pk-save").is_disabled()
+    p.click("#pk-undo")
+    # Volver atrás en el vídeo y tocar no estropea las marcas.
+    tap_at(p, 0.1)
+    assert "antes que el anterior" in p.locator("#pk-st").inner_text()
+    tap_at(p, 0.7); tap_at(p, 1.2); tap_at(p, 1.7)
+    assert p.locator("#pk-tap").is_disabled() and "4 de 4 marcas · 120 golpes por minuto" in p.locator("#pk-st").inner_text()
+    p.evaluate("""() => new Promise(r => { const v = document.querySelector('[data-pulso] video'); v.addEventListener('seeked', () => r(), {once: true}); v.currentTime = 1.25; })""")
+    p.wait_for_timeout(100)
+    assert p.locator("#pk-strip i.now").inner_text() == "3", "muestra en qué tiempo va el vídeo"
+    p.click("#pk-save")
+    p.wait_for_selector('[data-viewfig="f1"]')
+    assert "120 bpm" in p.locator("section:has(#fv-p)").inner_text() and "4 tiempos marcados" in p.locator("section:has(#fv-p)").inner_text()
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    pu = stored_state(p)["figures"]["f1"]["pulso"]
+    assert pu["vid"] == "v1" and pu["modo"] == "todos" and [m["b"] for m in pu["marcas"]] == [1, 2, 3, 4], pu
+    assert [round(m["s"], 2) for m in pu["marcas"]] == [0.2, 0.7, 1.2, 1.7], pu
+    # Si cambias el vídeo de la figura, el pulso deja de valer.
+    p.evaluate("() => { const S = window.__bachateca.state(); S.figures.f1.vid = 'v2'; }")
+    assert not p.evaluate("() => window.__bachateca.pulsoOk(window.__bachateca.state().figures.f1.pulso, 'v2')")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def marcar_pulso_de_un_intento_solo_extremos(browser):
+    """Lo mínimo: el primer y el último tiempo. Una figura que empieza en el 5 cuenta 5, 6, 7, 8."""
+    seed = {"schema": 4, "figures": {"f1": fig(1, "Cerrada", "Sombra", tiempo="5", tiempos="4", intentos=[att(1, "a1")])}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["a1"])
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    assert p.locator("section:has(#fv-p)").count() == 0, "sin vídeo de la clase no hay pulso que marcar"
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="pk-open"][data-att="i1"]')
+    p.wait_for_function("document.querySelector('[data-pulso] video').readyState >= 1")
+    p.click('[data-pkmodo="extremos"]')
+    assert "Toca en el 5" in " ".join(p.locator("#pk-tap").inner_text().split())
+    tap_at(p, 0.3)
+    assert "Toca en el 8" in " ".join(p.locator("#pk-tap").inner_text().split())
+    tap_at(p, 1.8)
+    assert "golpes por minuto" in p.locator("#pk-st").inner_text()
+    # Cerrar con marcas sin guardar pregunta antes.
+    p.click('[data-act="close"]')
+    assert p.locator("#confirm-root .confirm").count() == 1
+    p.click('#confirm-root [data-cf="no"]')
+    p.click("#pk-save")
+    p.wait_for_selector('[data-viewatt="i1"]')
+    assert "120 bpm" in p.locator('[data-viewatt="i1"]').inner_text()
+    pu = p.evaluate("() => window.__bachateca.state().figures.f1.intentos[0].pulso")
+    assert pu["vid"] == "a1" and pu["modo"] == "extremos" and [m["b"] for m in pu["marcas"]] == [5, 8], pu
+    p.click('[data-viewatt] [data-view="f1"]')
+    assert "120 bpm" in p.locator("section:has(#fv-i)").inner_text(), "el pulso del intento se ve en la lista"
+    # Quitar el pulso.
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="pk-open"][data-att="i1"]')
+    p.click("#pk-del")
+    p.wait_for_selector('[data-viewatt="i1"]')
+    assert "pulso" not in p.evaluate("() => window.__bachateca.state().figures.f1.intentos[0]")
     assert not errors, errors
     ctx.close()
 

@@ -352,6 +352,16 @@ button.card:active{background:var(--surface2)}
 .bk-pulse span{font-size:min(1rem,22px);font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .bk-pulse.live span{animation:beat-n calc(var(--beat,.48s) * 8) steps(1,end) infinite;animation-delay:calc((var(--b) - var(--o,0)) * var(--beat,.48s))}
 .bk-pulse i.one span{animation:none;color:var(--fg)}
+/* marcar el pulso: los tiempos ya marcados se encienden; el siguiente, en blanco; el que suena ahora, con anillo */
+.pk-strip i::before{opacity:1 !important}
+.pk-strip i.done::before{background:var(--mark)}
+.pk-strip i.next span{color:var(--fg)}
+.pk-strip i.now span{color:var(--bg);background:var(--fg);border-radius:50%;width:28px;height:28px;display:grid;place-items:center}
+.pk-strip i.out{opacity:.3}
+.pk-tap{min-height:96px;width:100%;border-radius:22px;font-size:1.2rem;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.pk-tap b{font-size:2.2rem;margin-left:8px;font-variant-numeric:tabular-nums}
+#pk-st{min-height:1.4em;color:var(--muted)}
+#pk-st.warn{color:var(--warn)}
 /* Quieto, el compás es secundario; al marcarlo, el 1 se enciende en cada vuelta. */
 .bk-pulse:not(.live) i::before{opacity:.7}
 @keyframes beat{0%{background:var(--neon)}12.5%,100%{background:var(--surface2)}}
@@ -907,6 +917,7 @@ function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
   if(sheetBase.carried) return true;
+  if(pk && pk.dirty && $("[data-pulso]")) return true;
   if([...document.querySelectorAll("#sheet-root input:not([type=file]):not([type=search]),#sheet-root select,#sheet-root textarea:not([readonly])")].some(fieldDirty)) return true;
   return pressSig()!==sheetBase.press || vSig()!==sheetBase.v;
 }
@@ -946,12 +957,47 @@ function nextRep(r0,g){
   r.last=todayStr(); return r;
 }
 
+// ---------- pulso de un vídeo ----------
+// Marcas {b, s}: el tiempo de la música b cae en el segundo s del vídeo. b sigue contando tras el 8
+// (9, 10…) para las figuras de más de una frase; beatName lo devuelve a 1–8 para mostrarlo.
+// Entre dos marcas se reparte en línea recta; antes de la primera y tras la última, con el ritmo del tramo más cercano.
+// El segundo es del vídeo (currentTime), así que da igual a qué velocidad se reproduzca al marcarlo.
+const BEAT_MIN = .3, BEAT_MAX = .8;   // segundos por tiempo que se aceptan: de 75 a 200 golpes por minuto
+const beatOk = iv => iv >= BEAT_MIN && iv <= BEAT_MAX;
+const beatName = b => ((Math.round(b)-1)%8+8)%8+1;
+const pkMarcas = p => (p && Array.isArray(p.marcas)) ? p.marcas.filter(m=>m && isFinite(m.b) && isFinite(m.s)).sort((x,y)=>x.b-y.b) : [];
+// Solo vale para el vídeo con el que se marcó: si cambias el vídeo de la figura, vuelve a estar sin marcar.
+const pulsoOk = (p, vid) => !!p && !!vid && p.vid===vid && pkMarcas(p).length>=2;
+function pkTramo(ms, x, k){ let i=0; while(i<ms.length-2 && x>ms[i+1][k]) i++; return [ms[i], ms[i+1]]; }
+function beatToSec(p, b){
+  const ms=pkMarcas(p); if(ms.length<2) return null;
+  const [a,c]=pkTramo(ms, b, "b"); return a.s + (b-a.b)*(c.s-a.s)/(c.b-a.b);
+}
+function secToBeat(p, s){
+  const ms=pkMarcas(p); if(ms.length<2) return null;
+  const [a,c]=pkTramo(ms, s, "s"); return a.b + (s-a.s)*(c.b-a.b)/(c.s-a.s);
+}
+const pulsoBpm = p => { const ms=pkMarcas(p); if(ms.length<2) return null; const a=ms[0], z=ms[ms.length-1]; return Math.round(60*(z.b-a.b)/(z.s-a.s)); };
+// null si las marcas sirven; si no, la frase que explica qué revisar.
+function checkMarcas(marcas){
+  const ms=[...(marcas||[])].sort((x,y)=>x.b-y.b);
+  if(ms.length<2) return "Marca al menos el primer y el último tiempo.";
+  for(let i=1;i<ms.length;i++){
+    const a=ms[i-1], c=ms[i], db=c.b-a.b, ds=c.s-a.s;
+    if(db<=0 || ds<=0) return "Las marcas tienen que ir hacia delante en el vídeo. Deshaz la última.";
+    const iv=ds/db, de=`el ${beatName(a.b)} y el ${beatName(c.b)}`;
+    if(iv>BEAT_MAX) return db===1 ? `Entre ${de} hay un hueco: ¿te has saltado un tiempo?` : `Entre ${de} va demasiado lento para ser un tiempo por golpe. Revisa las marcas.`;
+    if(iv<BEAT_MIN) return db===1 ? `${de.charAt(0).toUpperCase()+de.slice(1)} están demasiado juntos: ¿has tocado dos veces?` : `Entre ${de} va demasiado rápido. Revisa las marcas.`;
+  }
+  return null;
+}
+
 // ---------- almacenamiento (en este dispositivo) ----------
 // ---------- versión de los datos ----------
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 3;
+const SCHEMA = 4;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -973,7 +1019,11 @@ const MIGRATIONS = [
   // 2 → 3: intentos (vídeos en los que te grabas haciendo la figura). Cada figura empieza con la lista vacía.
   c => {
     Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.intentos)) f.intentos=[]; });
-  }
+  },
+  // 3 → 4: pulso de cada vídeo (f.pulso y el de cada intento: {vid, marcas:[{b, s}], modo}). Es opcional:
+  // sin él, el vídeo está «sin marcar». No hay nada que completar; el paso existe para que una versión anterior
+  // de la app rechace estas copias en vez de perder el pulso al guardar.
+  c => {}
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
 function migrate(c0){
@@ -1054,7 +1104,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.41";
+const APP_VERSION = "1.42";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1738,7 +1788,7 @@ function bkTap(){
   if(bkTaps.length < 4){ if(hint) hint.textContent = `${bkTaps.length}…`; return; }
   const iv = (bkTaps[3] - bkTaps[0]) / 3 / 1000;
   bkTaps = [];
-  if(iv < .3 || iv > .8){ if(hint) hint.textContent = "No lo he cogido. Toca otra vez en 1, 2, 3, 4."; announce("No lo he cogido. Toca otra vez."); return; }
+  if(!beatOk(iv)){ if(hint) hint.textContent = "No lo he cogido. Toca otra vez en 1, 2, 3, 4."; announce("No lo he cogido. Toca otra vez."); return; }
   bkBeat = Math.round(iv*1000)/1000;
   // El cuarto toque fue el 4: el compás sigue desde ahí, con el 5 en el siguiente golpe.
   bkT0 = now - 3*bkBeat*1000;
@@ -1936,6 +1986,7 @@ function openView(id){
     </div>
     ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
     ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
+    ${f.vid && assetsApi ? pkCardHTML(f.pulso, f.vid, f.id) : ""}
     ${mem}
     ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
     ${attCardHTML(f, CHEV)}
@@ -1954,7 +2005,7 @@ const attHora = a => { try{ return a.creado ? new Date(a.creado).toLocaleTimeStr
 function attCardHTML(f, chev){
   if(!assetsApi) return "";
   const list = [...intentosOf(f)].sort((x,y)=>(y.creado||0)-(x.creado||0));
-  const row = a => `<button type="button" class="mrow" data-act="att-open" data-id="${f.id}" data-att="${esc(a.id)}">${a.thumb?`<img class="nx-th" src="${esc(a.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`}<span><b>Intento del ${esc(fmtDate(a.fecha))}</b><span class="small muted">${[attHora(a), a.vidInfo?.dur?fmtT(a.vidInfo.dur):"", a.vidSaved===a.vid?"":"sin copia en Fotos"].filter(Boolean).join(" · ")}</span></span>${chev}</button>`;
+  const row = a => `<button type="button" class="mrow" data-act="att-open" data-id="${f.id}" data-att="${esc(a.id)}">${a.thumb?`<img class="nx-th" src="${esc(a.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`}<span><b>Intento del ${esc(fmtDate(a.fecha))}</b><span class="small muted">${[attHora(a), a.vidInfo?.dur?fmtT(a.vidInfo.dur):"", pulsoOk(a.pulso,a.vid)?`${pulsoBpm(a.pulso)} bpm`:"", a.vidSaved===a.vid?"":"sin copia en Fotos"].filter(Boolean).join(" · ")}</span></span>${chev}</button>`;
   return `<section class="fv-card" aria-labelledby="fv-i"><h3 id="fv-i">Mis intentos${list.length?` · ${list.length}`:""}</h3>
     ${list.length ? `<div class="menu">${list.map(row).join("")}</div>` : `<p class="small muted">Grábate haciendo la figura y guárdalo aquí para compararte con el vídeo de la clase.</p>`}
     <input type="file" id="att-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="att-lib" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">
@@ -2000,6 +2051,7 @@ function openAttemptView(figId, attId){
     <div class="fv-media">${playerHTML({vid:a.vid, vidTrim:a.vidTrim, thumb:a.thumb})}</div>
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Intento del ${esc(fmtDate(a.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${a.vidSaved===a.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
+    ${pkCardHTML(a.pulso, a.vid, f.id, a.id)}
     <div class="fv-actions"><button type="button" class="btn" data-act="att-savevid" data-id="${f.id}" data-att="${esc(a.id)}">Guardar en Fotos</button></div>
     <button type="button" class="btn danger wide del-row" data-act="att-del" data-id="${f.id}" data-att="${esc(a.id)}">Borrar intento</button>
   </div></div>`;
@@ -2014,6 +2066,130 @@ async function attSaveVid(figId, attId){
   const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
   const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
   if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
+}
+// ---------- pulso: marcar los tiempos de la música en un vídeo ----------
+// Tocas en cada tiempo mientras suena (mejor a 0,5×) o pausas en el fotograma y tocas. Se guarda el segundo del vídeo.
+// Modo «extremos»: solo el primer y el último tiempo de la figura (lo mínimo para compararla).
+function pkCardHTML(p, vid, figId, attId){
+  const ok = pulsoOk(p, vid), n = pkMarcas(p).length, old = p && p.vid && p.vid!==vid;
+  return `<section class="fv-card" aria-labelledby="fv-p${attId?"a":""}"><div class="in-h"><h3 id="fv-p${attId?"a":""}">Pulso del vídeo</h3>${ok?`<span class="tagx t-grey">${pulsoBpm(p)} bpm</span>`:""}</div>
+    <p class="small muted">${ok ? `${pl(n,"tiempo marcado","tiempos marcados")}. Sirve para compararte por tiempos de la música, aunque bailes a otro ritmo.`
+      : old ? "Las marcas eran del vídeo anterior: vuelve a marcarlo."
+      : "Sin marcar. Toca al ritmo de la música para que la app sepa en qué segundo cae cada tiempo."}</p>
+    <div class="fv-actions"><button type="button" class="btn" data-act="pk-open" data-id="${figId}"${attId?` data-att="${esc(attId)}"`:""}>${ok?"Revisar el pulso":"Marcar el pulso"}</button></div></section>`;
+}
+let pk = null;
+function pkTarget(figId, attId){
+  const f = S.figures[figId]; if(!f) return null;
+  if(attId){ const a = intentosOf(f).find(x=>x.id===attId); return a && a.vid ? {f, it:a, vid:a.vid, trim:a.vidTrim, thumb:a.thumb, title:`Intento del ${fmtDate(a.fecha)}`} : null; }
+  return f.vid ? {f, it:f, vid:f.vid, trim:f.vidTrim, thumb:f.thumb, title:"Vídeo de la clase"} : null;
+}
+const pkLast = () => pk.b0 + pk.n - 1;
+// El siguiente tiempo que toca marcar, o null si ya están todos.
+function pkNext(){
+  const m = pk.marcas, k = m.length;
+  if(pk.modo==="extremos") return k===0 ? pk.b0 : k===1 ? pkLast() : null;
+  const nx = k ? m[k-1].b + 1 : pk.b0; return nx > pkLast() ? null : nx;
+}
+function openPulso(figId, attId){
+  const t = pkTarget(figId, attId); if(!t) return;
+  const f = t.f, prev = pulsoOk(t.it.pulso, t.vid) ? pkMarcas(t.it.pulso) : [];
+  pk = {figId, attId:attId||null, vid:t.vid, b0: +f.tiempo===5 ? 5 : 1, n: Math.max(2, +f.tiempos||8), modo: t.it.pulso?.modo==="extremos" ? "extremos" : "todos",
+        marcas: prev.map(m=>({b:m.b, s:m.s})), had: prev.length>0, dirty:false, msg:""};
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-pulso>
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-act="pk-back">‹ ${esc(attId ? t.title : f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="fv-media">${playerHTML({vid:t.vid, vidTrim:t.trim, thumb:t.thumb})}</div>
+    <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Marcar el pulso</h2><p class="small muted">${esc(f.nombre)} · ${esc(t.title)}</p></div>
+    <p class="small muted">Dale a reproducir (va a 0,5×) y toca el botón en cada tiempo de la música, empezando por el ${pk.b0} de la figura. También puedes pausar en el fotograma justo y tocar. Cuenta el segundo del vídeo, no la velocidad.</p>
+    <div class="seg neutral" id="pk-modo" role="group" aria-label="Qué tiempos marcar"><button type="button" data-pkmodo="todos" aria-pressed="${pk.modo==="todos"}">Cada tiempo</button><button type="button" data-pkmodo="extremos" aria-pressed="${pk.modo==="extremos"}">Solo el primero y el último</button></div>
+    <div id="pk-strip"></div>
+    <button type="button" class="btn pri pk-tap" id="pk-tap"></button>
+    <p class="small" id="pk-st" aria-live="polite"></p>
+    <div class="row"><button type="button" class="btn sm" id="pk-undo">Deshacer el último</button><button type="button" class="btn sm ghost" id="pk-reset">Empezar de nuevo</button></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" id="pk-save" style="flex:1">Guardar pulso</button>${pk.had?`<button type="button" class="btn ghost danger" id="pk-del">Quitar el pulso</button>`:""}</div>
+  </div></div>`;
+  hydrateVideos($("#sheet-root"));
+  const box = $("[data-pulso] .player"), v = box && box.querySelector("video");
+  if(box && v){
+    box.dataset.loop = "0"; box.querySelector("[data-loopbtn]")?.setAttribute("aria-pressed", false);
+    const slow = ()=>{ v.defaultPlaybackRate = .5; v.playbackRate = .5; };
+    slow(); v.addEventListener("loadedmetadata", slow, {once:true});
+    box.querySelectorAll("[data-speed]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.speed==="0.5"));
+    v.addEventListener("timeupdate", pkNow); v.addEventListener("seeked", pkNow);
+  }
+  const tap = $("#pk-tap");
+  // Al bajar el dedo, no al soltarlo: así el toque cae en el golpe. El teclado y VoiceOver llegan como click sin puntero.
+  tap.onpointerdown = e=>{ e.preventDefault(); pkTap(); };
+  tap.onclick = e=>{ if(e.detail===0) pkTap(); };
+  document.querySelectorAll("#pk-modo button").forEach(b=> b.onclick=()=>{
+    if(pk.modo===b.dataset.pkmodo) return;
+    pk.modo = b.dataset.pkmodo; if(pk.marcas.length){ pk.marcas = []; pk.dirty = true; }
+    pk.msg = ""; document.querySelectorAll("#pk-modo button").forEach(x=>x.setAttribute("aria-pressed", x===b)); pkPaint();
+  });
+  $("#pk-undo").onclick = ()=>{ if(!pk.marcas.length) return; pk.marcas.pop(); pk.dirty = true; pk.msg = ""; pkPaint(); };
+  $("#pk-reset").onclick = ()=>{ if(!pk.marcas.length) return; pk.marcas = []; pk.dirty = true; pk.msg = ""; pkPaint(); };
+  $("#pk-save").onclick = ()=>pkSave(false);
+  const del = $("#pk-del"); if(del) del.onclick = ()=>pkSave(true);
+  pkPaint();
+  markClean();
+}
+function pkTap(){
+  if(!pk) return;
+  const v = $("[data-pulso] video"); if(!v || !(v.readyState>=1)){ pk.msg = "Espera a que cargue el vídeo."; return pkPaint(); }
+  const b = pkNext(); if(b===null) return;
+  const sec = Math.round(v.currentTime*1000)/1000, last = pk.marcas[pk.marcas.length-1];
+  if(last && sec <= last.s + .05){ pk.msg = "Ese toque cae antes que el anterior: el vídeo ha vuelto atrás. Deshaz la última marca o sigue desde donde ibas."; return pkPaint(); }
+  pk.marcas.push({b, s:sec}); pk.dirty = true; pk.msg = "";
+  pkPaint();
+}
+function pkPaint(){
+  if(!pk || !$("#pk-tap")) return;
+  const nx = pkNext(), ms = pk.marcas, done = new Set(ms.map(m=>m.b));
+  // La frase de 8 que se está marcando (la del siguiente tiempo, o la del último si ya están todos).
+  const ref = nx!==null ? nx : (ms.length ? ms[ms.length-1].b : pk.b0), k = Math.floor((ref-pk.b0)/8), first = pk.first = pk.b0 + 8*k;
+  const cells = [0,1,2,3,4,5,6,7].map(i=>{ const b = first+i, nm = beatName(b);
+    return `<i class="${nm%4===0?"tap":""}${done.has(b)?" done":""}${b===nx?" next":""}${b>pkLast()?" out":""}"><span>${nm}</span></i>`; }).join("");
+  const frases = Math.ceil(pk.n/8);
+  $("#pk-strip").innerHTML = `<div class="bk-pulse pk-strip" aria-hidden="true">${cells}</div>${frases>1?`<p class="small muted">Frase ${k+1} de ${frases}</p>`:""}`;
+  const tap = $("#pk-tap");
+  tap.disabled = nx===null;
+  tap.innerHTML = nx===null ? "Listo: ya están todos" : `Toca en el <b>${beatName(nx)}</b>`;
+  tap.setAttribute("aria-label", nx===null ? "Ya están todos los tiempos" : `Marcar el ${beatName(nx)}`);
+  const err = ms.length>=2 ? checkMarcas(ms) : null, want = pk.modo==="extremos" ? 2 : pk.n;
+  const st = $("#pk-st");
+  st.textContent = pk.msg || err || (ms.length>=2 ? `${ms.length} de ${want} marcas · ${pulsoBpm({marcas:ms})} golpes por minuto` : ms.length ? `1 de ${want} marcas` : "");
+  st.classList.toggle("warn", !!(pk.msg || err));
+  $("#pk-undo").disabled = !ms.length; $("#pk-reset").disabled = !ms.length;
+  $("#pk-save").disabled = !(ms.length>=2 && !err);
+  pkNow();
+}
+// Con dos marcas ya se sabe en qué tiempo va el vídeo: se muestra para comprobar que el pulso encaja.
+function pkNow(){
+  const v = $("[data-pulso] video"); if(!pk || !v) return;
+  const ms = pk.marcas; if(ms.length<2 || checkMarcas(ms)) return $("#pk-strip i.now")?.classList.remove("now");
+  const b = Math.round(secToBeat({marcas:ms}, v.currentTime));
+  document.querySelectorAll("#pk-strip i").forEach((el,i)=>el.classList.toggle("now", pk.first+i===b && b>=pk.b0 && b<=pkLast()));
+}
+function pkSave(remove){
+  if(!pk) return;
+  const t = pkTarget(pk.figId, pk.attId); if(!t){ closeSheet(); return; }
+  let msg;
+  if(remove){ delete t.it.pulso; msg = "Pulso quitado"; }
+  else {
+    const err = checkMarcas(pk.marcas); if(err){ pk.msg = err; return pkPaint(); }
+    t.it.pulso = {vid:pk.vid, marcas: pk.marcas.map(m=>({b:m.b, s:m.s})), modo:pk.modo};
+    msg = `Pulso guardado · ${pulsoBpm(t.it.pulso)} golpes por minuto`;
+  }
+  persist({t:"fig", id:pk.figId});
+  const {figId, attId} = pk; pk = null;
+  if(attId) openAttemptView(figId, attId); else openView(figId);
+  render(); toast(msg);
+}
+async function pkBack(){
+  if(!pk) return;
+  if(pk.dirty && !(await askConfirm({title:"¿Descartar las marcas?", msg:"Las marcas de esta vez no se han guardado.", ok:"Descartar", cancel:"Seguir marcando"}))) return;
+  const {figId, attId} = pk; pk = null;
+  if(attId) openAttemptView(figId, attId); else openView(figId);
 }
 async function attDelete(figId, attId){
   const f = S.figures[figId], list = intentosOf(f), i = list.findIndex(x=>x.id===attId); if(i<0) return;
@@ -2196,7 +2372,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null;
+  formApi = null; pk = null;
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -3111,6 +3287,8 @@ document.addEventListener("click", async e=>{
     closeSheet(); deleteFigureUndo(id); return;
   }
   if(a==="att-open") return openAttemptView(d.id, d.att);
+  if(a==="pk-open") return openPulso(d.id, d.att);
+  if(a==="pk-back") return pkBack();
   if(a==="att-savevid") return attSaveVid(d.id, d.att);
   if(a==="att-del") return attDelete(d.id, d.att);
   if(a==="export") return exportBackup();
@@ -3196,7 +3374,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

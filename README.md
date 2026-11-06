@@ -34,8 +34,25 @@ Todo vive en el iPhone: si borras la app, se pierde. Cada cierto tiempo:
 
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y cambia `bachateca-v1` por `bachateca-v2` en `sw.js`.
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v36` → `bachateca-v37`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
+
+## Pruebas automáticas
+
+Antes de publicar un cambio, comprueba que no se ha roto nada (repaso, enlaces, migración de datos, importar copias, vídeos):
+
+```
+pip install playwright && playwright install chromium   # solo la primera vez
+python3 tests/test_bachateca.py
+```
+
+Abren la app en un navegador sin ventana y con datos de prueba: no tocan tus datos.
+
+## Versión de los datos
+
+Los datos guardados llevan un número de versión (`schema`). Si un cambio necesita guardar las figuras de otra forma,
+se sube `SCHEMA` en `index.html` y se añade un paso en `MIGRATIONS`: al abrir la app, los datos antiguos se ponen al día
+solos, sin borrar nada. Las copias exportadas con una versión anterior se ponen al día al importarlas.
 
 ## Limitaciones conocidas
 

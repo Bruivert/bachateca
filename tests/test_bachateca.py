@@ -350,6 +350,27 @@ def apariencia(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- Rediseño (1.38)
+@test
+def ficha_y_filtros(browser):
+    ctx, p, errors = open_app(browser, seed=repertorio_inicio())
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('[data-fest="espera"]')
+    assert p.locator("#v-repertorio .card").count() == 1, "chip «Lista de espera» filtra"
+    p.click('[data-fest="todos"]')
+    assert p.locator("#v-repertorio .card").count() == 5
+    p.click('#v-repertorio [data-view="f2"]')
+    sheet = p.locator(".sheet")
+    assert "Memoria" in sheet.inner_text() and "Olvidada" in sheet.inner_text()
+    assert sheet.locator('[data-edit="f2"]').count() >= 1 and sheet.locator('[data-promote="f2"]').count() == 1, "editar y promocionar siguen"
+    p.click('[data-act="rev-one"]')
+    assert p.locator("#v-repasar").is_visible() and "1 de 1" in p.locator("#v-repasar").inner_text()
+    p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    assert "Repaso terminado" in p.locator("#v-repasar").inner_text() or "a compás" in p.locator("#v-repasar").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     srv = serve()
     failed = 0

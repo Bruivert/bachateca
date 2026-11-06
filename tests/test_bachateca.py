@@ -755,6 +755,38 @@ def comparar_por_tiempos(browser):
 
 
 @test
+def comparar_empieza_en_el_1_aunque_se_pierda_el_salto(browser):
+    """En el iPhone, el salto inicial al 1 a veces se pierde y la clase empezaba desde el principio del archivo (en el 7)."""
+    # El 1 de la clase en el segundo 1,0 a 200 bpm: el principio del archivo cae unos 3 tiempos antes (en el 6–7).
+    seed = cmp_seed(pulso={"vid": "v1", "modo": "extremos", "marcas": [{"b": 1, "s": 1.0}, {"b": 4, "s": 1.9}]})
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 2 && document.querySelector('#cmp-m').readyState >= 2")
+    wait_seeked(p)
+    beat = """() => { const B = window.__bachateca, S = B.state().figures.f1, t = document.querySelector('#cmp-t').currentTime, m = document.querySelector('#cmp-m').currentTime;
+      const b = B.secToBeat(S.pulso, t); return {t, b, err: m - B.beatToSec(S.intentos[0].pulso, b), st: B.cmpState()}; }"""
+    # 1) El salto se pierde antes de reproducir: los dos vídeos siguen en el segundo 0.
+    p.evaluate("() => { document.querySelector('#cmp-t').currentTime = 0; document.querySelector('#cmp-m').currentTime = 0; }")
+    wait_seeked(p)
+    p.click("#cmp-play")
+    p.wait_for_timeout(120)
+    r = p.evaluate(beat)
+    assert r["st"]["playing"] and 0.95 <= r["b"] < 2.5, r                    # la clase arranca en su 1, no en el 6–7
+    assert abs(r["err"]) < 0.2, r
+    # 2) Ya en marcha, la clase vuelve al principio del archivo: se lleva al 1 una vez.
+    p.evaluate("() => { document.querySelector('#cmp-t').currentTime = 0; }")
+    p.wait_for_timeout(150)
+    r = p.evaluate(beat)
+    assert r["st"]["playing"] and 0.95 <= r["b"] < 2.5, r
+    assert abs(r["err"]) < 0.2, r
+    p.click("#cmp-play")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def marcas_y_errores_que_cometo(browser):
     ctx, p, errors = open_app(browser, seed=cmp_seed())
     put_fixture(p, ["v1", "a1"])

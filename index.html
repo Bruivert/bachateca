@@ -362,6 +362,30 @@ button.card:active{background:var(--surface2)}
 .pk-tap b{font-size:2.2rem;margin-left:8px;font-variant-numeric:tabular-nums}
 #pk-st{min-height:1.4em;color:var(--muted)}
 #pk-st.warn{color:var(--warn)}
+/* comparar: los dos vídeos uno encima del otro, la línea de tiempos y las marcas */
+.cmp-vids{display:flex;flex-direction:column;gap:4px;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)))}
+.cmp-v{position:relative;margin:0;background:#000}
+.cmp-v video{display:block;width:100%;height:25vh;object-fit:contain;background:#000}
+.cmp-v video.mirror{transform:scaleX(-1)}
+.cmp-v figcaption{position:absolute;left:10px;top:8px;padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.62);color:#fff;font-size:0.8236rem;font-weight:600;font-variant-numeric:tabular-nums}
+.cmp-now{display:flex;align-items:baseline;gap:10px;margin-bottom:-6px}
+.cmp-now b{font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.cmp-line{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.cmp-line button{min-height:44px;border:0;border-radius:10px;background:var(--surface2);color:var(--fg);font-weight:700;font-variant-numeric:tabular-nums;position:relative}
+.cmp-line button.out{opacity:.35}
+.cmp-line button.pick{outline:2px solid var(--fg);outline-offset:-2px}
+.cmp-line button.cur{background:var(--chip-on);color:var(--chip-on-ink)}
+.cmp-line button.mk::after{content:"";position:absolute;bottom:5px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--warn)}
+.cmp-line button.mk.okm::after{background:var(--mark)}
+.cmp-ctl{display:grid;grid-template-columns:64px 1fr 64px;gap:10px}
+.cmp-ctl .btn{min-height:52px;border-radius:14px}
+.cmp-marks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.cmp-marks li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cmp-marks .cmp-nt{flex:1;min-width:8em}
+.cmp-fm{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--surface2)}
+.ojo{text-align:left;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--fg)}
+.ojo p{font-weight:700;color:var(--warn)}
+.ojo ul{margin:4px 0 0;padding-left:18px}
 /* Quieto, el compás es secundario; al marcarlo, el 1 se enciende en cada vuelta. */
 .bk-pulse:not(.live) i::before{opacity:.7}
 @keyframes beat{0%{background:var(--neon)}12.5%,100%{background:var(--surface2)}}
@@ -997,7 +1021,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 4;
+const SCHEMA = 5;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1023,7 +1047,16 @@ const MIGRATIONS = [
   // 3 → 4: pulso de cada vídeo (f.pulso y el de cada intento: {vid, marcas:[{b, s}], modo}). Es opcional:
   // sin él, el vídeo está «sin marcar». No hay nada que completar; el paso existe para que una versión anterior
   // de la app rechace estas copias en vez de perder el pulso al guardar.
-  c => {}
+  c => {},
+  // 4 → 5: marcadores en cada intento ({id, b, tipo:"error"|"bien", nota}) y «Errores que cometo» en la figura
+  // ({id, nota, b, desde: id del intento, fecha}). Las dos listas empiezan vacías.
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{
+      if(!f || typeof f!=="object") return;
+      if(!Array.isArray(f.errores)) f.errores=[];
+      (Array.isArray(f.intentos)?f.intentos:[]).forEach(a=>{ if(a && typeof a==="object" && !Array.isArray(a.marcadores)) a.marcadores=[]; });
+    });
+  }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
 function migrate(c0){
@@ -1104,7 +1137,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.42";
+const APP_VERSION = "1.43";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1587,6 +1620,7 @@ function renderRepasar(){
       ${ms && ms!=="nueva" ? `<span class="tagx ${MEM[ms][1]} flash-tag">${MEM[ms][0]}</span>` : ""}
       <div class="route"><span>${isMove(f)?`Empiezas en ${esc(f.entrada)}${holdTxt(f.agarreIn)}`:esc(TIPO[tipoOf(f)].t)+(f.entrada?` · en ${esc(f.entrada)}`:"")}</span></div>
       <div class="big">${esc(f.nombre)}</div>
+      ${erroresOf(f).length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${erroresOf(f).map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}
       ${!session.revealed ? `
         <p class="muted">${isMove(f)?"Hazla sin mirar. ¿Qué señal das y dónde terminas?":"Hazlo sin mirar, contando los tiempos."}</p>
         <button class="btn pri" data-act="reveal">Ver respuesta</button>
@@ -1989,6 +2023,7 @@ function openView(id){
     ${f.vid && assetsApi ? pkCardHTML(f.pulso, f.vid, f.id) : ""}
     ${mem}
     ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
+    ${errCardHTML(f)}
     ${attCardHTML(f, CHEV)}
     ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
       ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
@@ -2051,6 +2086,7 @@ function openAttemptView(figId, attId){
     <div class="fv-media">${playerHTML({vid:a.vid, vidTrim:a.vidTrim, thumb:a.thumb})}</div>
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Intento del ${esc(fmtDate(a.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${a.vidSaved===a.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
+    ${cmpCardHTML(f, a)}
     ${pkCardHTML(a.pulso, a.vid, f.id, a.id)}
     <div class="fv-actions"><button type="button" class="btn" data-act="att-savevid" data-id="${f.id}" data-att="${esc(a.id)}">Guardar en Fotos</button></div>
     <button type="button" class="btn danger wide del-row" data-act="att-del" data-id="${f.id}" data-att="${esc(a.id)}">Borrar intento</button>
@@ -2191,6 +2227,198 @@ async function pkBack(){
   const {figId, attId} = pk; pk = null;
   if(attId) openAttemptView(figId, attId); else openView(figId);
 }
+// ---------- comparar por tiempos: el vídeo de la clase y tu intento ----------
+// Un reloj común medido en tiempos de la música. El vídeo de la clase manda: de su segundo sale el tiempo en que va
+// (secToBeat) y tu vídeo se coloca en ese mismo tiempo (beatToSec), ajustando su velocidad tramo a tramo.
+// Así el 5 de la clase coincide con tu 5 aunque bailes más rápido, más lento o con otra canción: no es un fallo.
+const marcasOf = a => (a && Array.isArray(a.marcadores)) ? a.marcadores : [];
+const erroresOf = f => (f && Array.isArray(f.errores)) ? f.errores : [];
+const cmpReady = (f, a) => !!(f && a && f.vid && pulsoOk(f.pulso, f.vid) && pulsoOk(a.pulso, a.vid));
+function cmpCardHTML(f, a){
+  if(cmpReady(f, a)) return `<div class="fv-actions"><button type="button" class="btn pri" data-act="cmp-open" data-id="${f.id}" data-att="${esc(a.id)}">Comparar con la clase</button></div>${marcasHTML(a)}`;
+  const okT = f.vid && pulsoOk(f.pulso, f.vid), okM = pulsoOk(a.pulso, a.vid);
+  const falta = !f.vid ? "Añade el vídeo de la clase a la figura para compararte."
+    : `Para compararte por tiempos falta marcar el pulso ${[!okT?"del vídeo de la clase":"", !okM?"de este intento":""].filter(Boolean).join(" y ")}.`;
+  return `<section class="fv-card" aria-labelledby="fv-cmp"><h3 id="fv-cmp">Comparar con la clase</h3><p class="small muted">${falta}</p>
+    ${f.vid && !okT ? `<div class="fv-actions"><button type="button" class="btn" data-act="pk-open" data-id="${f.id}">Marcar el pulso de la clase</button></div>` : ""}</section>${marcasHTML(a)}`;
+}
+function marcasHTML(a){
+  const ms = [...marcasOf(a)].sort((x,y)=>x.b-y.b); if(!ms.length) return "";
+  return `<section class="fv-card" aria-labelledby="fv-mk"><h3 id="fv-mk">Tus marcas</h3><ul class="cmp-marks">${ms.map(m=>`<li><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span>en el <b>${beatName(m.b)}</b>${m.nota?` · ${esc(m.nota)}`:""}</span></li>`).join("")}</ul></section>`;
+}
+function errCardHTML(f){
+  const es = erroresOf(f); if(!es.length) return "";
+  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3><ul class="cmp-marks">${es.map(e=>`<li><span>${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}</span><button type="button" class="icon-btn" data-act="err-del" data-id="${f.id}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
+    <p class="small muted">Salen al repasar la figura. Quítalos cuando ya no te pasen.</p></section>`;
+}
+function errDelete(figId, errId){
+  const f = S.figures[figId], es = erroresOf(f), i = es.findIndex(e=>e.id===errId); if(i<0) return;
+  const e = es[i]; f.errores = es.filter(x=>x.id!==errId); persist({t:"fig", id:figId}); openView(figId);
+  toast("Error quitado", {label:"Deshacer", fn:()=>{ const g=S.figures[figId]; if(!g) return; g.errores=[...erroresOf(g)]; g.errores.splice(i,0,e); persist({t:"fig",id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); }});
+}
+let cmp = null;
+function cmpStop(){ if(!cmp) return; cancelAnimationFrame(cmp.raf); cmp.playing = false; ["#cmp-t","#cmp-m"].forEach(k=>{ try{ $(k)?.pause(); }catch{} }); }
+async function openCompare(figId, attId){
+  const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!cmpReady(f, a)) return;
+  const [uT, uM] = await Promise.all([vidObjUrl(f.vid).catch(()=>null), vidObjUrl(a.vid).catch(()=>null)]);
+  if(!uT || !uM){ toast("Uno de los vídeos no está en este dispositivo: las copias no incluyen vídeos."); return; }
+  const b0 = +f.tiempo===5 ? 5 : 1, n = Math.max(2, +f.tiempos||8);
+  cmpStop();
+  cmp = {figId, attId, pT:f.pulso, pM:a.pulso, lo:b0, hi:b0+n, A:b0, B:b0+n, b:b0, rate:1, playing:false, raf:0, pick:null, form:null};
+  const bT = pulsoBpm(f.pulso), bM = pulsoBpm(a.pulso), r = bM/bT, pct = Math.round(Math.abs(1-r)*100);
+  const tempo = pct<3 ? `La clase y tú vais al mismo pulso (${bT} bpm).`
+    : `Tú bailas a ${bM} bpm y la clase a ${bT}: un ${pct} % más ${r<1?"lento":"rápido"}. Es un dato, no un fallo: aquí cada vídeo va a su pulso y se comparan tiempo a tiempo.`;
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-cmp>
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-act="cmp-back">‹ Intento del ${esc(fmtDate(a.fecha))}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="cmp-vids">
+      <figure class="cmp-v"><video id="cmp-t" playsinline preload="auto" src="${esc(uT)}"></video><figcaption>Clase · ${bT} bpm</figcaption></figure>
+      <figure class="cmp-v"><video id="cmp-m" playsinline muted preload="auto" src="${esc(uM)}"></video><figcaption>Tú · ${bM} bpm</figcaption></figure>
+    </div>
+    <h2 id="sheet-t" class="sr">Comparar con la clase: ${esc(f.nombre)}</h2>
+    <div class="cmp-now"><span class="small muted">Tiempo</span><b id="cmp-b">${beatName(b0)}</b><span class="small muted" id="cmp-fr"></span></div>
+    <div class="cmp-line" id="cmp-line" role="group" aria-label="Ir a un tiempo"></div>
+    <p class="small muted" id="cmp-hint" aria-live="polite"></p>
+    <div class="cmp-ctl"><button type="button" class="btn" id="cmp-prev" aria-label="Tiempo anterior">◀︎</button><button type="button" class="btn pri" id="cmp-play">Reproducir</button><button type="button" class="btn" id="cmp-next" aria-label="Tiempo siguiente">▶︎</button></div>
+    <div class="pctl" role="group" aria-label="Reproducción">${CMP_RATES.map(x=>`<button type="button" data-crate="${x}" aria-pressed="${x===1}">${String(x).replace(".",",")}×</button>`).join("")}<button type="button" id="cmp-mirror" aria-pressed="false">Espejo de la clase</button><button type="button" id="cmp-range" aria-pressed="false">Tramo: toda</button></div>
+    <p class="small muted" id="cmp-tempo">${esc(tempo)}</p>
+    <section class="fv-card" aria-labelledby="fv-cm"><h3 id="fv-cm">Marcas</h3>
+      <div class="fv-actions"><button type="button" class="btn" data-cmk="error">Error aquí</button><button type="button" class="btn" data-cmk="bien">Bien hecho aquí</button></div>
+      <div id="cmp-form"></div><ul class="cmp-marks" id="cmp-marks"></ul></section>
+  </div></div>`;
+  const T = $("#cmp-t"), M = $("#cmp-m");
+  let ready = 0; const go = ()=>{ if(++ready===2) cmpSeek(cmp.A); };
+  [T, M].forEach(v=>{ if(v.readyState>=1) go(); else v.addEventListener("loadedmetadata", go, {once:true}); });
+  T.addEventListener("seeked", ()=>{ if(cmp && !cmp.playing) cmpPaint(); });
+  T.addEventListener("pause", ()=>{ if(cmp && cmp.playing && !T.seeking && !T.ended) cmpPause(); });
+  $("#cmp-play").onclick = ()=> cmp.playing ? cmpPause() : cmpPlay();
+  $("#cmp-prev").onclick = ()=>{ cmpPause(); cmpSeek(Math.max(cmp.lo, Math.ceil(cmp.b-1e-3)-1)); };
+  $("#cmp-next").onclick = ()=>{ cmpPause(); cmpSeek(Math.min(cmp.hi-1, Math.floor(cmp.b+1e-3)+1)); };
+  document.querySelectorAll("[data-crate]").forEach(b=> b.onclick=()=>{ cmp.rate=+b.dataset.crate; document.querySelectorAll("[data-crate]").forEach(x=>x.setAttribute("aria-pressed", x===b)); if(cmp.playing) T.playbackRate=cmp.rate; });
+  $("#cmp-mirror").onclick = e=>{ const on=!T.classList.contains("mirror"); T.classList.toggle("mirror", on); e.currentTarget.setAttribute("aria-pressed", on); };
+  $("#cmp-range").onclick = ()=>{
+    if(cmp.pick || cmp.A!==cmp.lo || cmp.B!==cmp.hi){ cmp.pick=null; cmp.A=cmp.lo; cmp.B=cmp.hi; $("#cmp-hint").textContent=""; }
+    else { cmp.pick=[]; cmpPause(); $("#cmp-hint").textContent="Toca en la línea el primer y el último tiempo del tramo que quieres repetir."; }
+    cmpLine();
+  };
+  $("#cmp-line").onclick = e=>{ const b=e.target.closest("[data-cb]"); if(!b) return; const k=+b.dataset.cb;
+    if(cmp.pick){ cmp.pick.push(k); if(cmp.pick.length===2){ const [x,y]=cmp.pick.sort((p,q)=>p-q); cmp.A=x; cmp.B=y+1; cmp.pick=null; $("#cmp-hint").textContent=`Se repite del ${beatName(x)} al ${beatName(y)}.`; cmpLine(); cmpSeek(x); } else { $("#cmp-hint").textContent="Ahora el último tiempo del tramo."; cmpLine(); } return; }
+    cmpPause(); cmpSeek(k); };
+  document.querySelectorAll("[data-cmk]").forEach(b=> b.onclick=()=>{ cmpPause(); cmp.form={tipo:b.dataset.cmk, b:Math.floor(cmp.b+1e-3)}; cmpForm(); });
+  $("#cmp-marks").onclick = e=>{
+    const g=e.target.closest("[data-cgo]"), pe=e.target.closest("[data-cerr]"), d=e.target.closest("[data-cdel]");
+    if(g){ cmpPause(); cmpSeek(+g.dataset.cgo); }
+    else if(pe) cmpToErrores(pe.dataset.cerr);
+    else if(d) cmpDelMark(d.dataset.cdel);
+  };
+  cmpLine(); cmpMarks();
+  markClean();
+}
+const cmpClampT = (v, t) => Math.max(0, Math.min(t, (isFinite(v.duration) && v.duration ? v.duration - .05 : t)));
+// Segundos de tu vídeo por cada segundo del de la clase en el tiempo b: la velocidad a la que tiene que ir el tuyo.
+function cmpSlope(b){
+  const e=.25, dT=beatToSec(cmp.pT,b+e)-beatToSec(cmp.pT,b-e), dM=beatToSec(cmp.pM,b+e)-beatToSec(cmp.pM,b-e);
+  return dT>0 ? dM/dT : 1;
+}
+function cmpSeek(b){
+  const T=$("#cmp-t"), M=$("#cmp-m"); if(!cmp || !T || !M) return;
+  cmp.b = b;
+  try{ T.currentTime = cmpClampT(T, beatToSec(cmp.pT, b)); M.currentTime = cmpClampT(M, beatToSec(cmp.pM, b)); }catch{}
+  cmpPaint();
+}
+function cmpPlay(){
+  const T=$("#cmp-t"), M=$("#cmp-m"); if(!cmp || !T || !M) return;
+  if(cmp.b >= cmp.B - .02 || cmp.b < cmp.A) cmpSeek(cmp.A);
+  T.playbackRate = cmp.rate; M.playbackRate = Math.max(.25, Math.min(2, cmp.rate*cmpSlope(cmp.b)));
+  // Los dos play() en el mismo toque: Safari solo deja reproducir con sonido justo después de tocar. El tuyo va en silencio.
+  const pT = T.play(), pM = M.play();
+  Promise.all([pT, pM]).catch(()=>{ T.muted = true; T.play().catch(()=>{}); M.play().catch(()=>{}); });
+  cmp.playing = true; $("#cmp-play").textContent = "Pausa";
+  cancelAnimationFrame(cmp.raf); cmp.raf = requestAnimationFrame(cmpTick);
+}
+function cmpPause(){
+  if(!cmp) return; cancelAnimationFrame(cmp.raf);
+  const was = cmp.playing; cmp.playing = false;
+  ["#cmp-t","#cmp-m"].forEach(k=>{ try{ $(k)?.pause(); }catch{} });
+  const pb=$("#cmp-play"); if(pb) pb.textContent="Reproducir";
+  if(was) cmpPaint();
+}
+function cmpTick(){
+  const T=$("#cmp-t"), M=$("#cmp-m"); if(!cmp || !cmp.playing || !T || !M) return;
+  if(!T.seeking){
+    const b = secToBeat(cmp.pT, T.currentTime); cmp.b = b;
+    if(b >= cmp.B || T.ended){ T.currentTime = cmpClampT(T, beatToSec(cmp.pT, cmp.A)); M.currentTime = cmpClampT(M, beatToSec(cmp.pM, cmp.A)); cmp.b = cmp.A; if(T.paused) T.play().catch(()=>{}); if(M.paused) M.play().catch(()=>{}); }
+    else if(!M.seeking){
+      const want = beatToSec(cmp.pM, b), err = M.currentTime - want;
+      // Lejos: salto. Cerca: un empujón de velocidad (±10 %), que en iPhone se nota menos que un salto.
+      if(Math.abs(err) > .25) M.currentTime = cmpClampT(M, want);
+      else { const r = Math.max(.25, Math.min(2, cmp.rate*cmpSlope(b)*(1 - Math.max(-.1, Math.min(.1, err*.8))))); if(Math.abs(M.playbackRate - r) > .02) M.playbackRate = r; }
+      if(M.paused && !M.ended) M.play().catch(()=>{});
+    }
+    cmpPaint();
+  }
+  cmp.raf = requestAnimationFrame(cmpTick);
+}
+function cmpLine(){
+  const el=$("#cmp-line"); if(!el || !cmp) return;
+  const ms = marcasOf(intentosOf(S.figures[cmp.figId]).find(x=>x.id===cmp.attId));
+  const out=[]; for(let b=cmp.lo; b<cmp.hi; b++){
+    const m = ms.filter(x=>Math.floor(x.b)===b), mk = m.length ? (m.some(x=>x.tipo==="error")?" mk":" mk okm") : "";
+    const inR = b>=cmp.A && b<cmp.B, picked = cmp.pick && cmp.pick.includes(b);
+    out.push(`<button type="button" data-cb="${b}" class="${inR?"":"out"}${mk}${picked?" pick":""}" aria-label="Tiempo ${beatName(b)}${m.length?`, ${pl(m.length,"marca","marcas")}`:""}">${beatName(b)}</button>`);
+  }
+  el.innerHTML = out.join("");
+  const rg=$("#cmp-range"); if(rg){ const whole = cmp.A===cmp.lo && cmp.B===cmp.hi; rg.textContent = cmp.pick ? "Elige el tramo…" : whole ? "Tramo: toda" : `Tramo: ${beatName(cmp.A)}–${beatName(cmp.B-1)}`; rg.setAttribute("aria-pressed", !!cmp.pick || !whole); }
+  cmpPaint();
+}
+function cmpPaint(){
+  if(!cmp) return;
+  const cur = Math.min(cmp.hi-1, Math.max(cmp.lo, Math.floor(cmp.b+1e-3)));
+  const bb=$("#cmp-b"); if(bb && bb.textContent!==String(beatName(cur))) bb.textContent = beatName(cur);
+  const fr=$("#cmp-fr"), nf=Math.ceil((cmp.hi-cmp.lo)/8); if(fr) fr.textContent = nf>1 ? `frase ${Math.floor((cur-cmp.lo)/8)+1} de ${nf}` : "";
+  document.querySelectorAll("#cmp-line [data-cb]").forEach(x=>x.classList.toggle("cur", +x.dataset.cb===cur));
+}
+function cmpForm(){
+  const el=$("#cmp-form"); if(!el || !cmp) return;
+  if(!cmp.form){ el.innerHTML=""; return; }
+  const er = cmp.form.tipo==="error";
+  el.innerHTML = `<div class="cmp-fm"><p class="small"><b>${er?"Error":"Bien hecho"} en el ${beatName(cmp.form.b)}</b></p>
+    <label class="f" for="cmp-nota">Nota (opcional)<input type="text" id="cmp-nota" placeholder="${er?"Ej.: el brazo izquierdo se queda bajo":"Ej.: buena preparación en el 4"}"></label>
+    ${er?`<label class="small row" for="cmp-toerr" style="gap:10px;min-height:44px"><input type="checkbox" id="cmp-toerr"> Añadir a «Errores que cometo» para verlo al repasarla</label>`:""}
+    <div class="row"><button type="button" class="btn pri sm" id="cmp-fsave">Guardar marca</button><button type="button" class="btn ghost sm" id="cmp-fcancel">Cancelar</button></div></div>`;
+  $("#cmp-fcancel").onclick = ()=>{ cmp.form=null; cmpForm(); };
+  $("#cmp-fsave").onclick = ()=>{
+    const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId); if(!a) return;
+    const nota=$("#cmp-nota").value.trim(), m={id:uid(), b:cmp.form.b, tipo:cmp.form.tipo, nota};
+    a.marcadores = [...marcasOf(a), m];
+    if($("#cmp-toerr")?.checked) addError(f, a, m);
+    persist({t:"fig", id:f.id}); cmp.form=null; cmpForm(); cmpLine(); cmpMarks();
+    toast(m.tipo==="error" ? (S.figures[f.id] && erroresOf(f).some(e=>e.marca===m.id) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
+  };
+  setTimeout(()=>$("#cmp-nota")?.focus(), 50);
+}
+function addError(f, a, m){
+  if(erroresOf(f).some(e=>e.marca===m.id)) return;
+  f.errores = [...erroresOf(f), {id:uid(), nota: m.nota || `Error en el ${beatName(m.b)}`, b:m.b, desde:a.id, marca:m.id, fecha:todayStr()}];
+}
+function cmpMarks(){
+  const el=$("#cmp-marks"); if(!el || !cmp) return;
+  const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId);
+  const ms=[...marcasOf(a)].sort((x,y)=>x.b-y.b);
+  el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>e.marca===m.id);
+    return `<li><button type="button" class="btn sm" data-cgo="${m.b}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
+      ${m.tipo==="error" ? (inErr ? `<span class="small muted">En tus errores</span>` : `<button type="button" class="btn ghost sm" data-cerr="${esc(m.id)}">A mis errores</button>`) : ""}
+      <button type="button" class="icon-btn" data-cdel="${esc(m.id)}" aria-label="Borrar la marca del ${beatName(m.b)}">✕</button></li>`; }).join("")
+    : `<li class="small muted">Pausa en el tiempo que quieras y toca «Error aquí» o «Bien hecho aquí».</li>`;
+}
+function cmpToErrores(mid){
+  const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId), m=marcasOf(a).find(x=>x.id===mid); if(!m) return;
+  addError(f, a, m); persist({t:"fig", id:f.id}); cmpMarks(); toast("Añadido a «Errores que cometo»");
+}
+function cmpDelMark(mid){
+  const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId); if(!a) return;
+  a.marcadores = marcasOf(a).filter(x=>x.id!==mid); persist({t:"fig", id:f.id}); cmpLine(); cmpMarks(); toast("Marca borrada");
+}
+const CMP_RATES = [.5, .75, 1];
 async function attDelete(figId, attId){
   const f = S.figures[figId], list = intentosOf(f), i = list.findIndex(x=>x.id===attId); if(i<0) return;
   const ok = await askConfirm({title:"¿Borrar este intento?", msg:"También se borra su vídeo guardado en la app. Tendrás unos segundos para deshacerlo.", ok:"Borrar intento"});
@@ -2372,7 +2600,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null; pk = null;
+  formApi = null; pk = null; cmpStop(); cmp = null;
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -3288,6 +3516,9 @@ document.addEventListener("click", async e=>{
   }
   if(a==="att-open") return openAttemptView(d.id, d.att);
   if(a==="pk-open") return openPulso(d.id, d.att);
+  if(a==="cmp-open") return openCompare(d.id, d.att);
+  if(a==="cmp-back"){ const c=cmp; cmpStop(); cmp=null; return c ? openAttemptView(c.figId, c.attId) : null; }
+  if(a==="err-del") return errDelete(d.id, d.err);
   if(a==="pk-back") return pkBack();
   if(a==="att-savevid") return attSaveVid(d.id, d.att);
   if(a==="att-del") return attDelete(d.id, d.att);
@@ -3374,7 +3605,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

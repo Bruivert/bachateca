@@ -574,6 +574,97 @@ details.info summary::after{inset:-10px -4px}
 .week i.pend{background:repeating-linear-gradient(180deg,var(--neon) 0 4px,transparent 4px 7px);opacity:.7}
 .week span{font-size:0.7059rem;color:var(--muted)}
 .week .today span{color:var(--fg);font-weight:800}
+
+/* ---------- Rediseño 1.38: tarjetas sueltas, miniaturas grandes y fichas por bloques ---------- */
+/* Listas: cada figura es una tarjeta con su borde, en vez de filas pegadas con separador. */
+.list,.group{gap:10px}
+.group-h{padding:6px 2px 2px}
+.card{border-radius:18px;border:1px solid var(--edge);padding:12px 34px 12px 12px}
+.list>.card+.card::before,.group>.card+.card::before{display:none}
+.card.has-thumb{grid-template-columns:104px 1fr;column-gap:14px}
+.card .thumb{width:104px;height:76px;border-radius:14px}
+.thumb-ph{display:grid;place-items:center;background:linear-gradient(160deg,var(--surface2),color-mix(in srgb,var(--surface2) 50%,var(--bg)));color:var(--muted);font-size:1.2rem}
+.card .fname{font-size:1.0588rem;font-weight:700}
+.card .meta{gap:6px}
+.group-hint{margin:-2px 2px 4px}
+/* Estado: etiqueta de color en lugar de punto. */
+.pill{height:22px;padding:0 8px;border-radius:7px;font-size:0.7059rem;font-weight:800;background:color-mix(in srgb,currentColor 16%,transparent)}
+.pill::before{width:6px;height:6px}
+.st-tag.st-espera{background:var(--fill);color:var(--st-espera)}
+.st-tag.st-practica{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.st-tag.st-disponible{background:color-mix(in srgb,var(--st-disponible) 18%,transparent);color:var(--st-disponible)}
+.st-tag.st-consolidada{background:color-mix(in srgb,var(--st-consolidada) 16%,transparent);color:var(--st-consolidada)}
+/* Filtros: buscador grande y chips de estado que se deslizan. */
+.filters input[type=search]{min-height:48px;border-radius:14px;background:var(--surface);border:1px solid var(--edge)}
+.filters select{border-radius:14px}
+.fchips{display:flex;gap:8px;overflow-x:auto;margin:-8px -16px 0;padding:0 16px 2px;scrollbar-width:none;scroll-padding-inline:16px}
+.fchips::-webkit-scrollbar{display:none}
+.fchips .chip{flex:none;min-height:38px}
+.seg2{border-radius:14px;padding:3px;background:var(--surface);border:1px solid var(--edge)}
+.seg2 button{border-radius:11px}
+.chip{background:var(--surface2)}
+
+/* Ficha: vídeo arriba de borde a borde, título grande y bloques. */
+.fview{gap:14px}
+.fview .sheet-head{min-height:40px}
+.fv-spacer{margin-right:auto}
+.fv-media{margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)))}
+.fv-media .player{gap:10px}
+.fv-media video{border-radius:0;max-height:52vh}
+.fv-media .pctl{padding:0 16px}
+.fv-img{display:block;width:100%;height:220px;object-fit:cover;filter:saturate(1.05)}
+.fv-title{display:flex;flex-direction:column;gap:8px}
+.fv-title h2{font-size:1.8rem;line-height:1.08;letter-spacing:-.01em}
+.fv-title .route-big{color:var(--muted);font-size:1rem}
+.fv-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.fv-actions .btn{min-height:50px;border-radius:14px}
+.fv-card{background:var(--surface);border:1px solid var(--edge);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.fv-card h3{font-size:1.05rem;font-weight:700}
+.fv-card .menu{background:none;gap:8px;border-radius:0}
+.fv-card .mrow{background:var(--surface2);border-radius:14px;min-height:60px;padding:8px 12px 8px 8px;gap:12px}
+.fv-card .mrow+.mrow::before{display:none}
+.fview .fv-card .mrow>span:not(.nx-th){display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.nx-th{width:56px;height:44px;border-radius:10px;object-fit:cover;flex:none !important;display:grid;place-items:center;font-size:.9rem}
+.fv-keys{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.fv-keys li{display:flex;gap:10px;align-items:flex-start;font-size:0.9412rem}
+.fv-keys li::before{content:"✓";flex:none;width:22px;height:22px;border-radius:50%;background:var(--neon);color:var(--neon-ink);display:grid;place-items:center;font-size:13px;font-weight:900;margin-top:1px}
+.fv-mem{flex-direction:row;align-items:center;gap:14px}
+.ring.sm{width:70px;height:70px}
+.ring.sm b{font-size:0.9412rem}
+.fv-mem-t{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.fg{color:var(--fg)}
+
+/* Formulario: campos con borde fino y altura cómoda. */
+.sheet input[type=text],.sheet select,.sheet textarea{border:1px solid var(--edge);border-radius:14px;min-height:50px;background-color:var(--surface)}
+.sheet textarea{min-height:90px}
+.seg button{border-radius:12px;background:var(--surface2)}
+.seg.neutral button[aria-pressed="true"]{font-weight:800}
+.vidbox{border:1px solid var(--edge);border-radius:20px;padding:12px}
+.vidbox video{border-radius:14px}
+.sheet .btn.pri[type=submit],.sheet .btn.pri.wide{min-height:52px;font-size:1rem}
+
+/* Repaso: tarjeta grande con la miniatura difuminada de fondo y notas de colores. */
+.flash{position:relative;border:1px solid var(--edge);border-radius:26px;padding:24px 20px}
+.flash-bgw{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.flash-bgw img{width:100%;height:100%;object-fit:cover;filter:blur(22px) brightness(.38) saturate(1.2);transform:scale(1.3)}
+html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.1) saturate(.6);opacity:.35}
+.flash>*:not(.flash-bgw){position:relative}
+.flash .big{font-size:2rem;line-height:1.08}
+.flash-tag{align-self:flex-start}
+.grade .btn{min-height:64px;border-radius:16px;font-weight:800}
+.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
+.progress{height:6px}
+
+/* Enlazar y Social: tarjetas sueltas con borde. */
+.chips .chip{min-height:38px}
+.social-pos{border:1px solid var(--edge);border-radius:20px !important;margin-bottom:10px}
+.social-pos+.social-pos::before{display:none}
+.social-pos .p{font-size:1.2rem}
+.block-btn{border-radius:20px}
+.empty{border:1px solid var(--edge);border-radius:20px}
+.menu{border:1px solid var(--edge)}
 </style>
 </head>
 <body>
@@ -909,7 +1000,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.37";
+const APP_VERSION = "1.38";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1030,7 +1121,9 @@ function compas(f, big){
   return `<span class="cmp" role="img" aria-label="${esc(label)}">${cells}${reps>1?`<b>×${reps}</b>`:""}</span>`;
 }
 function figCard(f, inGroup){
-  const th = f.thumb ? `<img class="thumb" src="${esc(f.thumb)}" alt="" loading="lazy">` : "";
+  // Siempre con miniatura: la del vídeo o, si no tiene, el compás de la figura sobre fondo azul.
+  const th = f.thumb ? `<img class="thumb" src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="thumb thumb-ph" aria-hidden="true">${f.vid?"▶":compas(f)||ico("music")}</span>`;
+  const ms = memState(f), mtag = ms==="olvidada" ? `<span class="tagx t-red">Olvidada</span>` : "";
   let sub;
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = routeTxt(f, !inGroup);
@@ -1038,7 +1131,7 @@ function figCard(f, inGroup){
   return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-view="${f.id}">${th}${th?`<div class="card-body">`:""}
     <div class="fname">${esc(f.nombre)}</div>
     <div class="route"><span>${sub}</span></div>
-    <div class="meta">${pill(f.estado)}
+    <div class="meta">${pill(f.estado)}${mtag}
       ${tipoOf(f)==="transicion"?`<span class="tag">transición</span>`:""}
       ${f.sugerido?`<span class="tag">✦ sugerido por Claude</span>`:""}
       ${compas(f)}
@@ -1244,9 +1337,10 @@ function renderRepertorio(){
     <div class="filters">
       <input type="search" class="full" id="f-q" placeholder="Buscar figura, posición, agarre, clase…" value="${esc(filt.q)}" aria-label="Buscar">
       ${bailes.length>1?`<select id="f-baile" aria-label="Baile"><option value="todos">Baile: todos</option>${bailes.map(b=>`<option ${filt.baile===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
-      <select id="f-estado" aria-label="Estado"><option value="todos">Estado: todos</option>${ESTADOS.map(e=>`<option value="${e.k}" ${filt.estado===e.k?"selected":""}>${e.t}</option>`).join("")}<option value="incompletas" ${filt.estado==="incompletas"?"selected":""}>Sin completar</option></select>
+
       <div class="seg2 ${bailes.length>1?"full":""}" role="group" aria-label="Orden"><button data-vista="pos" aria-pressed="${filt.vista==="pos"}">Posición</button><button data-vista="rec" aria-pressed="${filt.vista==="rec"}">Recientes</button></div>
     </div>
+    <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.map(e=>[e.k, e.t]), ["incompletas","Sin completar"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
     ${list.length ? body : `<p class="muted">Ninguna figura coincide con la búsqueda o los filtros.</p><button class="btn sm" data-act="clear-filt">Ver todas</button>`}
     ` : `
     <div class="empty">
@@ -1257,7 +1351,7 @@ function renderRepertorio(){
   `;
   const qi=$("#f-q"); if(qi) qi.oninput=e=>{filt.q=e.target.value; renderListOnly();};
   const fb=$("#f-baile"); if(fb) fb.onchange=e=>{filt.baile=e.target.value; render();};
-  const fe=$("#f-estado"); if(fe) fe.onchange=e=>{filt.estado=e.target.value; render();};
+
 }
 function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
 
@@ -1344,8 +1438,10 @@ function renderRepasar(){
   }
   const f = S.figures[session.ids[session.i]];
   if(!f){ session.i++; return renderRepasar(); }
+  const ms = memState(f);
   v.innerHTML = `${head}
-    <div class="flash">
+    <div class="flash${f.thumb?" has-bg":""}">${f.thumb?`<span class="flash-bgw" aria-hidden="true"><img src="${esc(f.thumb)}" alt=""></span>`:""}
+      ${ms && ms!=="nueva" ? `<span class="tagx ${MEM[ms][1]} flash-tag">${MEM[ms][0]}</span>` : ""}
       <div class="route"><span>${isMove(f)?`Empiezas en ${esc(f.entrada)}${holdTxt(f.agarreIn)}`:esc(TIPO[tipoOf(f)].t)+(f.entrada?` · en ${esc(f.entrada)}`:"")}</span></div>
       <div class="big">${esc(f.nombre)}</div>
       ${!session.revealed ? `
@@ -1717,23 +1813,41 @@ function openView(id){
   const f = S.figures[id]; if(!f) return;
   const i = ESTADOS.findIndex(e=>e.k===f.estado), up = ESTADOS[i+1];
   const nexts = placed(f) ? figs().filter(x=>x.id!==f.id && active(x) && placed(x) && canFollow(f,x)).sort(socSort).slice(0,4) : [];
-  const meta = [pill(f.estado), tipoOf(f)!=="figura"?esc(TIPO[tipoOf(f)].t):"", f.baile && f.baile!=="Bachata"?esc(f.baile):"", f.profesor?esc(f.profesor):"", f.usos?`salió ${f.usos}×`:""].filter(Boolean);
+  const tags = [`<span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>`,
+    tipoOf(f)!=="figura" ? `<span class="tagx t-grey">${esc(TIPO[tipoOf(f)].t)}</span>` : "",
+    f.baile && f.baile!=="Bachata" ? `<span class="tagx t-grey">${esc(f.baile)}</span>` : "",
+    f.profesor ? `<span class="tagx t-grey">${esc(f.profesor)}</span>` : "",
+    f.tiempos ? `<span class="tagx t-grey">${esc(f.tiempos)} tiempos</span>` : ""].filter(Boolean).join("");
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
+  // Puntos clave: la señal, una línea por idea (se separa por punto, punto y coma o salto de línea).
+  const keys = String(f.senal||"").split(/\s*(?:[;\n]|\.(?:\s|$))\s*/).map(x=>x.trim()).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1));
+  const ms = memState(f), r = f.rep || {}, step = Math.min(r.step||0, LADDER.length-1);
+  const when = d => !d ? "" : d<=todayStr() ? "hoy" : d===todayStr(1) ? "mañana" : fmtDate(d);
+  const mem = active(f) ? `<section class="fv-card fv-mem" aria-labelledby="fv-mem">
+      <div class="ring sm">${ringSVG((step+1)/LADDER.length, 70, 8)}<b>${LADDER[step]} d</b></div>
+      <div class="fv-mem-t"><div class="in-h"><h3 id="fv-mem">Memoria</h3><span class="tagx ${(MEM[ms]||MEM.nueva)[1]}">${(MEM[ms]||MEM.nueva)[0]}</span></div>
+        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${r.aciertos||r.fallos ? ` · ${pl(r.aciertos||0,"acierto","aciertos")}, ${pl(r.fallos||0,"fallo","fallos")}` : ""}${f.usos?` · salió ${f.usos}× en el social`:""}</p></div>
+    </section>` : "";
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${f.id}">
-    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${esc(f.nombre)}</h2><button type="button" class="btn ghost sm" data-edit="${f.id}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    <p class="meta-line">${meta.join(`<span aria-hidden="true">·</span>`)}</p>
-    ${f.vid ? playerHTML(f) : ""}
-    ${isMove(f) ? (placed(f)
-      ? `<p class="route-big">${routeTxt(f, true)}</p>`
-      : `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${f.id}">Completar</button></div>`)
-      : (f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
-    ${(f.tiempo||f.tiempos) ? compas(f, true) : ""}
-    ${f.senal ? `<div><p class="lbl">Señal</p><p class="txt">${esc(f.senal)}</p></div>` : ""}
-    ${f.notas ? `<div><p class="lbl">Notas</p><p class="txt">${esc(f.notas)}</p></div>` : ""}
-    ${placed(f) ? `<div><p class="lbl">Y después, desde ${esc(f.salida)}</p>${nexts.length
-      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}"><span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
-      : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</div>` : ""}
-    ${up ? `<button type="button" class="btn" data-promote="${f.id}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
+    <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${f.id}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    ${f.vid ? `<div class="fv-media">${playerHTML(f)}</div>` : f.thumb ? `<div class="fv-media"><img class="fv-img" src="${esc(f.thumb)}" alt=""></div>` : ""}
+    <div class="fv-title">
+      <h2 id="sheet-t" tabindex="-1">${esc(f.nombre)}</h2>
+      ${isMove(f) && placed(f) ? `<p class="route-big">${routeTxt(f, true)}</p>` : (!isMove(f) && f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
+      <div class="tags">${tags}</div>
+    </div>
+    ${isMove(f) && !placed(f) ? `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${f.id}">Completar</button></div>` : ""}
+    <div class="fv-actions">
+      ${active(f) ? `<button type="button" class="btn pri" data-act="rev-one" data-id="${f.id}">Repasarla ahora</button>` : ""}
+      ${up ? `<button type="button" class="btn" data-promote="${f.id}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
+    </div>
+    ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
+    ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
+    ${mem}
+    ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
+    ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
+      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
+      : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
   </div></div>`;
   hydrateVideos($("#sheet-root"));
   const s=$(".sheet"); if(s) s.scrollTop=0;
@@ -2034,9 +2148,12 @@ function hydrateVideos(root){
     v.addEventListener("seeked",()=>backfillThumb(id, v), {once:true});
     v.addEventListener("playing",()=>setTimeout(()=>backfillThumb(id, v),300));
     v.addEventListener("loadeddata",()=>{ if(!(s>0)) backfillThumb(id, v); }, {once:true});
+    // La miniatura (160 px) solo sirve mientras carga: en cuanto hay fotograma real, se quita para que no se vea borrosa.
+    v.addEventListener("loadeddata",()=>{ if(v.closest(".fv-media")) v.removeAttribute("poster"); }, {once:true});
     v.addEventListener("timeupdate",()=>{ if(e>0 && v.currentTime>=e){ const loop=v.closest(".player")?.dataset.loop==="1"; v.currentTime=s; if(!loop) v.pause(); } });
     v.addEventListener("play",()=>{ if(v.currentTime<s-0.25 || (e>0 && v.currentTime>=e)) v.currentTime=s; });
-    v.src=url;
+    // En la ficha, «#t=» hace que Safari cargue y dibuje el primer fotograma de la figura sin pulsar play.
+    v.src = v.closest(".fv-media") ? url + "#t=" + Math.max(0.05, s) : url;
   });
 }
 async function shareOrDownload(file){
@@ -2684,7 +2801,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-mins],[data-tema]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-mins],[data-tema],[data-fest]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -2704,6 +2821,7 @@ document.addEventListener("click", async e=>{
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
+  if(d.fest){ filt.estado=d.fest; return render(); }
   if(d.promote){
     const f=S.figures[d.promote] ? clone(S.figures[d.promote]) : null; const to=d.to||"disponible";
     // Sin dónde empieza o acaba no sale de la lista de espera: se abre la ficha con lo que falta señalado.
@@ -2740,6 +2858,7 @@ document.addEventListener("click", async e=>{
   if(a==="reveal"){ session.revealed=true; render(); const an=$("#v-repasar .answer"); if(an){ an.tabIndex=-1; an.focus({preventScroll:true}); } return; }
   if(a==="end"){ const wasTrain=!!training; session=null; training=null; if(wasTrain) return go("inicio"); return render(); }
   if(a==="train-start") return startTraining();
+  if(a==="rev-one"){ if(!S.figures[d.id]) return; closeSheet(); training=null; session={kind:"fig", ids:[d.id], i:0, revealed:false, done:[], promote:[], weak:[]}; return go("repasar"); }
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
   if(a==="goto-pos"){ linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }

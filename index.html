@@ -30,7 +30,7 @@
   --fg:#0a1a3f; --muted:#596989;
   --accent:#1e5eff; --accent-ink:#ffffff; --accent-fg:#1a4fd8; --accent-soft:rgba(30,94,255,.10);
   --neon:#c4f838; --neon-ink:#0a1a3f; --chip-on:#0a1a3f; --chip-on-ink:#ffffff;
-  --st-espera:#56637f; --st-practica:#1a4fd8; --st-disponible:#3b7b00; --st-consolidada:#0a1a3f;
+  --st-espera:#56637f; --st-incompleta:#a35200; --st-practica:#1a4fd8; --st-disponible:#3b7b00; --st-consolidada:#0a1a3f;
   --warn:#d70015;
   --bar:rgba(243,246,255,.84);
   --toast-act:#c4f838;
@@ -54,7 +54,7 @@
     --fg:#ffffff; --muted:#8e9ab6;
     --accent:#c4f838; --accent-ink:#060c1a; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.14);
     --neon:#c4f838; --neon-ink:#060c1a; --chip-on:#c4f838; --chip-on-ink:#060c1a;
-    --st-espera:#8e9ab6; --st-practica:#8cc4ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
+    --st-espera:#8e9ab6; --st-incompleta:#ffb35c; --st-practica:#8cc4ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
     --warn:#ff8f9b;
     --bar:rgba(6,12,26,.86);
     --toast-act:#c4f838;
@@ -69,7 +69,7 @@
     --fg:#ffffff; --muted:#8e9ab6;
     --accent:#c4f838; --accent-ink:#060c1a; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.14);
     --neon:#c4f838; --neon-ink:#060c1a; --chip-on:#c4f838; --chip-on-ink:#060c1a;
-    --st-espera:#8e9ab6; --st-practica:#8cc4ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
+    --st-espera:#8e9ab6; --st-incompleta:#ffb35c; --st-practica:#8cc4ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
     --warn:#ff8f9b;
     --bar:rgba(6,12,26,.86);
     --toast-act:#c4f838;
@@ -178,7 +178,7 @@ button.card:active{background:var(--surface2)}
 .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:0.8236rem;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:0.8236rem;font-weight:600}
 .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
-.st-espera{color:var(--st-espera)}.st-practica{color:var(--st-practica)}.st-disponible{color:var(--st-disponible)}.st-consolidada{color:var(--st-consolidada)}
+.st-espera{color:var(--st-espera)}.st-incompleta{color:var(--st-incompleta)}.st-practica{color:var(--st-practica)}.st-disponible{color:var(--st-disponible)}.st-consolidada{color:var(--st-consolidada)}
 .tag{font-size:0.7648rem;border-radius:6px;padding:1px 7px;background:var(--fill);color:var(--muted);font-weight:500}
 .tag.warn{color:var(--warn)}
 .empty{background:var(--surface);border-radius:var(--r);padding:24px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
@@ -417,7 +417,7 @@ button.card:active{background:var(--surface2)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{border:0;background:var(--fill);border-radius:10px;padding:8px 12px;min-height:44px;font-size:0.8236rem;font-weight:600;color:var(--sc,var(--fg))}
-.seg .st-espera{--sc:var(--st-espera)}.seg .st-practica{--sc:var(--st-practica)}.seg .st-disponible{--sc:var(--st-disponible)}.seg .st-consolidada{--sc:var(--st-consolidada)}
+.seg .st-espera{--sc:var(--st-espera)}.seg .st-incompleta{--sc:var(--st-incompleta)}.seg .st-practica{--sc:var(--st-practica)}.seg .st-disponible{--sc:var(--st-disponible)}.seg .st-consolidada{--sc:var(--st-consolidada)}
 .seg.neutral button{color:var(--fg)}
 .seg button[aria-pressed="true"]{background:var(--sc);color:var(--bg)}
 .seg.neutral button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
@@ -632,6 +632,7 @@ details.info summary::after{inset:-10px -4px}
 .pill{height:22px;padding:0 8px;border-radius:7px;font-size:0.7059rem;font-weight:800;background:color-mix(in srgb,currentColor 16%,transparent)}
 .pill::before{width:6px;height:6px}
 .st-tag.st-espera{background:var(--fill);color:var(--st-espera)}
+.st-tag.st-incompleta{background:color-mix(in srgb,var(--st-incompleta) 18%,transparent);color:var(--st-incompleta)}
 .st-tag.st-practica{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
 .st-tag.st-disponible{background:color-mix(in srgb,var(--st-disponible) 18%,transparent);color:var(--st-disponible)}
 .st-tag.st-consolidada{background:color-mix(in srgb,var(--st-consolidada) 16%,transparent);color:var(--st-consolidada)}
@@ -724,6 +725,7 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .gtop .st-tag.st-disponible,.gtop .st-tag.st-consolidada{background:#c4f838;color:#060c1a}
 .gtop .st-tag.st-practica{color:#8cc4ff}
 .gtop .st-tag.st-espera{color:#c3cce0}
+.gtop .st-tag.st-incompleta{color:#ffb35c}
 .gtop .t-red{color:#ff8f9b}
 .gplay{margin-left:auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .gbody{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px}
@@ -779,6 +781,7 @@ const DEFAULT_HOLDS = ["Abrazo","Dos manos","Dos manos cruzadas","Izq–der","De
 const DEFAULT_CLASSES = ["Oscar e Inés · Parejas 1","Oscar e Inés · Salsa en línea","Cris y Argenis","Brotons · Parejas 1","Brotons · Parejas 2","Brotons · Footwork"];
 const ESTADOS = [
   {k:"espera", t:"Lista de espera", d:"Capturada, aún no la llevo al social"},
+  {k:"incompleta", t:"Incompleta", d:"Nos la están enseñando por partes: la repaso cada día"},
   {k:"practica", t:"En práctica", d:"La recuerdo pensando o con el vídeo"},
   {k:"disponible", t:"Disponible", d:"La recupero y guío cómoda en el social"},
   {k:"consolidada", t:"Consolidada", d:"Con distintas parejas y canciones, sé salir"}
@@ -873,13 +876,17 @@ const tipoOf = f => f.tipo || "figura";
 const moveTipo = t => t==="figura" || t==="transicion";
 const isMove = f => moveTipo(tipoOf(f));
 const placed = f => isMove(f) && !!f.entrada && !!f.salida;
-const incomplete = f => isMove(f) && (!f.entrada || !f.salida);
+// Le falta dónde empieza o dónde acaba (para Enlazar). Una figura incompleta aún no lo sabe: no cuenta como pendiente.
+const sinRuta = f => isMove(f) && (!f.entrada || !f.salida);
+const incomplete = f => f.estado!=="incompleta" && sinRuta(f);
 const active = f => f.estado !== "espera";
+// Se repasa, pero no se saca en el social ni se encadena: aún no te la han enseñado entera.
+const usable = f => active(f) && f.estado !== "incompleta";
 const ready = f => f.estado==="disponible" || f.estado==="consolidada";
 const holdOk = (a,b) => !a || !b || a===b;
 const canFollow = (p,n) => n.entrada===p.salida && holdOk(p.agarreOut, n.agarreIn);
-const exitsFrom = (pos, hold, excl) => figs().filter(f=> f.id!==excl && active(f) && placed(f) && f.entrada===pos && holdOk(hold, f.agarreIn));
-const arrivals = pos => figs().filter(f=> active(f) && placed(f) && f.salida===pos);
+const exitsFrom = (pos, hold, excl) => figs().filter(f=> f.id!==excl && usable(f) && placed(f) && f.entrada===pos && holdOk(hold, f.agarreIn));
+const arrivals = pos => figs().filter(f=> usable(f) && placed(f) && f.salida===pos);
 const extraPositions = () => [...new Set(figs().flatMap(f=>[f.entrada,f.salida]).filter(Boolean))].filter(p=>!S.positions.includes(p));
 const allPositions = () => [...S.positions, ...extraPositions()];
 const isDue = f => active(f) && (!f.rep || !f.rep.due || f.rep.due <= todayStr());
@@ -1029,7 +1036,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 5;
+const SCHEMA = 6;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1064,6 +1071,12 @@ const MIGRATIONS = [
       if(!Array.isArray(f.errores)) f.errores=[];
       (Array.isArray(f.intentos)?f.intentos:[]).forEach(a=>{ if(a && typeof a==="object" && !Array.isArray(a.marcadores)) a.marcadores=[]; });
     });
+  },
+  // 5 → 6: figuras que enseñan por partes. Cada parte anterior guarda su vídeo de la clase
+  // ({id, fecha, nota, vid, vidTrim, vidInfo, thumb, vidSaved}); la parte de ahora es el vídeo de la figura
+  // (con f.parteFecha y f.parteNota). La lista empieza vacía.
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.partes)) f.partes=[]; });
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1189,7 +1202,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.48";
+const APP_VERSION = "1.49";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1279,9 +1292,10 @@ function deleteFigureUndo(id){
     onExpire:()=>{ if(!undone) figVids(copy).forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel",id:v}); }); }});
 }
 function deleteFigure(id){ const vs=figVids(S.figures[id]); delete S.figures[id]; persist({t:"figdel",id}); vs.forEach(v=>persist({t:"assetdel",id:v})); render(); }
-// Vídeos guardados de una figura: el de la clase y los de sus intentos.
+// Vídeos guardados de una figura: el de la clase, los de las partes anteriores y los de sus intentos.
 const intentosOf = f => (f && Array.isArray(f.intentos)) ? f.intentos : [];
-const figVids = f => f ? [f.vid, ...intentosOf(f).map(a=>a.vid)].filter(Boolean) : [];
+const partesOf = f => (f && Array.isArray(f.partes)) ? f.partes : [];
+const figVids = f => f ? [f.vid, ...partesOf(f).map(x=>x.vid), ...intentosOf(f).map(a=>a.vid)].filter(Boolean) : [];
 const vidInUse = v => Object.values(S.figures).some(x=>figVids(x).includes(v));
 function saveMeta(){ persist({t:"meta"}); render(); }
 
@@ -1341,6 +1355,7 @@ function galCard(f, inGroup){
   let sub;
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = inGroup ? `<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}` : `${esc(f.entrada)} <span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}`;
+  else if(f.estado==="incompleta") sub = esc(parteTxt(f));
   else sub = `<span class="warnc">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
   return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${f.id}">${media}<span class="gshade" aria-hidden="true"></span>
     <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"?`<span class="tagx t-red">Olvidada</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
@@ -1354,6 +1369,7 @@ function figCard(f, inGroup){
   let sub;
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = routeTxt(f, !inGroup);
+  else if(f.estado==="incompleta") sub = esc(parteTxt(f));
   else sub = `<span class="tag warn">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
   return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-view="${f.id}">${th}${th?`<div class="card-body">`:""}
     <div class="fname">${esc(f.nombre)}</div>
@@ -1553,9 +1569,12 @@ function renderRepertorio(){
   let body = "";
   if(filt.vista==="pos"){
     const groups = [];
-    const inc = list.filter(incomplete); if(inc.length) groups.push(["Sin completar", inc, inc.length===1?"Añade dónde empieza y dónde acaba para que salga en Enlazar.":"Añade dónde empiezan y dónde acaban para que salgan en Enlazar."]);
-    allPositions().forEach(p=>{ const it=list.filter(f=>placed(f)&&f.entrada===p); if(it.length) groups.push(["Desde "+p, it]); });
-    const fw = list.filter(f=>!isMove(f)); if(fw.length) groups.push(["Footwork y styling", fw]);
+    // Las incompletas, juntas y arriba: son las que se repasan cada día mientras os las enseñan.
+    const pend = list.filter(f=>f.estado==="incompleta"), rest = list.filter(f=>f.estado!=="incompleta");
+    if(pend.length) groups.push(["Incompletas", pend, "Os las están enseñando por partes: se repasan cada día. Añade el vídeo de cada clase en su ficha."]);
+    const inc = rest.filter(incomplete); if(inc.length) groups.push(["Sin entrada/salida", inc, inc.length===1?"Añade dónde empieza y dónde acaba para que salga en Enlazar.":"Añade dónde empiezan y dónde acaban para que salgan en Enlazar."]);
+    allPositions().forEach(p=>{ const it=rest.filter(f=>placed(f)&&f.entrada===p); if(it.length) groups.push(["Desde "+p, it]); });
+    const fw = rest.filter(f=>!isMove(f)); if(fw.length) groups.push(["Footwork y styling", fw]);
     body = groups.map(([t,it,hint])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${hint?`<p class="small muted group-hint">${hint}</p>`:""}<div class="gal">${it.map(f=>galCard(f, t.startsWith("Desde "))).join("")}</div></div>`).join("");
   } else body = `<div class="gal">${list.map(f=>galCard(f,false)).join("")}</div>`;
   const v=$("#v-repertorio");
@@ -1572,7 +1591,7 @@ function renderRepertorio(){
 
       <div class="seg2 ${bailes.length>1?"full":""}" role="group" aria-label="Orden"><button data-vista="pos" aria-pressed="${filt.vista==="pos"}">Posición</button><button data-vista="rec" aria-pressed="${filt.vista==="rec"}">Recientes</button></div>
     </div>
-    <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.map(e=>[e.k, e.t]), ["incompletas","Sin completar"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
+    <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.map(e=>[e.k, e.t]), ["incompletas","Sin entrada/salida"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
     ${list.length ? body : `<p class="muted">Ninguna figura coincide con la búsqueda o los filtros.</p><button class="btn sm" data-act="clear-filt">Ver todas</button>`}
     ` : `
     <div class="empty">
@@ -1699,7 +1718,7 @@ function renderRepasar(){
     <button class="btn ghost sm" data-act="end">Salir del repaso</button>`;
 }
 function nextFrom(f){
-  const opts = figs().filter(x=>x.id!==f.id && active(x) && placed(x) && canFollow(f,x)).slice(0,3);
+  const opts = figs().filter(x=>x.id!==f.id && usable(x) && placed(x) && canFollow(f,x)).slice(0,3);
   if(!opts.length) return `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico.</p>`;
   return `<p class="small muted">Para enlazar desde ${esc(f.salida)}: ${opts.map(o=>`<b style="color:var(--fg)">${esc(o.nombre)}</b>`).join(", ")}.</p>`;
 }
@@ -1710,7 +1729,10 @@ function grade(g){
     if(exitsFrom(p).length<2) session.weak.push(p);
   } else {
     const f = S.figures[session.ids[session.i]]; if(!f) return;
-    f.rep = nextRep(f.rep, g); S.figures[f.id]=f; persist({t:"fig",id:f.id});
+    f.rep = nextRep(f.rep, g);
+    // Incompleta: vuelve cada día hasta que te la terminen de enseñar, te salga como te salga.
+    if(f.estado==="incompleta") f.rep.due = todayStr(1);
+    S.figures[f.id]=f; persist({t:"fig",id:f.id});
     if(g==="fluida" && f.estado==="practica" && f.rep.step>=2) session.promote.push(f.id);
   }
   const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
@@ -1740,7 +1762,7 @@ function coverage(){
 function renderEnlazar(){
   const v=$("#v-enlazar");
   // Primer uso: sin figuras con ruta no hay posiciones ni mapa que enseñar.
-  if(!figs().some(f=>active(f)&&placed(f))){
+  if(!figs().some(f=>usable(f)&&placed(f))){
     v.innerHTML = `<h2>¿Qué hago desde aquí?</h2>
       <div class="empty"><p>Aquí verás qué figuras puedes hacer desde cada posición y dónde te falta una salida. Aparece en cuanto una figura fuera de la lista de espera tenga dónde empieza y dónde acaba.</p>
       ${figs().length ? `<button class="btn" data-tab="repertorio">Ir al repertorio</button>` : `<div class="row"><button class="btn pri" data-act="full">Añadir figura</button><button class="btn ghost" data-act="examples">Ver con ejemplos</button></div>`}</div>`;
@@ -1797,7 +1819,7 @@ function mapHTML(cov, gaps, incN){
     </div>`;
 }
 function makeChain(start){
-  const pool = figs().filter(f=>active(f)&&placed(f));
+  const pool = figs().filter(f=>usable(f)&&placed(f));
   const steps=[]; const used=new Set(); let prev=null;
   let pos = start || (pool[Math.floor(Math.random()*pool.length)]||{}).entrada;
   for(let i=0;i<4;i++){
@@ -1829,7 +1851,7 @@ function renderChain(){
 }
 
 // ---------- vista: social ----------
-function socialFootwork(){ return figs().filter(f=>active(f) && !isMove(f) && socOk(f)).sort(socSort); }
+function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && socOk(f)).sort(socSort); }
 // Lo que ya marcaste esta noche se ve siempre, aunque esté en práctica o quede fuera de las primeras.
 const socOk = f => ready(f) || socialIncl || logSel.has(f.id);
 const socTop = (list, n) => [...list.slice(0,n), ...list.slice(n).filter(f=>logSel.has(f.id))];
@@ -1922,7 +1944,7 @@ function showBlock(focus){
   let ov = $("#overlay-root .overlay");
   if(!ov){
     if(bkT0 && performance.now()-bkT0 > 3e5) bkT0 = 0;   // otra canción: el compás vuelve a quedarse quieto
-    const fw = figs().filter(f=>active(f) && !isMove(f));
+    const fw = figs().filter(f=>usable(f) && !isMove(f));
     // Una sola orden arriba; el pulso, debajo y opcional; la primera decisión es «¿Dónde estás?».
     $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
       <div class="bk-head"><h2 id="bk-t" tabindex="-1">Básico o footwork hasta el 1</h2>
@@ -2044,8 +2066,9 @@ function deleteLog(id){
 // Lo que se mira antes de bailarla: vídeo, ruta, compás, señal y qué puedes hacer después. Editar queda a un toque.
 function openView(id){
   const f = S.figures[id]; if(!f) return;
-  const i = ESTADOS.findIndex(e=>e.k===f.estado), up = ESTADOS[i+1];
-  const nexts = placed(f) ? figs().filter(x=>x.id!==f.id && active(x) && placed(x) && canFollow(f,x)).sort(socSort).slice(0,4) : [];
+  // Desde la lista de espera se pasa a práctica (Incompleta se elige a mano); una incompleta se termina con «Ya está completa».
+  const i = ESTADOS.findIndex(e=>e.k===f.estado), up = f.estado==="incompleta" ? null : ESTADOS.slice(i+1).find(e=>e.k!=="incompleta");
+  const nexts = placed(f) ? figs().filter(x=>x.id!==f.id && usable(x) && placed(x) && canFollow(f,x)).sort(socSort).slice(0,4) : [];
   const tags = [`<span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>`,
     tipoOf(f)!=="figura" ? `<span class="tagx t-grey">${esc(TIPO[tipoOf(f)].t)}</span>` : "",
     f.baile && f.baile!=="Bachata" ? `<span class="tagx t-grey">${esc(f.baile)}</span>` : "",
@@ -2069,11 +2092,13 @@ function openView(id){
       ${isMove(f) && placed(f) ? `<p class="route-big">${routeTxt(f, true)}</p>` : (!isMove(f) && f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
       <div class="tags">${tags}</div>
     </div>
-    ${isMove(f) && !placed(f) ? `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${f.id}">Completar</button></div>` : ""}
+    ${isMove(f) && !placed(f) && f.estado!=="incompleta" ? `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${f.id}">Completar</button></div>` : ""}
     <div class="fv-actions">
       ${active(f) ? `<button type="button" class="btn pri" data-act="rev-one" data-id="${f.id}">Repasarla ahora</button>` : ""}
+      ${f.estado==="incompleta" ? `<button type="button" class="btn" data-act="inc-done" data-id="${f.id}">Ya está completa</button>` : ""}
       ${up ? `<button type="button" class="btn" data-promote="${f.id}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
     </div>
+    ${f.estado==="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
     ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
     ${f.vid && assetsApi ? pkCardHTML(f.pulso, f.vid, f.id) : ""}
@@ -2081,6 +2106,7 @@ function openView(id){
     ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
     ${errCardHTML(f)}
     ${attCardHTML(f, CHEV)}
+    ${f.estado!=="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
       ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
       : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
@@ -2643,6 +2669,141 @@ async function attDelete(figId, attId){
     },
     onExpire:()=>{ if(!undone && !vidInUse(a.vid)) persist({t:"assetdel", id:a.vid}); }});
 }
+// Cambia el estado de una figura. Sin dónde empieza o acaba no sale de la lista de espera (ni de incompleta):
+// se abre la ficha con lo que falta señalado. el: el botón pulsado, que se quita si no hay hoja que repintar.
+function promoteFig(id, to, fromView, el){
+  const f=S.figures[id] ? clone(S.figures[id]) : null; if(!f) return;
+  if(sinRuta(f) && to!=="espera" && to!=="incompleta"){
+    openFigure(f.id, {fromView, estado:to});
+    const fin=$("#ff-in"), fout=$("#ff-out");
+    if(fin) fieldError([!f.entrada && fin, !f.salida && fout].filter(Boolean), fin.closest(".grid2"), `Para ${to==="practica"?"empezar a practicarla":"pasarla a "+EST[to].t.toLowerCase()} indica dónde empieza y dónde acaba.`);
+    return;
+  }
+  f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`);
+  if($('[data-sheet="log"]')) openLog(); else if(fromView || $("#sheet-root [data-viewfig]")) openView(f.id); else if(el) el.remove();
+}
+// ---------- partes: figuras que enseñan en varias clases ----------
+// El vídeo de la figura es siempre el de la última clase (cada uno junta lo anterior con lo nuevo): así el repaso,
+// el pulso, Comparar y los intentos usan ese. Al añadir una parte, el vídeo que había pasa a la lista de partes.
+const parteHoy = f => f.parteFecha || dayOf(f.creado);
+const parteTxt = f => `Parte ${partesOf(f).length+1} · ${fmtDate(parteHoy(f))}`;
+function parteCardHTML(f, chev){
+  const ps = partesOf(f), inc = f.estado==="incompleta";
+  if(!inc && !ps.length) return "";
+  const th = x => x.thumb ? `<img class="nx-th" src="${esc(x.thumb)}" alt="">` : `<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`;
+  const cur = `<div class="mrow pt-cur">${th(f)}<span><b>Parte ${ps.length+1} · ${esc(fmtDate(parteHoy(f)))}</b><span class="small muted">${[f.vid ? (inc ? "La de ahora: el vídeo de arriba" : "La última: el vídeo de arriba") : "Sin vídeo", f.parteNota ? esc(f.parteNota) : ""].filter(Boolean).join(" · ")}</span></span></div>`;
+  const rows = ps.map((x,i)=>({x,i})).reverse().map(({x,i})=>`<button type="button" class="mrow" data-act="pt-open" data-id="${f.id}" data-pt="${esc(x.id)}">${th(x)}<span><b>Parte ${i+1} · ${esc(fmtDate(x.fecha))}</b><span class="small muted">${[x.vid ? (x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "") : "Sin vídeo", x.nota ? esc(x.nota) : "", x.vid && x.vidSaved!==x.vid ? "sin copia en Fotos" : ""].filter(Boolean).join(" · ")}</span></span>${chev}</button>`).join("");
+  return `<section class="fv-card" aria-labelledby="fv-pt"><h3 id="fv-pt">${inc ? "Partes" : "Partes de la clase"} · ${ps.length+1}</h3>
+    <div class="menu">${cur}${rows}</div>
+    ${inc ? `<p class="small muted">Cada clase, añade el vídeo nuevo: pasa a ser el de la figura y el anterior se queda aquí. Mientras esté incompleta, sale en el repaso cada día.</p>
+    ${assetsApi ? `<div class="fv-actions"><button type="button" class="btn pri" data-act="pt-new" data-id="${f.id}">Añadir la parte de hoy</button></div>` : ""}` : ""}
+  </section>`;
+}
+function openParteNew(figId){
+  const f = S.figures[figId]; if(!f) return;
+  const n = partesOf(f).length + (f.vid || f.parteNota ? 2 : 1);
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="pt-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Parte ${n} de la figura</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <p class="small muted">${esc(f.nombre)} · ${esc(fmtDate(todayStr()))}</p>
+    <div class="vidbox" id="vidbox"></div>
+    <label class="f" for="pt-nota">Qué os han enseñado hoy (opcional)<input type="text" id="pt-nota" placeholder="Ej.: el giro final y la salida a abierta"></label>
+    ${f.vid ? `<p class="small muted">El vídeo de ahora pasa a «Parte ${n-1}». ${pulsoOk(f.pulso, f.vid) ? "El pulso hay que volver a marcarlo con el vídeo nuevo." : ""}</p>` : ""}
+    <div class="row sheet-foot"><button type="submit" class="btn pri" style="flex:1">Guardar parte</button></div>
+  </form></div>`;
+  vstate = {kind:"parte", cur:null, trim:null, thumb:null, figId, file:null, url:null, dur:0, start:0, end:0, remove:false};
+  renderVidbox();
+  markClean();
+  $("#pt-form").onsubmit = async e=>{
+    e.preventDefault();
+    if(busy) return;
+    if(!vstate.file){ toast("Elige el vídeo de la clase de hoy."); return; }
+    const nota = $("#pt-nota").value.trim();
+    const res = await saveVstateVideo(); if(!res) return;
+    const fig = S.figures[figId];
+    if(!fig){ persist({t:"assetdel", id:res.vid}); closeSheet(); return; }
+    // La parte de ahora pasa a la lista con su vídeo, su fecha y su nota.
+    if(fig.vid || fig.parteNota){
+      const x = {id:uid(), fecha:parteHoy(fig), creado:Date.now()};
+      if(fig.parteNota) x.nota = fig.parteNota;
+      if(fig.vid){ x.vid = fig.vid; ["vidTrim","vidInfo","thumb"].forEach(k=>{ if(fig[k]) x[k] = fig[k]; }); if(fig.vidSaved===fig.vid) x.vidSaved = fig.vid; }
+      fig.partes = [...partesOf(fig), x];
+    }
+    fig.vid = res.vid; fig.vidTrim = res.vidTrim; fig.vidInfo = res.vidInfo;
+    if(res.thumb) fig.thumb = res.thumb; else delete fig.thumb;
+    delete fig.vidSaved;
+    fig.parteFecha = todayStr(); if(nota) fig.parteNota = nota; else delete fig.parteNota;
+    fig.rep = Object.assign({step:0, aciertos:0, fallos:0}, fig.rep||{}, {due:todayStr()});   // lo nuevo, hoy mismo
+    persist({t:"fig", id:figId});
+    closeSheet(); render(); openView(figId);
+    toast(`Parte ${partesOf(fig).length+1} guardada`);
+  };
+}
+let ptBlob = null;
+function openParteView(figId, ptId){
+  const f = S.figures[figId], ps = partesOf(f), i = ps.findIndex(x=>x.id===ptId); if(!f || i<0) return;
+  const x = ps[i], info = [x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "", x.vidInfo?.bytes ? fmtMB(x.vidInfo.bytes) : ""].filter(Boolean).join(" · ");
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewpt="${esc(x.id)}">
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${f.id}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    ${x.vid ? `<div class="fv-media">${playerHTML({vid:x.vid, vidTrim:x.vidTrim, thumb:x.thumb})}</div>` : ""}
+    <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Parte ${i+1} · ${esc(fmtDate(x.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
+    ${x.nota ? `<section class="fv-card"><p class="txt">${esc(x.nota)}</p></section>` : ""}
+    ${x.vid ? `${x.vidSaved===x.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
+    <div class="fv-actions"><button type="button" class="btn" data-act="pt-savevid" data-id="${f.id}" data-pt="${esc(x.id)}">Guardar en Fotos</button></div>` : ""}
+    <button type="button" class="btn danger wide del-row" data-act="pt-del" data-id="${f.id}" data-pt="${esc(x.id)}">Borrar parte</button>
+  </div></div>`;
+  hydrateVideos($("#sheet-root"));
+  ptBlob = null; if(x.vid) vidGet(x.vid).then(b=>{ ptBlob = b ? {vid:x.vid, b} : null; }).catch(()=>{});
+  markClean();
+}
+async function ptSaveVid(figId, ptId){
+  const f = S.figures[figId], x = partesOf(f).find(y=>y.id===ptId); if(!x || !x.vid) return;
+  if(!ptBlob || ptBlob.vid!==x.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
+  const b = ptBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+  const name = parteName(f, x).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "parte";
+  const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
+  if(ok){ markVidSaved(figId, x.vid); toast("Vídeo guardado"); if($(`[data-viewpt="${CSS.escape(ptId)}"]`)) openParteView(figId, ptId); }
+}
+async function ptDelete(figId, ptId){
+  const f = S.figures[figId], list = partesOf(f), x = list.find(y=>y.id===ptId); if(!x) return;
+  const ok = await askConfirm({title:"¿Borrar esta parte?", msg: x.vid ? "También se borra su vídeo guardado en la app. Tendrás unos segundos para deshacerlo." : "Tendrás unos segundos para deshacerlo.", ok:"Borrar parte"});
+  if(!ok) return;
+  f.partes = list.filter(y=>y.id!==ptId); persist({t:"fig", id:figId});
+  closeSheet(); render(); openView(figId);
+  let undone = false;
+  toast("Parte borrada", {label:"Deshacer", fn:()=>{
+      undone = true; const g = S.figures[figId]; if(!g) return;
+      g.partes = [...partesOf(g), x].sort((a,b)=>(a.creado||0)-(b.creado||0)); persist({t:"fig", id:figId});
+      render(); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); toast("Parte recuperada");
+    },
+    onExpire:()=>{ if(!undone && x.vid && !vidInUse(x.vid)) persist({t:"assetdel", id:x.vid}); }});
+}
+// «Ya está completa»: pasa a En práctica o Disponible y entra en el repaso normal. Se puede borrar el vídeo de las
+// partes anteriores: el de la última clase ya lo tiene todo.
+function openIncDone(figId){
+  const f = S.figures[figId]; if(!f) return;
+  const nv = partesOf(f).filter(x=>x.vid).length;
+  let to = "practica";
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="inc-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Ya está completa</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <p class="small muted">${esc(f.nombre)}: ya os la han enseñado entera. A partir de ahora se repasa como las demás (al día siguiente, a los 3 días, a los 7…).</p>
+    <div class="f"><span>¿Cómo la llevas?</span><div class="seg states" id="inc-to">${["practica","disponible"].map(k=>`<button type="button" class="st-${k}" aria-pressed="${k===to}" data-incto="${k}">${EST[k].t}</button>`).join("")}</div>
+      <span class="small" id="inc-d">${esc(EST[to].d)}</span></div>
+    ${nv ? `<label class="small row" for="inc-del" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="inc-del"><span>Borrar ${nv===1?"el vídeo de la parte anterior":`los vídeos de las ${nv} partes anteriores`}: el de la última clase ya lo tiene todo. No se puede deshacer.</span></label>` : ""}
+    <div class="row sheet-foot"><button type="submit" class="btn pri" style="flex:1">Guardar</button></div>
+  </form></div>`;
+  document.querySelectorAll("#inc-to button").forEach(b=> b.onclick=()=>{
+    to = b.dataset.incto; document.querySelectorAll("#inc-to button").forEach(x=>x.setAttribute("aria-pressed", x===b)); $("#inc-d").textContent = EST[to].d;
+  });
+  markClean();
+  $("#inc-form").onsubmit = e=>{
+    e.preventDefault();
+    const g = S.figures[figId]; if(!g) return closeSheet();
+    const del = !!$("#inc-del")?.checked, gone = del ? partesOf(g).map(x=>x.vid).filter(Boolean) : [];
+    if(del){ g.partes = []; persist({t:"fig", id:figId}); gone.forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel", id:v}); }); }
+    closeSheet();
+    promoteFig(figId, to, true);
+  };
+}
 function openFigure(id, opts={}){
   const quick = !!opts.quick && !id;
   const base = {id:uid(), nombre:"", tipo:"figura", baile:"Bachata", entrada:"", salida:"", agarreIn:"", agarreOut:"", estado: quick?"espera":"practica", profesor:""};
@@ -2749,7 +2910,7 @@ function openFigure(id, opts={}){
     const agarreOut = quick ? (f.agarreOut || (mv ? sg?.agarreOut : agarreIn) || "") : (mv ? $("#ff-agout").value : agarreIn);
     const est = quick ? "espera" : estado;
     if(!nombre){ fieldError([$("#ff-nombre")], $('label[for="ff-nombre"]'), "Escribe un nombre para encontrarla luego."); return; }
-    if(mv && est!=="espera" && (!entrada||!salida)){ fieldError([!entrada && $("#ff-in"), !salida && $("#ff-out")].filter(Boolean), $("#ff-in").closest(".grid2"), "Para sacarla de la lista de espera indica dónde empieza y dónde acaba."); return; }
+    if(mv && est!=="espera" && est!=="incompleta" && (!entrada||!salida)){ fieldError([!entrada && $("#ff-in"), !salida && $("#ff-out")].filter(Boolean), $("#ff-in").closest(".grid2"), "Para sacarla de la lista de espera indica dónde empieza y dónde acaba."); return; }
     const prev = S.figures[f.id] || {};
     const out = Object.assign({}, prev, {id:f.id, nombre, tipo, entrada, salida, agarreIn, agarreOut, estado:est, ejemplo:false});
     if(quick){ out.profesor=prof; out.baile=baile; out.video = out.video || nombre; if(sg){ out.sugerido=true; if(sg.senal && !out.senal) out.senal=sg.senal; } }
@@ -2828,9 +2989,9 @@ function renderVidbox(){
   if(!assetsApi){ box.hidden=true; box.innerHTML=""; return; }
   box.hidden=false;
   // Intento: tu propio vídeo. Se puede grabar con la cámara (capture) o elegir de Fotos; sin «Identificar con Claude».
-  const att = vstate.kind==="intento";
-  const pick=`<input type="file" id="ff-file" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">${att?`<input type="file" id="ff-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true">`:""}`;
-  const ai=att?"":`<button type="button" class="btn sm" data-vid="ai">✦ Identificar con Claude</button>`;
+  const att = vstate.kind==="intento", pt = vstate.kind==="parte";
+  const pick=`<input type="file" id="ff-file" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">${att||pt?`<input type="file" id="ff-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true">`:""}`;
+  const ai=att||pt?"":`<button type="button" class="btn sm" data-vid="ai">✦ Identificar con Claude</button>`;
   const aiOut=`<div id="ai-out" class="small" aria-live="polite">${vstate.aiMsg||""}</div>`;
   if(vstate.file){
     const seg=Math.max(0,(vstate.end||vstate.dur)-vstate.start);
@@ -2850,6 +3011,9 @@ function renderVidbox(){
       <div class="row"><button type="button" class="btn sm" data-vid="retrim">Ajustar recorte</button><button type="button" class="btn sm" data-pick="ff-file">Cambiar vídeo</button><button type="button" class="btn sm" data-vid="savevid">Guardar en Fotos</button><button type="button" class="btn ghost sm danger" data-vid="remove">Quitar vídeo</button>${ai}</div>${aiOut}`;
     hydrateVideos(box);
     if(!vstate.curBlob) vidGet(vstate.cur).then(b=>{ if(vstate) vstate.curBlob=b; }).catch(()=>{});
+  } else if(pt){
+    box.innerHTML=`${pick}<div class="row"><button type="button" class="btn pri" data-pick="ff-file">Elegir de Fotos</button><button type="button" class="btn" data-pick="ff-cam">Cámara del iPhone</button></div>
+      <p class="small muted">El vídeo de la clase de hoy, con lo de las semanas anteriores y la parte nueva. Luego marcas dónde empieza y acaba. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`;
   } else if(att){
     box.innerHTML=`${pick}<div class="row"><button type="button" class="btn pri" data-pick="ff-cam">Grabarme</button><button type="button" class="btn" data-pick="ff-file">Elegir de Fotos</button></div>
       <p class="small muted">Grábate haciendo la figura entera. Luego marcas dónde empieza y acaba. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`;
@@ -3002,14 +3166,16 @@ async function shareOrDownload(file){
 // Cuentan el vídeo de la clase y los de los intentos; cada uno lleva su propio vidSaved.
 function markVidSaved(figId, vidId){
   const f = S.figures[figId]; if(!f || !vidId) return;
-  const it = f.vid===vidId ? f : intentosOf(f).find(a=>a.vid===vidId);
+  const it = f.vid===vidId ? f : (partesOf(f).find(x=>x.vid===vidId) || intentosOf(f).find(a=>a.vid===vidId));
   if(!it || it.vidSaved===vidId) return;
   it.vidSaved = vidId; persist({t:"fig", id:f.id});
 }
 const attName = (f, a) => `${f.nombre} · intento ${fmtDate(a.fecha)}`;
+const parteName = (f, x) => `${f.nombre} · parte ${partesOf(f).indexOf(x)+1} (${fmtDate(x.fecha)})`;
 // Un elemento por vídeo sin copia: {id: figura, att: intento (si lo es), vid, nombre}. La figura más reciente primero.
 const vidsUnsaved = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
   ...(f.vid && f.vidSaved!==f.vid ? [{id:f.id, vid:f.vid, nombre:f.nombre}] : []),
+  ...partesOf(f).filter(x=>x.vid && x.vidSaved!==x.vid).map(x=>({id:f.id, parte:x.id, vid:x.vid, nombre:parteName(f,x)})),
   ...intentosOf(f).filter(a=>a.vid && a.vidSaved!==a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a)}))
 ]);
 // iOS comparte varios vídeos a la vez («Guardar N vídeos»), pero cada envío necesita un toque:
@@ -3363,7 +3529,7 @@ function graphHTML(cov){
   const P={};
   nodes.forEach((p,i)=>{ const a = n<=2 ? Math.PI*(1-i) : -Math.PI/2+2*Math.PI*i/n; P[p]={x:cx+rx*Math.cos(a), y:cy+ry*Math.sin(a), w:hw(p), h:16}; });
   const E={};
-  figs().filter(f=>active(f)&&placed(f)&&P[f.entrada]&&P[f.salida]).forEach(f=>{
+  figs().filter(f=>usable(f)&&placed(f)&&P[f.entrada]&&P[f.salida]).forEach(f=>{
     const k=f.entrada+"␟"+f.salida; const e=E[k]||(E[k]={a:f.entrada,b:f.salida,n:0,r:0}); e.n++; if(ready(f)) e.r++;
   });
   const gaps = new Set(cov.filter(c=>c.into.length && c.ready.length<2).map(c=>c.p));
@@ -3416,7 +3582,7 @@ function progressHTML(){
     const s=new Date(monday); s.setDate(monday.getDate()-7*i);
     const e=new Date(s); e.setDate(s.getDate()+6);
     const end = i===0 ? todayStr() : e.toISOString().slice(0,10);
-    const c={espera:0,practica:0,disponible:0,consolidada:0};
+    const c={espera:0,incompleta:0,practica:0,disponible:0,consolidada:0};
     all.forEach(f=>{ const st=stateAt(f,end); if(st) c[st]++; });
     const soc = Object.values(S.logs).filter(l=>l.fecha>=s.toISOString().slice(0,10) && l.fecha<=end).length;
     weeks.push({label:s.toLocaleDateString("es-ES",{day:"numeric",month:"short"}).replace(".",""), day:s.getDate(), mon:s.getMonth(), c, ready:c.disponible+c.consolidada, soc, cur:i===0});
@@ -3441,7 +3607,7 @@ function progressHTML(){
             <text class="c-ax" x="${x+bwid/2}" y="${H-8}" text-anchor="middle">${i===0||wk.mon!==weeks[i-1].mon?esc(wk.label):wk.day}</text>
             <rect class="c-hit" data-week="${i}" x="${L+i*bw}" y="${T}" width="${bw}" height="${ph+B}"/>`; }).join("")}
       </svg>
-      <figcaption class="small" id="prog-read">Semana del ${esc(w.label)}${w.cur?" (en curso)":""}: <b>${w.c.consolidada}</b> ${w.c.consolidada===1?"consolidada":"consolidadas"} · <b>${w.c.disponible}</b> ${w.c.disponible===1?"disponible":"disponibles"} · ${w.c.practica} en práctica · ${w.c.espera} en espera · ${pl(w.soc,"social registrado","socials registrados")}</figcaption>
+      <figcaption class="small" id="prog-read">Semana del ${esc(w.label)}${w.cur?" (en curso)":""}: <b>${w.c.consolidada}</b> ${w.c.consolidada===1?"consolidada":"consolidadas"} · <b>${w.c.disponible}</b> ${w.c.disponible===1?"disponible":"disponibles"} · ${w.c.practica} en práctica${w.c.incompleta?` · ${w.c.incompleta} ${w.c.incompleta===1?"incompleta":"incompletas"}`:""} · ${w.c.espera} en espera · ${pl(w.soc,"social registrado","socials registrados")}</figcaption>
     </figure>
     <details><summary>Ver datos</summary><div style="overflow-x:auto"><table class="dtab"><thead><tr><th>Semana</th><th>Seguras</th><th>Práctica</th><th>Espera</th><th>Socials</th></tr></thead>
       <tbody>${weeks.map(wk=>`<tr><td>${esc(wk.label)}</td><td>${wk.ready}</td><td>${wk.c.practica}</td><td>${wk.c.espera}</td><td>${wk.soc}</td></tr>`).join("")}</tbody></table></div></details>
@@ -3579,6 +3745,8 @@ async function importData(replace){
     const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
     const keep = mine.filter(a=>!got.has(a.id));
     if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
+    const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
+    if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
     S.figures[f.id]=f; persist({t:"fig",id:f.id});
   });
   Object.values(d.logs||{}).forEach(l=>{ if(l&&l.id){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
@@ -3669,18 +3837,7 @@ document.addEventListener("click", async e=>{
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.fest){ filt.estado=d.fest; return render(); }
-  if(d.promote){
-    const f=S.figures[d.promote] ? clone(S.figures[d.promote]) : null; const to=d.to||"disponible";
-    // Sin dónde empieza o acaba no sale de la lista de espera: se abre la ficha con lo que falta señalado.
-    if(f && incomplete(f) && to!=="espera"){
-      openFigure(f.id, {fromView: !!t.closest("[data-viewfig]"), estado:to});
-      const fin=$("#ff-in"), fout=$("#ff-out");
-      if(fin) fieldError([!f.entrada && fin, !f.salida && fout].filter(Boolean), fin.closest(".grid2"), `Para ${to==="practica"?"empezar a practicarla":"pasarla a "+EST[to].t.toLowerCase()} indica dónde empieza y dónde acaba.`);
-      return;
-    }
-    if(f){ f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`); if($('[data-sheet="log"]')) openLog(); else if($("#sheet-root [data-viewfig]")) openView(f.id); else t.remove(); }
-    return;
-  }
+  if(d.promote){ promoteFig(d.promote, d.to||"disponible", !!t.closest("[data-viewfig]"), t); return; }
   if(d.logfig){ logSel.has(d.logfig) ? logSel.delete(d.logfig) : logSel.add(d.logfig); t.setAttribute("aria-pressed", logSel.has(d.logfig)); saveSel(); render(); return; }
   if(d.dellog) return deleteLog(d.dellog);
   if(d.lren){ editKey=d.lren+d.i; confirmKey=null; return openSettings(); }
@@ -3754,6 +3911,11 @@ document.addEventListener("click", async e=>{
   if(a==="pk-back") return pkBack();
   if(a==="att-savevid") return attSaveVid(d.id, d.att);
   if(a==="att-del") return attDelete(d.id, d.att);
+  if(a==="pt-new") return openParteNew(d.id);
+  if(a==="pt-open") return openParteView(d.id, d.pt);
+  if(a==="pt-savevid") return ptSaveVid(d.id, d.pt);
+  if(a==="pt-del") return ptDelete(d.id, d.pt);
+  if(a==="inc-done") return openIncDone(d.id);
   if(a==="export") return exportBackup();
   if(a==="save-vids") return saveVidBatch();
   if(a==="persist"){

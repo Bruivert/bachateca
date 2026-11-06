@@ -985,6 +985,82 @@ def videos_sin_coletilla(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- grabarme con conteo (dentro de la app)
+@test
+def pulso_automatico_del_conteo(browser):
+    """El conteo dijo «1» en 0,5 s y cada tiempo dura 0,5 s: la figura empieza en el 1 (o el 5) más cercano al recorte."""
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, A = {first: 0.5, beat: 0.5};
+      const m = (f, st, sh) => B.autoPulso(A, f, st, sh).marcas;
+      return {uno: m({tiempo: "1", tiempos: "8"}, 0.7, 0), luego: m({tiempo: "1", tiempos: "8"}, 4.4, 0),
+              cinco: m({tiempo: "5", tiempos: "4"}, 2.6, 0), recortado: m({tiempo: "5", tiempos: "4"}, 2.6, 2.5),
+              pronto: m({tiempo: "1", tiempos: "8"}, 0, 0), sin: B.autoPulso(null, {}, 0, 0)}; }""")
+    assert [(x["b"], x["s"]) for x in r["uno"]] == [(b, 0.5 + (b - 1) * 0.5) for b in range(1, 9)], r["uno"]
+    assert r["luego"][0] == {"b": 1, "s": 4.5}, r["luego"]                 # el siguiente «1»
+    assert [(x["b"], x["s"]) for x in r["cinco"]] == [(5, 2.5), (6, 3.0), (7, 3.5), (8, 4.0)], r["cinco"]
+    assert r["recortado"][0] == {"b": 5, "s": 0}, "al reducir el vídeo empieza en el recorte"
+    assert r["pronto"][0] == {"b": 1, "s": 0.5} and r["sin"] is None, r
+    ctx.close()
+
+
+@test
+def grabarme_con_conteo(browser):
+    seed = cmp_seed(intentos=[])
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    btn = p.locator('[data-act="rc-open"]')
+    assert "120 bpm" in btn.inner_text(), "al pulso del vídeo de la clase"
+    btn.click()
+    p.wait_for_function("!document.querySelector('#rc-go').disabled", timeout=10000)
+    assert "120 bpm" in p.locator("[data-recc]").inner_text()
+    p.click("#rc-go")
+    p.wait_for_function("document.querySelector('#rc-beat').textContent !== ''", timeout=5000)
+    assert p.evaluate("() => window.__bachateca.rcState().recording")
+    p.wait_for_timeout(2500)
+    p.click("#rc-go")
+    p.wait_for_selector("#att-form #ff-prev", timeout=10000)
+    assert p.evaluate("() => window.__bachateca.rcState()") is None, "la cámara se apaga al parar"
+    assert "El pulso se guarda solo" in p.locator("#att-form").inner_text()
+    assert not p.locator("#ff-compact").is_checked(), "ya está en calidad media: no hace falta reducirlo"
+    p.click('#att-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]', timeout=15000)
+    a = p.evaluate("() => window.__bachateca.state().figures.f1.intentos[0]")
+    pu = a["pulso"]
+    assert pu["modo"] == "auto" and pu["vid"] == a["vid"] and [m["b"] for m in pu["marcas"]] == [1, 2, 3, 4], pu
+    assert p.evaluate("p => window.__bachateca.pulsoOk(p, p.vid)", pu) and abs(p.evaluate("p => Math.round(60 * 3 / (p.marcas[3].s - p.marcas[0].s))", pu) - 120) <= 1, pu
+    assert 0.3 <= pu["marcas"][0]["s"] <= 1.2, pu                            # el primer «1» suena medio segundo después de empezar
+    # Con los dos pulsos, ya se puede comparar sin marcar nada a mano.
+    p.click(f'[data-act="att-open"][data-att="{a["id"]}"]')
+    assert p.locator('[data-act="cmp-open"]').count() == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def salir_de_grabar_apaga_la_camara(browser):
+    ctx, p, errors = open_app(browser, seed=cmp_seed(intentos=[]))
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="rc-open"]')
+    p.wait_for_function("!document.querySelector('#rc-go').disabled", timeout=10000)
+    p.evaluate("() => { window._tracks = document.querySelector('#rc-live').srcObject.getTracks(); }")
+    p.click('[data-recc] [data-view="f1"]')
+    p.wait_for_selector('[data-viewfig="f1"]')
+    assert p.evaluate("() => window.__bachateca.rcState()") is None
+    p.wait_for_timeout(100)
+    assert p.evaluate("() => window._tracks.every(t => t.readyState === 'ended')"), "cámara y micrófono apagados"
+    # Cerrar a mitad de una grabación pregunta antes.
+    p.click('[data-act="rc-open"]')
+    p.wait_for_function("!document.querySelector('#rc-go').disabled", timeout=10000)
+    p.click("#rc-go"); p.wait_for_timeout(500)
+    p.click('[data-recc] [data-act="close"]')
+    assert p.locator("#confirm-root .confirm").count() == 1
+    p.click('#confirm-root [data-cf="ok"]')
+    assert p.evaluate("() => window.__bachateca.rcState()") is None
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     srv = serve()
     failed = 0

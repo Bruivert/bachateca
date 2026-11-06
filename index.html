@@ -367,6 +367,12 @@ button.card:active{background:var(--surface2)}
 .cmp-v{position:relative;margin:0;background:#000}
 .cmp-v video{display:block;width:100%;height:25vh;object-fit:contain;background:#000}
 .cmp-v video.mirror{transform:scaleX(-1)}
+/* grabarme con conteo: la cámara en directo y el número que suena encima */
+.rc-media{position:relative;background:#000}
+.rc-media video{width:100%;height:46vh;object-fit:cover;display:block;background:#000}
+.rc-media video.mirror{transform:scaleX(-1)}
+.rc-rec{position:absolute;left:12px;top:10px;padding:4px 10px;border-radius:99px;background:rgba(0,0,0,.62);color:#ff6b6b;font-size:0.8824rem;font-weight:700;font-variant-numeric:tabular-nums}
+.rc-beat{position:absolute;right:14px;bottom:10px;font-size:3.4rem;font-weight:800;line-height:1;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.7);font-variant-numeric:tabular-nums}
 .cmp-v figcaption{position:absolute;left:10px;top:8px;padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.62);color:#fff;font-size:0.8236rem;font-weight:600;font-variant-numeric:tabular-nums}
 .cmp-now{display:flex;align-items:baseline;gap:10px;margin-bottom:-6px}
 .cmp-now b{font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
@@ -943,6 +949,7 @@ function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
   if(sheetBase.carried) return true;
   if(pk && pk.dirty && $("[data-pulso]")) return true;
+  if(rc && rc.rec && $("[data-recc]")) return true;
   if([...document.querySelectorAll("#sheet-root input:not([type=file]):not([type=search]),#sheet-root select,#sheet-root textarea:not([readonly])")].some(fieldDirty)) return true;
   return pressSig()!==sheetBase.press || vSig()!==sheetBase.v;
 }
@@ -1159,6 +1166,8 @@ function releaseVideo(v){ try{ v.pause(); }catch{} if(v.hasAttribute("src")){ v.
 new MutationObserver(ms=>{
   for(const m of ms) for(const n of m.removedNodes){
     if(n.nodeType!==1) continue;
+    // Si se sale de «Grabarme con conteo» por cualquier camino, la cámara y el micrófono se apagan.
+    if(rc && !$("[data-recc]") && (n.matches("[data-recc]") || n.querySelector("[data-recc]"))) rcCleanup();
     (n.tagName==="VIDEO" ? [n] : n.querySelectorAll("video")).forEach(v=>{ if(!v.isConnected && !v.dataset.aux) releaseVideo(v); });
   }
 }).observe(document.body, {childList:true, subtree:true});
@@ -1180,7 +1189,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.46";
+const APP_VERSION = "1.47";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -2091,20 +2100,158 @@ function attCardHTML(f, chev){
   return `<section class="fv-card" aria-labelledby="fv-i"><h3 id="fv-i">Mis intentos${list.length?` · ${list.length}`:""}</h3>
     ${list.length ? `<div class="menu">${list.map(row).join("")}</div>` : `<p class="small muted">Grábate haciendo la figura y guárdalo aquí para compararte con el vídeo de la clase.</p>`}
     <input type="file" id="att-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="att-lib" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">
-    <div class="fv-actions"><button type="button" class="btn" data-pick="att-cam">Grabarme</button><button type="button" class="btn" data-pick="att-lib">Elegir de Fotos</button></div>
+    ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder!=="undefined" ? `<button type="button" class="btn pri" data-act="rc-open" data-id="${f.id}">Grabarme con conteo${pulsoOk(f.pulso, f.vid) ? ` · ${pulsoBpm(f.pulso)} bpm` : ""}</button>` : ""}
+    <div class="fv-actions"><button type="button" class="btn" data-pick="att-cam">Cámara del iPhone</button><button type="button" class="btn" data-pick="att-lib">Elegir de Fotos</button></div>
   </section>`;
+}
+// ---------- grabarme con conteo ----------
+// La app graba con la cámara (getUserMedia + MediaRecorder) mientras suena «1, 2… 8» al pulso del vídeo de la clase.
+// Con la cámara del iPhone no se puede: iOS calla la app mientras está abierta. El conteo va al altavoz y, además,
+// directo a la grabación, así que queda en el vídeo; y como se sabe cuándo sonó cada número, el pulso sale solo.
+// La voz son 8 archivos cortos (sonidos/conteo); se mide dónde empieza en cada uno para que caiga en el golpe.
+let cntCtx = null, cntVoz = null, cntVozP = null;
+function cntAudio(){ if(!cntCtx){ const AC = window.AudioContext || window.webkitAudioContext; cntCtx = new AC(); } return cntCtx; }
+function cntLoad(){
+  if(cntVozP) return cntVozP;
+  const c = cntAudio();
+  cntVozP = Promise.all([1,2,3,4,5,6,7,8].map(async n=>{
+    const ab = await (await fetch(`sonidos/conteo/${n}.m4a`)).arrayBuffer();
+    const buf = await new Promise((res, rej)=>{ const p = c.decodeAudioData(ab, res, rej); if(p && p.then) p.then(res, rej); });
+    const d = buf.getChannelData(0); let i = 0; while(i<d.length && Math.abs(d[i])<.02) i++;
+    return {buf, on: i/buf.sampleRate};
+  })).then(v=>{ cntVoz = v; return v; }, e=>{ cntVozP = null; throw e; });
+  return cntVozP;
+}
+// Un número del conteo (n = 1…8) que suena justo en «at» (segundos de Web Audio). Sin voz, un pitido (más agudo en 1 y 5).
+function cntPlay(dests, at, n, voz){
+  const c = cntAudio(), out = [];
+  dests.forEach(d=>{
+    if(voz && cntVoz){ const v = cntVoz[n-1], s = c.createBufferSource(); s.buffer = v.buf; s.connect(d); s.start(Math.max(c.currentTime, at - v.on)); out.push(s); }
+    else { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = n===1 ? 1320 : n===5 ? 990 : 760;
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(.6, at+.004); g.gain.exponentialRampToValueAtTime(.001, at+.09);
+      o.connect(g).connect(d); o.start(at); o.stop(at+.1); out.push(o); }
+  });
+  return out;
+}
+// Pulso de un intento grabado con conteo. El conteo dijo el número k%8+1 en first + k·beat (segundos del vídeo grabado).
+// La figura empieza en su tiempo (1 o 5) más cercano al inicio del recorte. shift: lo que se quita si el vídeo guardado
+// empieza en el recorte (al reducirlo).
+function autoPulso(auto, f, start, shift){
+  if(!auto || !(auto.beat>0)) return null;
+  const b0 = +f.tiempo===5 ? 5 : 1, n = Math.max(2, +f.tiempos||8), off = b0-1;
+  let k = Math.round(((start - auto.first)/auto.beat - off)/8)*8 + off; while(k<0) k += 8;
+  const marcas = [];
+  for(let j=0; j<n; j++){ const t = auto.first + (k+j)*auto.beat - shift; if(t>=0) marcas.push({b:b0+j, s:Math.round(t*1000)/1000}); }
+  return marcas.length>=2 ? {vid:null, marcas, modo:"auto"} : null;
+}
+const RC_MAX = 300;   // como mucho 5 minutos por grabación
+let rc = null;        // {figId, stream, facing, mic, voz, bpm, rec, nodes, t0, recAt, raf, stopT}
+function rcCleanup(){
+  if(!rc) return;
+  try{ if(rc.rec && rc.rec.state!=="inactive"){ rc.rec.onstop = null; rc.rec.stop(); } }catch{}
+  (rc.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} });
+  if(rc.stream) rc.stream.getTracks().forEach(t=>t.stop());
+  cancelAnimationFrame(rc.raf); clearTimeout(rc.stopT);
+  rc = null;
+}
+function openRecCount(figId){
+  const f = S.figures[figId]; if(!f) return;
+  rcCleanup();
+  const ref = pulsoOk(f.pulso, f.vid) ? pulsoBpm(f.pulso) : null;
+  rc = {figId, facing:"environment", mic:true, voz:true, bpm: ref || 110, ref};
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-recc>
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${f.id}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="fv-media rc-media"><video id="rc-live" playsinline muted autoplay></video><div class="rc-beat" id="rc-beat" aria-hidden="true"></div><div class="rc-rec" id="rc-rec" hidden></div></div>
+    <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Grabarme con conteo</h2>
+      <p class="small muted">${ref ? `El conteo suena a <b class="fg">${ref} bpm</b>, como el vídeo de la clase.` : `El vídeo de la clase no tiene el pulso marcado: elige el ritmo.`} Empieza a bailar en el ${+f.tiempo===5?"5":"1"} que quieras; luego recortas la figura y el pulso queda marcado solo.</p></div>
+    ${ref ? "" : `<label class="f" for="rc-bpm">Golpes por minuto<input type="number" id="rc-bpm" min="75" max="200" step="1" value="${rc.bpm}" inputmode="numeric"></label>`}
+    <div class="seg neutral" role="group" aria-label="Sonido del conteo"><button type="button" data-rcsnd="voz" aria-pressed="true">Voz</button><button type="button" data-rcsnd="pitido" aria-pressed="false">Pitidos</button></div>
+    <label class="small row" for="rc-mic" style="gap:10px;min-height:44px;flex-wrap:nowrap"><input type="checkbox" id="rc-mic" checked><span>Grabar también el sonido del micrófono. Si el conteo se oye bajito, desmárcalo: el conteo se graba igual.</span></label>
+    <p class="small" id="rc-st" aria-live="polite">Encendiendo la cámara…</p>
+    <div class="row sheet-foot"><button type="button" class="btn" id="rc-flip">Cambiar cámara</button><button type="button" class="btn pri" id="rc-go" style="flex:1" disabled>Grabar</button></div>
+  </div></div>`;
+  cntLoad().catch(()=>{ const st=$("#rc-st"); if(st && rc) st.textContent = "No se pudo cargar la voz: sonarán pitidos."; });
+  $("#rc-flip").onclick = ()=>{ if(rc.rec) return; rc.facing = rc.facing==="environment" ? "user" : "environment"; rcCam(); };
+  $("#rc-mic").onchange = e=>{ if(rc.rec) return; rc.mic = e.target.checked; rcCam(); };
+  document.querySelectorAll("[data-rcsnd]").forEach(b=> b.onclick=()=>{ rc.voz = b.dataset.rcsnd==="voz"; document.querySelectorAll("[data-rcsnd]").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+  const bi = $("#rc-bpm"); if(bi) bi.onchange = ()=>{ rc.bpm = Math.max(75, Math.min(200, Math.round(+bi.value)||110)); bi.value = rc.bpm; };
+  $("#rc-go").onclick = ()=> rc.rec ? rcStop() : rcStart();
+  rcCam();
+  markClean();
+}
+async function rcCam(){
+  if(!rc) return;
+  if(rc.stream) rc.stream.getTracks().forEach(t=>t.stop());
+  const st = $("#rc-st"), go = $("#rc-go"); go.disabled = true;
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:rc.facing, width:{ideal:1280}, height:{ideal:720}},
+      audio: rc.mic ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false});
+    if(!rc || !$("[data-recc]")){ stream.getTracks().forEach(t=>t.stop()); return; }
+    rc.stream = stream;
+    const v = $("#rc-live"); v.srcObject = stream; v.classList.toggle("mirror", rc.facing==="user"); v.play().catch(()=>{});
+    go.disabled = false; st.textContent = "Pon el móvil donde se te vea entera la figura y pulsa Grabar.";
+  }catch(e){
+    st.textContent = e && e.name==="NotAllowedError" ? "No hay permiso para la cámara. Actívalo en Ajustes → Safari → Cámara (y Micrófono) y vuelve a abrir esta hoja."
+      : `No se pudo encender la cámara (${e && e.name || "error"}).`;
+  }
+}
+function rcStart(){
+  if(!rc || !rc.stream || rc.rec) return;
+  const c = cntAudio(); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const mix = c.createMediaStreamDestination();
+  if(rc.mic && rc.stream.getAudioTracks().length) c.createMediaStreamSource(rc.stream).connect(mix);
+  const out = new MediaStream([...rc.stream.getVideoTracks(), ...mix.stream.getAudioTracks()]);
+  const mime = ["video/mp4;codecs=avc1,mp4a.40.2","video/mp4","video/webm;codecs=vp8,opus","video/webm"].find(m=>{ try{ return MediaRecorder.isTypeSupported(m); }catch{ return false; } }) || "";
+  const chunks = [], beat = 60/rc.bpm, voz = rc.voz && !!cntVoz;
+  let rec;
+  try{ rec = new MediaRecorder(out, Object.assign({videoBitsPerSecond:2500000}, mime ? {mimeType:mime} : {})); }
+  catch(e){ $("#rc-st").textContent = `Este iPhone no deja grabar aquí (${e.name}).`; return; }
+  rc.rec = rec; rc.beat = beat; rc.nodes = [];
+  rec.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  rec.onstart = ()=>{
+    if(!rc) return;
+    // El conteo empieza medio segundo después de arrancar la grabación, para que el primer «1» quede dentro.
+    rc.recAt = c.currentTime; rc.t0 = rc.recAt + .5;
+    const n = Math.ceil(RC_MAX/beat);
+    for(let k=0; k<n; k++) rc.nodes.push(...cntPlay([c.destination, mix], rc.t0 + k*beat, k%8+1, voz));
+    const tick = ()=>{ if(!rc || !rc.rec) return; const t = c.currentTime - rc.t0, el = $("#rc-beat"), rr = $("#rc-rec"); if(el) el.textContent = t<0 ? "" : String(Math.floor(t/beat)%8+1); if(rr){ rr.hidden = false; rr.textContent = `● Grabando ${fmtT(c.currentTime - rc.recAt)}`; } rc.raf = requestAnimationFrame(tick); };
+    tick();
+    rc.stopT = setTimeout(()=>{ if(rc && rc.rec) rcStop(); }, RC_MAX*1000);
+  };
+  rec.onstop = ()=>{
+    const r = rc; if(!r) return;
+    const type = rec.mimeType || mime || "video/mp4", ext = type.includes("webm") ? "webm" : "mp4";
+    const file = new File([new Blob(chunks, {type})], `intento.${ext}`, {type});
+    const auto = {first: r.t0 - r.recAt, beat: r.beat, bpm: r.bpm};
+    rcCleanup();
+    if(!file.size){ toast("No se grabó nada. Vuelve a probar."); return openView(r.figId); }
+    openAttemptNew(r.figId, file, auto);
+  };
+  rec.start(1000);
+  $("#rc-go").textContent = "Parar"; $("#rc-flip").disabled = true; $("#rc-mic").disabled = true;
+  $("#rc-st").textContent = "Grabando… baila con el conteo y pulsa Parar al terminar.";
+  askWake();
+}
+function rcStop(){
+  if(!rc || !rc.rec) return;
+  (rc.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} }); rc.nodes = [];
+  clearTimeout(rc.stopT); cancelAnimationFrame(rc.raf);
+  try{ rc.rec.stop(); }catch{}
+  if(tab!=="social") releaseWake();
 }
 // Hoja «Nuevo intento»: el vídeo ya elegido, con el mismo recorte que el vídeo de la clase.
 // Por defecto se guarda solo el fragmento en calidad media: los vídeos de la cámara ocupan mucho.
-function openAttemptNew(figId, file){
+function openAttemptNew(figId, file, auto){
   const f = S.figures[figId]; if(!f) return;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="att-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Nuevo intento</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     <p class="small muted">${esc(f.nombre)} · ${esc(fmtDate(todayStr()))}</p>
+    ${auto ? `<p class="small">Marca el inicio donde empieza la figura (en su ${+f.tiempo===5?"5":"1"}) y el final. El pulso se guarda solo, con el conteo que sonaba.</p>` : ""}
     <div class="vidbox" id="vidbox"></div>
     <div class="row sheet-foot"><button type="submit" class="btn pri" style="flex:1">Guardar intento</button></div>
   </form></div>`;
-  vstate = {kind:"intento", cur:null, trim:null, thumb:null, figId, file:null, url:null, dur:0, start:0, end:0, remove:false, compact:true};
+  // Grabado en la app con conteo: ya está en calidad media (no hace falta reducirlo) y el pulso sale solo.
+  vstate = {kind:"intento", cur:null, trim:null, thumb:null, figId, file:null, url:null, dur:0, start:0, end:0, remove:false, compact:!auto, auto:auto||null};
   markClean();
   if(file) useVideoFile(file); else renderVidbox();
   $("#att-form").onsubmit = async e=>{
@@ -2116,6 +2263,7 @@ function openAttemptNew(figId, file){
     if(!fig){ persist({t:"assetdel", id:res.vid}); closeSheet(); return; }
     const a = {id:uid(), fecha:todayStr(), creado:Date.now(), vid:res.vid, vidTrim:res.vidTrim, vidInfo:res.vidInfo};
     if(res.thumb) a.thumb = res.thumb;
+    if(vstate.auto){ const pu = autoPulso(vstate.auto, fig, vstate.start||0, res.vidInfo.comprimido ? (vstate.start||0) : 0); if(pu){ pu.vid = res.vid; a.pulso = pu; } }
     fig.intentos = [...intentosOf(fig), a]; persist({t:"fig", id:figId});
     const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
     closeSheet(); render(); openView(figId);
@@ -2647,7 +2795,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null; pk = null; cmpStop(); cmp = null;
+  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup();
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -3585,6 +3733,7 @@ document.addEventListener("click", async e=>{
   if(a==="att-open") return openAttemptView(d.id, d.att);
   if(a==="pk-open") return openPulso(d.id, d.att);
   if(a==="cmp-open") return openCompare(d.id, d.att);
+  if(a==="rc-open") return openRecCount(d.id);
   if(a==="cmp-back"){ const c=cmp; cmpStop(); cmp=null; return c ? openAttemptView(c.figId, c.attId) : null; }
   if(a==="err-del") return errDelete(d.id, d.err);
   if(a==="pk-back") return pkBack();
@@ -3673,7 +3822,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

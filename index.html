@@ -752,9 +752,38 @@ function nextRep(r0,g){
 }
 
 // ---------- almacenamiento (en este dispositivo) ----------
+// ---------- versión de los datos ----------
+// Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
+// Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
+// y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
+const SCHEMA = 1;
+const MIGRATIONS = [
+  // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{
+      if(!f || typeof f!=="object") return;
+      if(!f.tipo) f.tipo="figura";
+      if(!f.estado) f.estado="practica";
+      if(f.hist && !Array.isArray(f.hist)) delete f.hist;
+    });
+  }
+];
+// Devuelve los datos al día. No toca el original: trabaja sobre una copia.
+function migrate(c0){
+  const c = clone(c0||{});
+  if(!c.figures || typeof c.figures!=="object") c.figures={};
+  let v = Number.isInteger(c.schema) ? c.schema : 0;
+  // Datos de una versión más nueva de la app (p. ej. copia hecha en otro iPhone ya actualizado): se dejan como están.
+  if(v > SCHEMA) return c;
+  for(; v<SCHEMA; v++) MIGRATIONS[v](c);
+  c.schema = SCHEMA;
+  return c;
+}
 function applyData(c){
-  S = { figures:c.figures||{}, logs:c.logs||{}, positions:arrOr(c.positions,DEFAULT_POS), holds:arrOr(c.holds,DEFAULT_HOLDS),
-        classes:Array.isArray(c.classes)?[...c.classes]:[...DEFAULT_CLASSES], linkRep:(c.linkRep&&typeof c.linkRep==="object")?c.linkRep:{} };
+  // Lo que esta versión no conoce se conserva tal cual para no perderlo al guardar.
+  S = { ...c, figures:c.figures||{}, logs:c.logs||{}, positions:arrOr(c.positions,DEFAULT_POS), holds:arrOr(c.holds,DEFAULT_HOLDS),
+        classes:Array.isArray(c.classes)?[...c.classes]:[...DEFAULT_CLASSES], linkRep:(c.linkRep&&typeof c.linkRep==="object")?c.linkRep:{},
+        schema: Number.isInteger(c.schema) ? c.schema : SCHEMA };
 }
 function lsGet(k){ try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; } catch { return null; } }
 function lsSet(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -795,7 +824,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.35";
+const APP_VERSION = "1.36";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -835,7 +864,12 @@ async function initStore(){
   try{ idb = await idbOpen(); }catch{ idb = null; }
   let c=null; try{ if(idb) c = await kvGet("state"); }catch{}
   if(!c) c = lsGet(LS_FALLBACK);
-  if(c) applyData(c);
+  if(c){
+    const old = c.schema;
+    c = migrate(c);
+    applyData(c);
+    if(old !== c.schema) saveNow();   // guarda ya la versión al día (no cuenta como cambio para la copia)
+  }
   assetsApi = idb ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
@@ -1686,7 +1720,8 @@ function renderVidbox(){
     else if(k==="savevid"){
       const blob=vstate.curBlob; if(!blob){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
       const ty=blob.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty}));
+      const vidId = vstate.cur, figId = vstate.figId;
+      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
     }
     else if(k==="ai"){ prepareCapture(); }
   });
@@ -1765,6 +1800,66 @@ async function shareOrDownload(file){
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click();
   setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return true;
+}
+// ---------- vídeos sin copia fuera de la app ----------
+// La copia de seguridad (JSON) no lleva vídeos. Se apunta qué vídeo se sacó con «Guardar en Fotos»
+// (vidSaved = id de ese vídeo): si cambias el vídeo de la figura, vuelve a contar como sin copia.
+function markVidSaved(figId, vidId){
+  const f = S.figures[figId]; if(!f || !vidId || f.vid!==vidId || f.vidSaved===vidId) return;
+  f.vidSaved = vidId; persist({t:"fig", id:f.id});
+}
+const vidsUnsaved = () => figs().filter(f=>f.vid && !f.ejemplo && f.vidSaved!==f.vid);
+// iOS comparte varios vídeos a la vez («Guardar N vídeos»), pero cada envío necesita un toque:
+// se mandan por tandas de hasta 5 y unos 200 MB, y el botón ofrece la siguiente tanda.
+const VID_BATCH = 5, VID_BATCH_BYTES = 200*1048576;
+// Safari solo deja abrir la hoja de compartir justo después del toque: los vídeos se leen antes
+// (al abrir Ajustes) y el botón los comparte sin esperar.
+let vidBatch = null, vidBatchP = null;
+function prepVidBatch(){
+  if(vidBatchP) return vidBatchP;
+  vidBatchP = (async()=>{
+    const files = [], ids = []; let bytes = 0;
+    for(const f of vidsUnsaved()){
+      if(files.length>=VID_BATCH) break;
+      const b = await vidGet(f.vid).catch(()=>null); if(!b) continue;
+      if(files.length && bytes + b.size > VID_BATCH_BYTES) break;
+      const ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+      const name = (f.nombre||"figura").replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "figura";
+      files.push(new File([b], `${name}.${ext}`, {type:ty})); ids.push([f.id, f.vid]); bytes += b.size;
+    }
+    vidBatch = {files, ids};
+  })().catch(()=>{ vidBatch = {files:[], ids:[]}; }).finally(()=>{ vidBatchP = null; });
+  return vidBatchP;
+}
+async function saveVidBatch(){
+  if(!vidsUnsaved().length){ toast("Todos tus vídeos tienen copia."); return; }
+  const batch = vidBatch;
+  if(!batch){ toast("Preparando los vídeos… vuelve a pulsar."); prepVidBatch(); return; }
+  if(!batch.files.length){ vidBatch = null; toast("No se encontraron los vídeos en el dispositivo."); return; }
+  // Lo que ya se guardó desde la ficha mientras tanto no se vuelve a mandar.
+  const still = new Set(vidsUnsaved().map(f=>f.vid));
+  const keep = batch.ids.map((x,i)=>still.has(x[1]) ? i : -1).filter(i=>i>=0);
+  if(!keep.length){ vidBatch = null; prepVidBatch(); toast("Preparando los vídeos… vuelve a pulsar."); return; }
+  const files = keep.map(i=>batch.files[i]); let ids = keep.map(i=>batch.ids[i]);
+  let ok = false;
+  if(navigator.canShare && navigator.canShare({files})){
+    try{ await navigator.share({files}); ok = true; }catch(e){ if(e && e.name==="AbortError") return; }
+  }
+  if(!ok){
+    // Sin hoja de compartir con varios archivos: de uno en uno, como «Guardar en Fotos» en la ficha.
+    ok = await shareOrDownload(files[0]); ids = ok ? ids.slice(0,1) : [];
+  }
+  if(!ok) return;
+  vidBatch = null;
+  ids.forEach(([fid,vid])=>markVidSaved(fid, vid));
+  const left = vidsUnsaved().length;
+  toast(left ? `${pl(ids.length,"vídeo guardado","vídeos guardados")}. Quedan ${left}.` : "Listo: todos tus vídeos tienen copia.");
+  if($('[aria-label="Ajustes"]')) openSettings();
+}
+function vidsUnsavedHTML(){
+  const n = vidsUnsaved().length; if(!n) return "";
+  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. La copia de seguridad no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}.
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)} en Fotos</button></div></div>`;
 }
 // Social de otro día sin registrar: registrarlo con su fecha o descartarlo (con Deshacer).
 function staleHTML(){
@@ -2211,6 +2306,7 @@ function openSettings(){
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   const bk = backupInfo(), bs = backupStatus(bk);
+  if(!vidBatch && vidsUnsaved().length) prepVidBatch();
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
   const row = (v, t, val) => `<button type="button" class="mrow" data-setv="${v}"><span>${t}</span>${val!==""?`<span class="mv">${val}</span>`:""}${CHEV}</button>`;
   const head = setView
@@ -2240,6 +2336,7 @@ function openSettings(){
       <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»).</p>
       <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar como texto</button></div>
       <textarea id="exp-text" readonly hidden aria-label="Texto de tu copia"></textarea>
+      ${vidsUnsavedHTML()}
     </div>
     <p class="menu-h">Listas</p>
     <div class="menu">${row("pos","Posiciones",S.positions.length)}${row("hold","Agarres",S.holds.length)}${row("cls","Tus clases",S.classes.length)}</div>
@@ -2255,12 +2352,14 @@ function openSettings(){
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
   markClean();
 }
-function exportData(){ return JSON.stringify({app:"bachateca",version:3,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep},null,2); }
+function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep},null,2); }
 async function importData(replace){
   const raw=$("#imp-text").value.trim();
   if(!raw){ toast("Elige un archivo de copia o pega su texto primero."); return; }
   let d; try{ d=JSON.parse(raw); }catch{ toast("Ese texto no es una copia completa. Pega todo el contenido o elige el archivo."); return; }
   if(!d || !d.figures || typeof d.figures!=="object"){ toast("Ese archivo no es una copia de Bachateca."); return; }
+  if(Number.isInteger(d.schema) && d.schema > SCHEMA){ toast("Esa copia es de una versión más nueva de Bachateca. Actualiza la app (ábrela con conexión) y vuelve a importarla."); return; }
+  d = migrate(d);
   const inc=Object.values(d.figures).filter(f=>f&&f.id&&f.nombre), nIn=inc.length;
   if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."); return; }
   if(!nIn && !Object.keys(d.logs||{}).length){ toast("Esa copia no tiene figuras ni registros que añadir."); return; }
@@ -2425,6 +2524,7 @@ document.addEventListener("click", async e=>{
     closeSheet(); deleteFigureUndo(id); return;
   }
   if(a==="export") return exportBackup();
+  if(a==="save-vids") return saveVidBatch();
   if(a==="persist"){
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok=>{ toast(ok?"Datos protegidos":"El sistema no lo ha permitido. Instala la app en la pantalla de inicio y vuelve a probar."); openSettings(); });
     else toast("Este navegador no lo permite.");
@@ -2502,6 +2602,12 @@ $("#confirm-root").addEventListener("click", e=>{
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy||socialLive()) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
+
+// Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
+if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
+  SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  state: ()=>S, ready: ()=>loaded, flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+};
 
 // arranque
 const h=(location.hash||"").slice(1);

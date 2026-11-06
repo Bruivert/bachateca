@@ -157,7 +157,7 @@ def arranque_migra_y_guarda(browser):
     ctx, p, errors = open_app(browser, seed=seed)
     p.wait_for_timeout(400)
     st = stored_state(p)
-    assert st["schema"] == 1, st.get("schema")
+    assert st["schema"] == 2, st.get("schema")
     assert set(st["figures"]) == {"a", "b"} and st["figures"]["b"]["tipo"] == "figura"
     assert st["figures"]["a"]["rep"]["step"] == 2, "no toca el repaso"
     assert st["logs"]["l1"]["figs"] == ["a"] and st["linkRep"]["Cerrada"]["step"] == 1
@@ -186,7 +186,7 @@ def importar_copia_antigua(browser):
     assert S["figures"]["x"]["tipo"] == "figura" and S["figures"]["x"]["estado"] == "practica", S["figures"]["x"]
     assert "Mano cruzada" in S["positions"]
     exp = json.loads(p.evaluate("() => window.__bachateca.exportData()"))
-    assert exp["schema"] == 1 and "x" in exp["figures"]
+    assert exp["schema"] == 2 and "x" in exp["figures"]
     assert not errors, errors
     ctx.close()
 
@@ -267,6 +267,86 @@ def recorrer_pestanas_sin_errores(browser):
     p.click('[data-act="reveal"]')
     p.click('[data-grade="fluida"]')
     assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- Inicio (1.37)
+def repertorio_inicio():
+    """Figuras con repasos en distintos estados, un social con bloqueo y vídeo en una."""
+    import datetime
+    d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
+    figs = [
+        fig(1, "Cerrada", "Abierta 2 manos", estado="consolidada", rep={"step": 4, "due": d(10), "last": d(-20), "aciertos": 4, "fallos": 0}),
+        fig(2, "Abierta 2 manos", "Sombra", rep={"step": 0, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 1}, vid="v1"),
+        fig(3, "Sombra", "Abierta 1 mano", rep={"step": 1, "due": d(-6), "last": d(-9), "aciertos": 1, "fallos": 0}),
+        fig(4, "Abierta 1 mano", "Cerrada", estado="disponible", rep={"step": 2, "due": d(0), "last": d(-7), "aciertos": 2, "fallos": 0}),
+        fig(5, "Abierta 2 manos", "Hammerlock", estado="espera"),
+    ]
+    return {"figures": {f["id"]: f for f in figs},
+            "logs": {"l1": {"id": "l1", "fecha": d(-2), "creado": 1, "figs": ["f1", "f4"], "bloqueo": "Sombra", "salio": "", "proximo": ""}},
+            "linkRep": {"Sombra": {"step": 0, "due": d(0), "last": d(-3)}}}
+
+
+@test
+def inicio_con_datos(browser):
+    ctx, p, errors = open_app(browser, seed=repertorio_inicio(), videos=["v1"])
+    p.wait_for_timeout(400)
+    v = p.locator("#v-inicio")
+    assert v.is_visible(), "Inicio es la pantalla de entrada"
+    txt = v.inner_text()
+    assert "Tu entreno" in txt and "Empezar entreno" in txt, txt[:300]
+    assert "Salidas desde Sombra" in txt and "te bloqueaste" in txt.lower(), "prioriza el bloqueo del último social"
+    assert "Figuras que recuerdas" in txt
+    ring = v.locator(".in-mem .in-big").inner_text()
+    assert ring.startswith("2") and "de 4" in ring, ring      # 4 activas; olvidadas: la 2 (último repaso fallado) y la 3 (6 días pendiente)
+    assert "Olvidada" in v.locator(".carr").inner_text()
+    assert v.locator("video[data-hvid]").count() == 1, "portada con el vídeo de la figura"
+    st = stored_state(p)
+    assert st["schema"] == 2 and len(st["actividad"]) >= 3, st.get("actividad")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def entreno_completo(browser):
+    ctx, p, errors = open_app(browser, seed=repertorio_inicio())
+    p.click('[data-mins="5"]')
+    p.click('[data-act="train-start"]')
+    assert p.locator("#v-repasar").is_visible()
+    for _ in range(2):                                   # 5 min: 2 figuras
+        p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    p.click('[data-act="train-next"]')                   # sigue con las salidas
+    assert "Sombra" in p.locator("#v-repasar .flash .big").inner_text()
+    p.click('[data-act="reveal"]'); p.click('[data-grade="dudas"]')
+    assert p.locator('[data-act="train-next"]').count() == 0, "con 5 min no hay cadena"
+    p.click('[data-act="end"]')
+    assert p.locator("#v-inicio").is_visible()
+    import datetime
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(200)
+    assert stored_state(p)["actividad"].get(datetime.date.today().isoformat()) == 3
+    # 10 min: termina con una cadena en Enlazar
+    p.click('[data-mins="10"]')
+    p.click('[data-act="train-start"]')
+    while p.locator('#v-repasar:visible [data-act="reveal"], #v-repasar:visible [data-act="train-next"]').count():
+        if p.locator('#v-repasar:visible [data-act="train-next"]').count(): p.click('[data-act="train-next"]'); continue
+        p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+        if not p.locator("#v-repasar").is_visible(): break
+    assert p.locator("#v-enlazar").is_visible() and p.locator("#v-enlazar .chain").count() == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def apariencia(browser):
+    ctx, p, _ = open_app(browser)
+    assert "theme-dark" in p.evaluate("() => document.documentElement.className"), "oscuro por defecto"
+    bg = p.evaluate("() => getComputedStyle(document.body).backgroundColor")
+    assert bg == "rgb(6, 12, 26)", bg
+    p.click("#btn-settings"); p.click('[data-tema="claro"]')
+    assert "theme-light" in p.evaluate("() => document.documentElement.className")
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    assert "theme-light" in p.evaluate("() => document.documentElement.className"), "se recuerda al volver a abrir"
+    assert p.evaluate("() => getComputedStyle(document.body).backgroundColor") != "rgb(6, 12, 26)"
     ctx.close()
 
 

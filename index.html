@@ -1119,9 +1119,39 @@ function hydrateCovers(root){
     if(u && im.isConnected){ im.src = u; im.classList.add("has-cover"); }
   });
 }
-async function vidObjUrl(id){ if(vidCache.has(id)) return vidCache.get(id); const b=await vidGet(id); if(!b) return null; const u=URL.createObjectURL(b); vidCache.set(id,u); return u; }
-// Si Safari deja de poder leer la dirección guardada (p. ej. tras un rato con la app en segundo plano), se lee el vídeo otra vez.
-async function vidFreshUrl(id){ const old=vidCache.get(id); vidCache.delete(id); if(old) try{ URL.revokeObjectURL(old); }catch{} return vidObjUrl(id); }
+async function vidObjUrl(id){
+  if(vidCache.has(id)) return vidCache.get(id);
+  if(lsGet(LS_VIDMODE)==="mem"){ const r=await vidMemUrl(id); return r.url||null; }
+  const b=await vidGet(id); if(!b) return null; const u=URL.createObjectURL(b); vidCache.set(id,u); return u;
+}
+// Si un vídeo da error 4 («formato no admitido»), se prueba por pasos y se recuerda en este dispositivo el que funcione:
+//   «frag»: la dirección con «#t=» (para que Safari dibuje el primer fotograma de la figura sin pulsar play);
+//   «plain»: la misma dirección sin «#t=» (por si esta versión de Safari no lo acepta en las direcciones blob:);
+//   «mem»: una copia en memoria del archivo, con su tipo puesto según su contenido (Safari a veces no reproduce
+//          directamente lo que viene del almacén).
+const LS_VIDMODE = "bachateca.vidmode", VID_STEPS = ["frag","plain","mem"];
+const vidMode = () => VID_STEPS.includes(lsGet(LS_VIDMODE)) ? lsGet(LS_VIDMODE) : "frag";
+const withT = (u, s) => vidMode()==="frag" ? u + "#t=" + Math.max(0.05, s) : u;
+function sniffVideo(h){
+  const t = String.fromCharCode(...h.slice(4,12));
+  if(t.slice(0,4)==="ftyp") return {type: t.slice(4)==="qt  " ? "video/quicktime" : "video/mp4", marca: t.slice(4).trim()||"?"};
+  if(h[0]===0x1a && h[1]===0x45 && h[2]===0xdf && h[3]===0xa3) return {type:"video/webm", marca:"webm"};
+  return {type:"", marca:"desconocido"};
+}
+async function vidMemUrl(id){
+  const old=vidCache.get(id); vidCache.delete(id); if(old) try{ URL.revokeObjectURL(old); }catch{}
+  const b = await vidGet(id).catch(()=>null);
+  if(!b) return {err:"no está en el almacén"};
+  const d = {bytes:b.size, tipo:b.type||"sin tipo"};
+  let ab; try{ ab = await b.arrayBuffer(); }catch(e){ return {...d, err:`no se puede leer (${e && e.name || "error"})`}; }
+  const sn = sniffVideo(new Uint8Array(ab, 0, Math.min(16, ab.byteLength)));
+  const type = sn.type || b.type || "video/mp4";
+  const u = URL.createObjectURL(new Blob([ab], {type})); vidCache.set(id, u);
+  return {...d, url:u, type, marca:sn.marca, puede: document.createElement("video").canPlayType(type) || "no"};
+}
+function vidDiag(r, code){
+  return [`error ${code}`, r.bytes!=null ? fmtMB(r.bytes) : "", r.tipo ? `tipo ${r.tipo}` : "", r.marca ? `formato ${r.marca}` : "", r.puede ? `Safari dice: ${r.puede}` : "", r.err || ""].filter(Boolean).join(" · ");
+}
 // Los vídeos que desaparecen de la pantalla sueltan el archivo en seguida (salvo los auxiliares, data-aux, que se
 // usan fuera de la pantalla para la miniatura o para reducir el vídeo y se limpian solos): Safari solo deja cargar unos pocos a la vez
 // y, si se acumulan (el de Inicio se crea de nuevo en cada repintado), los siguientes no cargan y sale el play tachado.
@@ -1150,7 +1180,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.45";
+const APP_VERSION = "1.46";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1492,8 +1522,8 @@ function renderInicio(){
   // iOS no dibuja el fotograma de un <video> sin cargarlo: se carga del almacén y se coloca en el inicio de la figura.
   const hv = v.querySelector("video[data-hvid]");
   if(hv){
-    const at = u => u + "#t=" + Math.max(0.1, +hv.dataset.s||0);
-    hv.addEventListener("error", ()=>{ if(hv.dataset.retry || !hv.isConnected || !hv.getAttribute("src")) return; hv.dataset.retry="1"; vidFreshUrl(hv.dataset.hvid).then(u=>{ if(u && hv.isConnected) hv.src = at(u); }).catch(()=>{}); });
+    const at = u => withT(u, Math.max(0.1, +hv.dataset.s||0));
+    hv.addEventListener("error", ()=>{ if(hv.dataset.retry || !hv.isConnected || !hv.getAttribute("src")) return; hv.dataset.retry="1"; vidMemUrl(hv.dataset.hvid).then(r=>{ if(r.url && hv.isConnected) hv.src = r.url; }).catch(()=>{}); });
     vidObjUrl(hv.dataset.hvid).then(u=>{ if(u && hv.isConnected) hv.src = at(u); }).catch(()=>{});
   }
 }
@@ -2772,13 +2802,26 @@ function hydrateVideos(root){
     v.addEventListener("timeupdate",()=>{ if(e>0 && v.currentTime>=e){ const loop=v.closest(".player")?.dataset.loop==="1"; v.currentTime=s; if(!loop) v.pause(); } });
     v.addEventListener("play",()=>{ if(v.currentTime<s-0.25 || (e>0 && v.currentTime>=e)) v.currentTime=s; });
     // En la ficha, «#t=» hace que Safari cargue y dibuje el primer fotograma de la figura sin pulsar play.
-    const srcOf = u => v.closest(".fv-media") ? u + "#t=" + Math.max(0.05, s) : u;
-    // Si no carga, una segunda vez con el vídeo leído de nuevo; si tampoco, se dice en vez del play tachado.
+    const fv = !!v.closest(".fv-media"), first = vidMode();
+    let step = VID_STEPS.indexOf(first);
+    const srcOf = u => fv ? withT(u, s) : u;
+    // Lo que ha funcionado se recuerda para no tener que fallar cada vez.
+    v.addEventListener("loadeddata", ()=>{ const m = VID_STEPS[step]; if(m!==first && v.isConnected) lsSet(LS_VIDMODE, m); });
+    // Si no carga, el siguiente paso; si ninguno sirve, se dice con los datos del archivo en vez del play tachado.
     v.addEventListener("error", async ()=>{
       if(!v.isConnected || !v.getAttribute("src")) return;
       const code = v.error ? v.error.code : 0;
-      if(!v.dataset.retry){ v.dataset.retry="1"; const u=await vidFreshUrl(id).catch(()=>null); if(u && v.isConnected){ v.src=srcOf(u); return; } }
-      const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted vid-err">No se puede reproducir este vídeo en este dispositivo (error ${code}). Cierra la app del todo y vuelve a abrirla; si sigue igual, dímelo con este número.</p>`;
+      v._fails = [...(v._fails||[]), `${VID_STEPS[step]}: error ${code}`];
+      while(++step < VID_STEPS.length){
+        const m = VID_STEPS[step];
+        if(m==="plain"){ if(!fv || first==="plain") continue; v.src = v.getAttribute("src").split("#")[0]; return; }
+        const r = await vidMemUrl(id).catch(e=>({err:String(e)})); v._diag = r;
+        if(r.url && v.isConnected){ v.src = r.url; return; }
+      }
+      const diag = [vidDiag(v._diag||{}, code), `probado: ${v._fails.join(", ")}`].join(" · "), lost = v._diag && /no se puede leer|no está/.test(v._diag.err||"");
+      const p=v.closest(".player"); if(p) p.innerHTML=`<div class="note vid-err"><p class="small">${lost ? "El archivo de este vídeo se ha perdido en este dispositivo. Vuelve a añadirlo desde Fotos con «Editar»." : "No se puede reproducir este vídeo en este dispositivo."}</p>
+        <p class="small muted vid-diag">${esc(diag)}</p><div class="row"><button type="button" class="btn sm" data-copydiag>Copiar estos datos</button></div></div>`;
+      p?.querySelector("[data-copydiag]")?.addEventListener("click", async e=>{ try{ await navigator.clipboard.writeText(`Bachateca ${APP_VERSION} · ${navigator.userAgent} · ${diag}`); toast("Copiado: pégamelo en el chat"); }catch{ toast(diag); } });
     });
     v.src = srcOf(url);
   });
@@ -3341,7 +3384,7 @@ function openSettings(){
     <div class="seg2 seg3" role="group" aria-label="Apariencia">${[["oscuro","Oscuro"],["auto","Como el sistema"],["claro","Claro"]].map(([k,t])=>`<button type="button" data-tema="${k}" aria-pressed="${temaActual()===k}">${t}</button>`).join("")}</div>
     <p class="menu-h">Datos</p>
     <div class="menu">${row("importar","Restaurar o importar","")}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
-    <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)}</span><a class="lnk" href="conteo.html">Prueba del conteo al grabar</a></details>`;
+    <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)} · vídeos: ${esc({frag:"normal", plain:"sin #t", mem:"copia en memoria"}[vidMode()])}</span><a class="lnk" href="conteo.html">Prueba del conteo al grabar</a></details>`;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     ${head}
     ${body}
@@ -3630,7 +3673,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

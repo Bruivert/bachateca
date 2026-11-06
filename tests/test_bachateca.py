@@ -919,7 +919,38 @@ def video_roto_lo_dice(browser):
     ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}, videos=["v1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.wait_for_selector(".vid-err", timeout=10000)
-    assert "error 4" in p.locator(".vid-err").inner_text(), p.locator(".vid-err").inner_text()
+    d = p.locator(".vid-diag").inner_text()
+    # Ni directo ni como copia en memoria: dice el error y los datos del archivo para poder averiguarlo.
+    assert "error 4" in d and "tipo video/mp4" in d and "formato desconocido" in d and "Safari dice" in d, d
+    assert "probado: frag: error 4, plain: error 4, mem: error 4" in d, d
+    assert p.locator(".vid-err [data-copydiag]").count() == 1
+    assert p.evaluate("() => localStorage.getItem('bachateca.vidmode')") is None, "si nada funciona, no se cambia de modo"
+    ctx.close()
+
+
+@test
+def formato_del_video_por_su_contenido(browser):
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, b = s => [...s].map(c => c.charCodeAt(0));
+      return [B.sniffVideo(b("\\0\\0\\0\\x14ftypqt  \\0\\0")), B.sniffVideo(b("\\0\\0\\0\\x18ftypisom\\0\\0")),
+              B.sniffVideo([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0]), B.sniffVideo(new Array(12).fill(0))]; }""")
+    assert [x["type"] for x in r] == ["video/quicktime", "video/mp4", "video/webm", ""], r
+    assert r[0]["marca"] == "qt" and r[1]["marca"] == "isom", r
+    ctx.close()
+
+
+@test
+def videos_como_copia_en_memoria(browser):
+    """Cuando un iPhone necesita la copia en memoria, la app la usa siempre: el vídeo se ve igual."""
+    ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}})
+    put_fixture(p, ["v1"])
+    p.evaluate("() => localStorage.setItem('bachateca.vidmode', JSON.stringify('mem'))")
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
+    v = ficha_video(p)
+    assert v["err"] is None and "#t=" not in v["src"] and p.locator(".vid-err").count() == 0, v
+    assert not errors, errors
     ctx.close()
 
 
@@ -934,6 +965,22 @@ def inicio_no_acumula_videos(browser):
     p.wait_for_timeout(300)
     r = p.evaluate("() => ({n: window._seen.length, loaded: window._seen.filter(v => !v.isConnected && v.getAttribute('src')).length})")
     assert r["n"] >= 2 and r["loaded"] == 0, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def videos_sin_coletilla(browser):
+    """Modo «plain»: la ficha pide el vídeo sin «#t=» y lo lleva al inicio de la figura al cargar."""
+    ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidTrim={"start": 0.8, "end": 0})}, "logs": {}})
+    put_fixture(p, ["v1"])
+    p.evaluate("() => localStorage.setItem('bachateca.vidmode', JSON.stringify('plain'))")
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
+    v = ficha_video(p)
+    assert v["err"] is None and "#t=" not in v["src"], v
+    p.wait_for_function("Math.abs(document.querySelector('.fv-media video').currentTime - 0.8) < 0.05")
     assert not errors, errors
     ctx.close()
 

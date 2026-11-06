@@ -1189,7 +1189,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.47";
+const APP_VERSION = "1.48";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -2484,6 +2484,9 @@ async function openCompare(figId, attId){
   let ready = 0; const go = ()=>{ if(++ready===2) cmpSeek(cmp.A); };
   [T, M].forEach(v=>{ if(v.readyState>=1) go(); else v.addEventListener("loadedmetadata", go, {once:true}); });
   T.addEventListener("seeked", ()=>{ if(cmp && !cmp.playing) cmpPaint(); });
+  // En el iPhone, un salto pedido con solo los metadatos cargados a veces se pierde y el vídeo se queda en el segundo 0.
+  // Cuando ya hay fotogramas, se comprueba y se repite.
+  [T, M].forEach(v=> v.addEventListener("loadeddata", ()=>{ if(cmp && !cmp.playing) cmpFix(); }, {once:true}));
   T.addEventListener("pause", ()=>{ if(cmp && cmp.playing && !T.seeking && !T.ended) cmpPause(); });
   $("#cmp-play").onclick = ()=> cmp.playing ? cmpPause() : cmpPlay();
   $("#cmp-prev").onclick = ()=>{ cmpPause(); cmpSeek(Math.max(cmp.lo, Math.ceil(cmp.b-1e-3)-1)); };
@@ -2520,9 +2523,19 @@ function cmpSeek(b){
   try{ T.currentTime = cmpClampT(T, beatToSec(cmp.pT, b)); M.currentTime = cmpClampT(M, beatToSec(cmp.pM, b)); }catch{}
   cmpPaint();
 }
+// Lleva cada vídeo al segundo del tiempo cmp.b si no está ahí de verdad (no basta con lo que se pidió: el iPhone puede haberlo ignorado).
+function cmpFix(){
+  const T=$("#cmp-t"), M=$("#cmp-m"); if(!cmp || !T || !M) return;
+  [[T, cmp.pT], [M, cmp.pM]].forEach(([v, p])=>{
+    if(v.seeking) return;
+    const want = cmpClampT(v, beatToSec(p, cmp.b));
+    if(Math.abs(v.currentTime - want) > .15){ try{ v.currentTime = want; }catch{} }
+  });
+}
 function cmpPlay(){
   const T=$("#cmp-t"), M=$("#cmp-m"); if(!cmp || !T || !M) return;
-  if(cmp.b >= cmp.B - .02 || cmp.b < cmp.A) cmpSeek(cmp.A);
+  if(cmp.b >= cmp.B - .02 || cmp.b < cmp.A) cmpSeek(cmp.A); else cmpFix();
+  cmp.early = false;
   T.playbackRate = cmp.rate; M.playbackRate = Math.max(.25, Math.min(2, cmp.rate*cmpSlope(cmp.b)));
   // Los dos play() en el mismo toque: Safari solo deja reproducir con sonido justo después de tocar. El tuyo va en silencio.
   const pT = T.play(), pM = M.play();
@@ -2541,7 +2554,9 @@ function cmpTick(){
   const T=$("#cmp-t"), M=$("#cmp-m"); if(!cmp || !cmp.playing || !T || !M) return;
   if(!T.seeking){
     const b = secToBeat(cmp.pT, T.currentTime); cmp.b = b;
-    if(b >= cmp.B || T.ended){ T.currentTime = cmpClampT(T, beatToSec(cmp.pT, cmp.A)); M.currentTime = cmpClampT(M, beatToSec(cmp.pM, cmp.A)); cmp.b = cmp.A; if(T.paused) T.play().catch(()=>{}); if(M.paused) M.play().catch(()=>{}); }
+    // Antes del tramo solo si el salto se perdió: se corrige una vez por reproducción, por si el iPhone salta a un fotograma algo anterior.
+    const early = b < cmp.A - .25 && !cmp.early; if(early) cmp.early = true;
+    if(b >= cmp.B || early || T.ended){ T.currentTime = cmpClampT(T, beatToSec(cmp.pT, cmp.A)); M.currentTime = cmpClampT(M, beatToSec(cmp.pM, cmp.A)); cmp.b = cmp.A; if(T.paused) T.play().catch(()=>{}); if(M.paused) M.play().catch(()=>{}); }
     else if(!M.seeking){
       const want = beatToSec(cmp.pM, b), err = M.currentTime - want;
       // Lejos: salto. Cerca: un empujón de velocidad (±10 %), que en iPhone se nota menos que un salto.

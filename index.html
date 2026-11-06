@@ -951,7 +951,7 @@ function nextRep(r0,g){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 2;
+const SCHEMA = 3;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -969,6 +969,10 @@ const MIGRATIONS = [
     Object.values(c.figures||{}).forEach(f=>add(f && f.rep && f.rep.last));
     Object.values(c.linkRep||{}).forEach(r=>add(r && r.last));
     c.actividad = a;
+  },
+  // 2 → 3: intentos (vídeos en los que te grabas haciendo la figura). Cada figura empieza con la lista vacía.
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.intentos)) f.intentos=[]; });
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1050,7 +1054,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.40";
+const APP_VERSION = "1.41";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1137,9 +1141,13 @@ function deleteFigureUndo(id){
   const copy=clone(f); delete S.figures[id]; persist({t:"figdel",id}); render();
   let undone=false;
   toast(`«${f.nombre}» borrada`, {label:"Deshacer", fn:()=>{ undone=true; S.figures[id]=copy; persist({t:"fig",id}); render(); toast(`«${copy.nombre}» recuperada`); },
-    onExpire:()=>{ if(!undone && copy.vid && !Object.values(S.figures).some(x=>x.vid===copy.vid)) persist({t:"assetdel",id:copy.vid}); }});
+    onExpire:()=>{ if(!undone) figVids(copy).forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel",id:v}); }); }});
 }
-function deleteFigure(id){ const v=S.figures[id]?.vid; delete S.figures[id]; persist({t:"figdel",id}); if(v) persist({t:"assetdel",id:v}); render(); }
+function deleteFigure(id){ const vs=figVids(S.figures[id]); delete S.figures[id]; persist({t:"figdel",id}); vs.forEach(v=>persist({t:"assetdel",id:v})); render(); }
+// Vídeos guardados de una figura: el de la clase y los de sus intentos.
+const intentosOf = f => (f && Array.isArray(f.intentos)) ? f.intentos : [];
+const figVids = f => f ? [f.vid, ...intentosOf(f).map(a=>a.vid)].filter(Boolean) : [];
+const vidInUse = v => Object.values(S.figures).some(x=>figVids(x).includes(v));
 function saveMeta(){ persist({t:"meta"}); render(); }
 
 // ---------- navegación ----------
@@ -1930,13 +1938,96 @@ function openView(id){
     ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
     ${mem}
     ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
+    ${attCardHTML(f, CHEV)}
     ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
       ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
       : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
   </div></div>`;
   hydrateVideos($("#sheet-root"));
+  ["att-cam","att-lib"].forEach(k=>{ const fi=$("#"+k); if(fi) fi.onchange=()=>{ const file=fi.files[0]; if(file) openAttemptNew(f.id, file); }; });
   const s=$(".sheet"); if(s) s.scrollTop=0;
   markClean();
+}
+// ---------- intentos: tus propios vídeos haciendo la figura ----------
+// Cada intento guarda su vídeo (en el almacén de vídeos), su recorte, una miniatura y la fecha.
+const attHora = a => { try{ return a.creado ? new Date(a.creado).toLocaleTimeString("es-ES",{hour:"2-digit", minute:"2-digit"}) : ""; }catch{ return ""; } };
+function attCardHTML(f, chev){
+  if(!assetsApi) return "";
+  const list = [...intentosOf(f)].sort((x,y)=>(y.creado||0)-(x.creado||0));
+  const row = a => `<button type="button" class="mrow" data-act="att-open" data-id="${f.id}" data-att="${esc(a.id)}">${a.thumb?`<img class="nx-th" src="${esc(a.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`}<span><b>Intento del ${esc(fmtDate(a.fecha))}</b><span class="small muted">${[attHora(a), a.vidInfo?.dur?fmtT(a.vidInfo.dur):"", a.vidSaved===a.vid?"":"sin copia en Fotos"].filter(Boolean).join(" · ")}</span></span>${chev}</button>`;
+  return `<section class="fv-card" aria-labelledby="fv-i"><h3 id="fv-i">Mis intentos${list.length?` · ${list.length}`:""}</h3>
+    ${list.length ? `<div class="menu">${list.map(row).join("")}</div>` : `<p class="small muted">Grábate haciendo la figura y guárdalo aquí para compararte con el vídeo de la clase.</p>`}
+    <input type="file" id="att-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="att-lib" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">
+    <div class="fv-actions"><button type="button" class="btn" data-pick="att-cam">Grabarme</button><button type="button" class="btn" data-pick="att-lib">Elegir de Fotos</button></div>
+  </section>`;
+}
+// Hoja «Nuevo intento»: el vídeo ya elegido, con el mismo recorte que el vídeo de la clase.
+// Por defecto se guarda solo el fragmento en calidad media: los vídeos de la cámara ocupan mucho.
+function openAttemptNew(figId, file){
+  const f = S.figures[figId]; if(!f) return;
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="att-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Nuevo intento</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <p class="small muted">${esc(f.nombre)} · ${esc(fmtDate(todayStr()))}</p>
+    <div class="vidbox" id="vidbox"></div>
+    <div class="row sheet-foot"><button type="submit" class="btn pri" style="flex:1">Guardar intento</button></div>
+  </form></div>`;
+  vstate = {kind:"intento", cur:null, trim:null, thumb:null, figId, file:null, url:null, dur:0, start:0, end:0, remove:false, compact:true};
+  markClean();
+  if(file) useVideoFile(file); else renderVidbox();
+  $("#att-form").onsubmit = async e=>{
+    e.preventDefault();
+    if(busy) return;
+    if(!vstate.file){ toast("Graba o elige un vídeo primero."); return; }
+    const res = await saveVstateVideo(); if(!res) return;
+    const fig = S.figures[figId];
+    if(!fig){ persist({t:"assetdel", id:res.vid}); closeSheet(); return; }
+    const a = {id:uid(), fecha:todayStr(), creado:Date.now(), vid:res.vid, vidTrim:res.vidTrim, vidInfo:res.vidInfo};
+    if(res.thumb) a.thumb = res.thumb;
+    fig.intentos = [...intentosOf(fig), a]; persist({t:"fig", id:figId});
+    const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
+    closeSheet(); render(); openView(figId);
+    toast("Intento guardado");
+  };
+}
+// Ver un intento: el vídeo con el reproductor de siempre, guardarlo en Fotos o borrarlo.
+// El vídeo se lee al abrir la hoja: Safari solo deja compartir justo después del toque.
+let attBlob = null;
+function openAttemptView(figId, attId){
+  const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!f || !a) return;
+  const info = [a.vidInfo?.dur ? fmtT(a.vidInfo.dur) : "", a.vidInfo?.bytes ? fmtMB(a.vidInfo.bytes) : "", a.vidInfo?.comprimido ? "calidad media" : ""].filter(Boolean).join(" · ");
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewatt="${esc(a.id)}">
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${f.id}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="fv-media">${playerHTML({vid:a.vid, vidTrim:a.vidTrim, thumb:a.thumb})}</div>
+    <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Intento del ${esc(fmtDate(a.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
+    ${a.vidSaved===a.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
+    <div class="fv-actions"><button type="button" class="btn" data-act="att-savevid" data-id="${f.id}" data-att="${esc(a.id)}">Guardar en Fotos</button></div>
+    <button type="button" class="btn danger wide del-row" data-act="att-del" data-id="${f.id}" data-att="${esc(a.id)}">Borrar intento</button>
+  </div></div>`;
+  hydrateVideos($("#sheet-root"));
+  attBlob = null; vidGet(a.vid).then(b=>{ attBlob = b ? {vid:a.vid, b} : null; }).catch(()=>{});
+  markClean();
+}
+async function attSaveVid(figId, attId){
+  const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!a) return;
+  if(!attBlob || attBlob.vid!==a.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
+  const b = attBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+  const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
+  const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
+  if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
+}
+async function attDelete(figId, attId){
+  const f = S.figures[figId], list = intentosOf(f), i = list.findIndex(x=>x.id===attId); if(i<0) return;
+  const ok = await askConfirm({title:"¿Borrar este intento?", msg:"También se borra su vídeo guardado en la app. Tendrás unos segundos para deshacerlo.", ok:"Borrar intento"});
+  if(!ok) return;
+  const a = list[i]; f.intentos = list.filter(x=>x.id!==attId); persist({t:"fig", id:figId});
+  closeSheet(); render(); openView(figId);
+  let undone = false;
+  toast("Intento borrado", {label:"Deshacer", fn:()=>{
+      undone = true; const g = S.figures[figId]; if(!g) return;
+      g.intentos = [...intentosOf(g), a].sort((x,y)=>(x.creado||0)-(y.creado||0)); persist({t:"fig", id:figId});
+      render(); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); toast("Intento recuperado");
+    },
+    onExpire:()=>{ if(!undone && !vidInUse(a.vid)) persist({t:"assetdel", id:a.vid}); }});
 }
 function openFigure(id, opts={}){
   const quick = !!opts.quick && !id;
@@ -2057,19 +2148,8 @@ function openFigure(id, opts={}){
     if(prev.estado==="espera" && est!=="espera" && out.rep) out.rep.due=todayStr();
     const oldVid = prev.vid || null;
     if(vstate.file){
-      const prime = primeMedia(vstate.url);   // debe ir antes de cualquier await (iOS)
-      const thumbP = makeThumb(prime.v, vstate.start||0).catch(()=>null);
-      busy=true; setBusyUI(true);
-      try{
-        const res = await uploadVideo(vstate, prime, msg=>{ const el=$("#vprog"); if(el) el.textContent=msg; });
-        const th = await thumbP; if(th) out.thumb = th;
-        out.vid = res.id; out.vidTrim = res.trim; out.vidInfo = {bytes:res.sizeBytes, dur:Math.round((vstate.end||vstate.dur)-vstate.start), comprimido:res.compressed};
-      }catch(ex){
-        busy=false; setBusyUI(false);
-        const el=$("#vprog"); if(el){ el.textContent = ex.userMsg || "No se pudo guardar el vídeo. Vuelve a pulsar Guardar; si se repite, marca «Guardar solo el fragmento»."; el.style.color="var(--warn)"; }
-        return;
-      }
-      busy=false;
+      const res = await saveVstateVideo(); if(!res) return;
+      const {thumb, ...v} = res; Object.assign(out, v); if(thumb) out.thumb = thumb;
     } else if(vstate.remove){ delete out.vid; delete out.vidInfo; delete out.vidTrim; delete out.thumb; }
     if(out.profesor && !S.classes.includes(out.profesor)){ S.classes.push(out.profesor); persist({t:"meta"}); }
     justSaved = out.id; saveFigure(out);
@@ -2084,6 +2164,23 @@ function openFigure(id, opts={}){
   $("#fig-form").addEventListener("change", clearFieldError);
   setTimeout(()=>{ if(!id && !quick) $("#ff-nombre").focus(); },50);
   markClean(!!opts.keepV);
+}
+// Guarda el vídeo elegido en la hoja (vstate) con su recorte y su miniatura: {vid, vidTrim, vidInfo, thumb}.
+// Se llama directamente desde el toque en Guardar: primeMedia tiene que ir antes de cualquier await (iOS).
+// Si falla, deja el mensaje en la hoja y devuelve null.
+async function saveVstateVideo(){
+  const prime = primeMedia(vstate.url);
+  const thumbP = makeThumb(prime.v, vstate.start||0).catch(()=>null);
+  busy=true; setBusyUI(true);
+  try{
+    const res = await uploadVideo(vstate, prime, msg=>{ const el=$("#vprog"); if(el) el.textContent=msg; });
+    const th = await thumbP;
+    return {vid:res.id, vidTrim:res.trim, vidInfo:{bytes:res.sizeBytes, dur:Math.round((vstate.end||vstate.dur)-vstate.start), comprimido:res.compressed}, thumb:th||null};
+  }catch(ex){
+    setBusyUI(false);
+    const el=$("#vprog"); if(el){ el.textContent = ex.userMsg || "No se pudo guardar el vídeo. Vuelve a pulsar Guardar; si se repite, marca «Guardar solo el fragmento»."; el.style.color="var(--warn)"; }
+    return null;
+  }finally{ busy=false; }
 }
 // Error junto al campo: se anuncia, se enfoca el campo y se lleva a la vista.
 function fieldError(fields, anchor, msg){
@@ -2108,16 +2205,18 @@ function closeSheet(){
 
 // ---------- vídeo ----------
 function setBusyUI(on){
-  document.querySelectorAll("#fig-form button, #fig-form input, #fig-form select, #fig-form textarea").forEach(x=>{ if(x.dataset.act!=="close") x.disabled=on; });
-  const sb=document.querySelector('#fig-form button[type="submit"]'); if(sb) sb.textContent = on ? "Guardando…" : "Guardar";
+  document.querySelectorAll("#sheet-root form button, #sheet-root form input, #sheet-root form select, #sheet-root form textarea").forEach(x=>{ if(x.dataset.act!=="close") x.disabled=on; });
+  const sb=document.querySelector('#sheet-root form button[type="submit"]'); if(sb) sb.textContent = on ? "Guardando…" : "Guardar";
   if(on) askWake(); else if(tab!=="social") releaseWake();
 }
 function renderVidbox(){
   const box=$("#vidbox"); if(!box||!vstate) return;
   if(!assetsApi){ box.hidden=true; box.innerHTML=""; return; }
   box.hidden=false;
-  const pick=`<input type="file" id="ff-file" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">`;
-  const ai=`<button type="button" class="btn sm" data-vid="ai">✦ Identificar con Claude</button>`;
+  // Intento: tu propio vídeo. Se puede grabar con la cámara (capture) o elegir de Fotos; sin «Identificar con Claude».
+  const att = vstate.kind==="intento";
+  const pick=`<input type="file" id="ff-file" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">${att?`<input type="file" id="ff-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true">`:""}`;
+  const ai=att?"":`<button type="button" class="btn sm" data-vid="ai">✦ Identificar con Claude</button>`;
   const aiOut=`<div id="ai-out" class="small" aria-live="polite">${vstate.aiMsg||""}</div>`;
   if(vstate.file){
     const seg=Math.max(0,(vstate.end||vstate.dur)-vstate.start);
@@ -2137,17 +2236,17 @@ function renderVidbox(){
       <div class="row"><button type="button" class="btn sm" data-vid="retrim">Ajustar recorte</button><button type="button" class="btn sm" data-pick="ff-file">Cambiar vídeo</button><button type="button" class="btn sm" data-vid="savevid">Guardar en Fotos</button><button type="button" class="btn ghost sm danger" data-vid="remove">Quitar vídeo</button>${ai}</div>${aiOut}`;
     hydrateVideos(box);
     if(!vstate.curBlob) vidGet(vstate.cur).then(b=>{ if(vstate) vstate.curBlob=b; }).catch(()=>{});
+  } else if(att){
+    box.innerHTML=`${pick}<div class="row"><button type="button" class="btn pri" data-pick="ff-cam">Grabarme</button><button type="button" class="btn" data-pick="ff-file">Elegir de Fotos</button></div>
+      <p class="small muted">Grábate haciendo la figura entera. Luego marcas dónde empieza y acaba. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`;
   } else {
     box.innerHTML=`${pick}<button type="button" class="btn" data-pick="ff-file">Añadir vídeo de la clase</button>
       <p class="small muted">${vstate.remove?"El vídeo se quitará al guardar. ":""}Elígelo desde Fotos. Se guarda en este dispositivo con su calidad original y marcas dónde empieza y acaba la figura.</p>`;
   }
-  const fi=$("#ff-file");
-  fi.onchange=()=>{
+  ["ff-file","ff-cam"].forEach(k=>{ const fi=$("#"+k); if(fi) fi.onchange=()=>{
     const file=fi.files[0]; if(!file) return;
-    if(vstate.url && !vstate.fromId) try{ URL.revokeObjectURL(vstate.url); }catch{}
-    vstate.fromId=null; vstate.file=file; vstate.url=URL.createObjectURL(file); vstate.start=0; vstate.end=0; vstate.dur=0;
-    loadPrev();
-  };
+    useVideoFile(file);
+  }; });
   const cc=$("#ff-compact"); if(cc) cc.onchange=()=>{ vstate.compact=cc.checked; };
   box.querySelectorAll("[data-vid]").forEach(b=> b.onclick=async()=>{
     const k=b.dataset.vid, pv=$("#ff-prev");
@@ -2169,6 +2268,11 @@ function renderVidbox(){
     }
     else if(k==="ai"){ prepareCapture(); }
   });
+}
+function useVideoFile(file){
+  if(vstate.url && !vstate.fromId) try{ URL.revokeObjectURL(vstate.url); }catch{}
+  vstate.fromId=null; vstate.file=file; vstate.url=URL.createObjectURL(file); vstate.start=0; vstate.end=0; vstate.dur=0;
+  loadPrev();
 }
 function loadPrev(){
   renderVidbox(); const pv=$("#ff-prev"); if(!pv) return;
@@ -2260,11 +2364,19 @@ async function shareOrDownload(file){
 // ---------- vídeos sin copia fuera de la app ----------
 // La copia de seguridad (JSON) no lleva vídeos. Se apunta qué vídeo se sacó con «Guardar en Fotos»
 // (vidSaved = id de ese vídeo): si cambias el vídeo de la figura, vuelve a contar como sin copia.
+// Cuentan el vídeo de la clase y los de los intentos; cada uno lleva su propio vidSaved.
 function markVidSaved(figId, vidId){
-  const f = S.figures[figId]; if(!f || !vidId || f.vid!==vidId || f.vidSaved===vidId) return;
-  f.vidSaved = vidId; persist({t:"fig", id:f.id});
+  const f = S.figures[figId]; if(!f || !vidId) return;
+  const it = f.vid===vidId ? f : intentosOf(f).find(a=>a.vid===vidId);
+  if(!it || it.vidSaved===vidId) return;
+  it.vidSaved = vidId; persist({t:"fig", id:f.id});
 }
-const vidsUnsaved = () => figs().filter(f=>f.vid && !f.ejemplo && f.vidSaved!==f.vid);
+const attName = (f, a) => `${f.nombre} · intento ${fmtDate(a.fecha)}`;
+// Un elemento por vídeo sin copia: {id: figura, att: intento (si lo es), vid, nombre}. La figura más reciente primero.
+const vidsUnsaved = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
+  ...(f.vid && f.vidSaved!==f.vid ? [{id:f.id, vid:f.vid, nombre:f.nombre}] : []),
+  ...intentosOf(f).filter(a=>a.vid && a.vidSaved!==a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a)}))
+]);
 // iOS comparte varios vídeos a la vez («Guardar N vídeos»), pero cada envío necesita un toque:
 // se mandan por tandas de hasta 5 y unos 200 MB, y el botón ofrece la siguiente tanda.
 const VID_BATCH = 5, VID_BATCH_BYTES = 200*1048576;
@@ -2827,7 +2939,13 @@ async function importData(replace){
     Object.keys(S.figures).forEach(id=>{ if(!d.figures[id]) deleteFigure(id); });
     Object.keys(S.logs).forEach(id=>{ if(!(d.logs||{})[id]){ delete S.logs[id]; persist({t:"logdel",id}); } });
   }
-  inc.forEach(f=>{ S.figures[f.id]=f; persist({t:"fig",id:f.id}); });
+  // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
+  inc.forEach(f=>{
+    const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
+    const keep = mine.filter(a=>!got.has(a.id));
+    if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
+    S.figures[f.id]=f; persist({t:"fig",id:f.id});
+  });
   Object.values(d.logs||{}).forEach(l=>{ if(l&&l.id){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
   const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
   S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
@@ -2987,10 +3105,14 @@ document.addEventListener("click", async e=>{
   if(a==="log-all"){ logAll=true; openLog(); return ($("#lg-q") || $("#lg-chips .chip:not([aria-pressed=true])"))?.focus(); }
   if(a==="del-fig"){
     const id=d.id, f=S.figures[id]; if(!f) return;
-    const ok = await askConfirm({title:`¿Borrar «${f.nombre}»?`, msg: f.vid ? "También se borra su vídeo guardado en la app. Tendrás unos segundos para deshacerlo." : "Tendrás unos segundos para deshacerlo.", ok:"Borrar figura"});
+    const nv = figVids(f).length;
+    const ok = await askConfirm({title:`¿Borrar «${f.nombre}»?`, msg: nv ? `También se ${nv===1?"borra su vídeo guardado":`borran sus ${nv} vídeos guardados`} en la app${intentosOf(f).length?" (también los de tus intentos)":""}. Tendrás unos segundos para deshacerlo.` : "Tendrás unos segundos para deshacerlo.", ok:"Borrar figura"});
     if(!ok) return;
     closeSheet(); deleteFigureUndo(id); return;
   }
+  if(a==="att-open") return openAttemptView(d.id, d.att);
+  if(a==="att-savevid") return attSaveVid(d.id, d.att);
+  if(a==="att-del") return attDelete(d.id, d.att);
   if(a==="export") return exportBackup();
   if(a==="save-vids") return saveVidBatch();
   if(a==="persist"){
@@ -3074,7 +3196,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

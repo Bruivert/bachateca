@@ -19,6 +19,8 @@ results = []
 def serve():
     global URL
     class Quiet(http.server.SimpleHTTPRequestHandler):
+        # Algunos Python sirven .md como descarga y open_app no podría abrir README.md.
+        extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".md": "text/plain"}
         def log_message(self, *a):
             pass
     handler = functools.partial(Quiet, directory=ROOT)
@@ -36,6 +38,9 @@ def test(fn):
 def open_app(browser, seed=None, videos=None):
     """App limpia. seed: estado guardado antes de abrirla (como si viniera de una versión anterior)."""
     ctx = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
+    # Sin hoja de compartir: así «Guardar en Fotos» y «Exportar» descargan el archivo y se puede comprobar.
+    # (Chromium reciente la tiene y, sin ventana, se queda esperando.)
+    ctx.add_init_script("delete Navigator.prototype.share; delete Navigator.prototype.canShare;")
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -157,7 +162,7 @@ def arranque_migra_y_guarda(browser):
     ctx, p, errors = open_app(browser, seed=seed)
     p.wait_for_timeout(400)
     st = stored_state(p)
-    assert st["schema"] == 2, st.get("schema")
+    assert st["schema"] == p.evaluate("() => window.__bachateca.SCHEMA"), st.get("schema")
     assert set(st["figures"]) == {"a", "b"} and st["figures"]["b"]["tipo"] == "figura"
     assert st["figures"]["a"]["rep"]["step"] == 2, "no toca el repaso"
     assert st["logs"]["l1"]["figs"] == ["a"] and st["linkRep"]["Cerrada"]["step"] == 1
@@ -186,7 +191,7 @@ def importar_copia_antigua(browser):
     assert S["figures"]["x"]["tipo"] == "figura" and S["figures"]["x"]["estado"] == "practica", S["figures"]["x"]
     assert "Mano cruzada" in S["positions"]
     exp = json.loads(p.evaluate("() => window.__bachateca.exportData()"))
-    assert exp["schema"] == 2 and "x" in exp["figures"]
+    assert exp["schema"] == p.evaluate("() => window.__bachateca.SCHEMA") and "x" in exp["figures"]
     assert not errors, errors
     ctx.close()
 
@@ -302,7 +307,7 @@ def inicio_con_datos(browser):
     assert "Olvidada" in v.locator(".carr").inner_text()
     assert v.locator("video[data-hvid]").count() == 1, "portada con el vídeo de la figura"
     st = stored_state(p)
-    assert st["schema"] == 2 and len(st["actividad"]) >= 3, st.get("actividad")
+    assert st["schema"] == p.evaluate("() => window.__bachateca.SCHEMA") and len(st["actividad"]) >= 3, st.get("actividad")
     assert not errors, errors
     ctx.close()
 
@@ -391,6 +396,139 @@ def portadas_desde_el_video(browser):
     p.wait_for_selector("#v-repertorio img.gm.has-cover", timeout=5000)
     w = p.evaluate("() => document.querySelector('#v-repertorio img.gm').naturalWidth")
     assert w >= 300, f"portada grande ({w} px)"
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- intentos (grabarme)
+FIXTURE = os.path.join(ROOT, "tests", "fixtures", "prueba-vertical.mp4")
+
+
+def stored_video_sizes(page):
+    """Tamaño de cada vídeo guardado (sin las portadas)."""
+    return page.evaluate("""() => new Promise(res => { const q = indexedDB.open("bachateca", 1);
+      q.onsuccess = () => { const st = q.result.transaction("videos").objectStore("videos"), out = {};
+        const c = st.openCursor(); c.onsuccess = () => { const k = c.result; if (!k) { q.result.close(); return res(out); }
+          if (!String(k.key).startsWith("cover:")) out[k.key] = k.value.size; k.continue(); }; }; })""")
+
+
+def att(i, vid, **kw):
+    a = {"id": f"i{i}", "fecha": "2026-11-0" + str(i), "creado": 5000 + i, "vid": vid, "vidTrim": {"start": 0, "end": 0},
+         "vidInfo": {"bytes": 2048, "dur": 4, "comprimido": False}}
+    a.update(kw)
+    return a
+
+
+@test
+def migracion_3_intentos(browser):
+    ctx, p, _ = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 2, figures: {a: {id: "a", nombre: "A"}, b: {id: "b", nombre: "B", intentos: [{id: "i1", vid: "x"}]}}};
+      const m = B.migrate(old), m2 = B.migrate(m);
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2), S: B.SCHEMA}; }""")
+    assert r["S"] == 3 and r["m"]["schema"] == 3, r
+    assert r["m"]["figures"]["a"]["intentos"] == [], "cada figura empieza con la lista vacía"
+    assert r["m"]["figures"]["b"]["intentos"] == [{"id": "i1", "vid": "x"}], "no toca los intentos que ya hay"
+    assert r["same"], "repetir la migración no cambia nada"
+    ctx.close()
+
+
+@test
+def intento_grabado(browser):
+    """Ficha → «Elegir de Fotos» → recorte → guardar: el intento queda en la figura y su vídeo en el almacén."""
+    ctx, p, errors = open_app(browser, seed={"figures": {"f1": fig(1, "Cerrada", "Sombra")}, "logs": {}})
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    card = p.locator("section:has(#fv-i)")
+    assert "Mis intentos" in card.inner_text() and "Grábate" in card.inner_text()
+    assert p.locator("#att-cam").get_attribute("capture") == "environment", "«Grabarme» abre la cámara"
+    p.set_input_files("#att-lib", FIXTURE)
+    p.wait_for_selector("#att-form #ff-prev")
+    assert p.locator("#ff-compact").is_checked(), "en los intentos se reduce el vídeo por defecto"
+    assert p.locator('[data-vid="ai"]').count() == 0, "sin «Identificar con Claude»"
+    p.wait_for_function("document.querySelector('#ff-prev').readyState >= 1")
+    p.evaluate("""() => new Promise(r => { const v = document.querySelector('#ff-prev'); v.onseeked = r; v.currentTime = 0.5; })""")
+    p.click('[data-vid="start"]')
+    p.uncheck("#ff-compact")
+    p.click('#att-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]', timeout=15000)
+    assert "Intento guardado" in p.locator(".toast").inner_text()
+    assert "Mis intentos · 1" in p.locator("section:has(#fv-i)").inner_text()
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    st = stored_state(p)
+    ints = st["figures"]["f1"]["intentos"]
+    assert len(ints) == 1, ints
+    a = ints[0]
+    assert abs(a["vidTrim"]["start"] - 0.5) < 0.05 and a["fecha"] == p.evaluate("() => window.__bachateca.todayStr()"), a
+    assert a["vidInfo"]["comprimido"] is False and a.get("thumb", "").startswith("data:image/jpeg"), a.get("vidInfo")
+    assert stored_video_sizes(p).get(a["vid"]) == os.path.getsize(FIXTURE), "el vídeo está en el almacén de vídeos"
+    assert [x.get("att") for x in p.evaluate("() => window.__bachateca.vidsUnsaved()")] == [a["id"]], "cuenta en el aviso de copias"
+    # Abrir el intento y guardarlo en Fotos: deja de contar como sin copia.
+    p.click(f'[data-act="att-open"][data-att="{a["id"]}"]')
+    p.wait_for_selector(f'[data-viewatt="{a["id"]}"] video')
+    p.wait_for_timeout(300)
+    with p.expect_download() as dl:
+        p.click('[data-act="att-savevid"]')
+    assert dl.value.suggested_filename.startswith("Figura 1 · intento"), dl.value.suggested_filename
+    p.wait_for_timeout(200)
+    assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def intento_en_aviso_de_copias(browser):
+    f1 = fig(1, "Cerrada", "Sombra", vid="v1", vidSaved="v1", intentos=[att(1, "a1"), att(2, "a2", vidSaved="a2")])
+    ctx, p, errors = open_app(browser, seed={"schema": 3, "figures": {"f1": f1}, "logs": {}}, videos=["v1", "a1", "a2"])
+    us = p.evaluate("() => window.__bachateca.vidsUnsaved()")
+    assert [(x["id"], x.get("att"), x["vid"]) for x in us] == [("f1", "i1", "a1")], us
+    p.click("#btn-settings")
+    assert "1 vídeo no tiene copia" in p.locator(".sheet").inner_text()
+    p.evaluate("() => window.__bachateca.markVidSaved('f1', 'a1')")
+    assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def borrar_intento_y_figura_borra_videos(browser):
+    f1 = fig(1, "Cerrada", "Sombra", vid="v1", intentos=[att(1, "a1"), att(2, "a2")])
+    f2 = fig(2, "Sombra", "Cerrada", intentos=[att(3, "a3")])
+    ctx, p, errors = open_app(browser, seed={"schema": 3, "figures": {"f1": f1, "f2": f2}, "logs": {}}, videos=["v1", "a1", "a2", "a3"])
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="att-del"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector('[data-viewfig="f1"]')
+    assert "Mis intentos · 1" in p.locator("section:has(#fv-i)").inner_text()
+    # Deshacer lo recupera; volver a borrarlo y dejar que caduque el aviso borra el vídeo.
+    p.click(".toast .undo")
+    assert "Mis intentos · 2" in p.locator("section:has(#fv-i)").inner_text()
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="att-del"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.evaluate("() => document.activeElement && document.activeElement.blur()")   # con «Deshacer» enfocado el aviso espera más
+    p.wait_for_function("!document.querySelector('.toast') || document.querySelector('.toast').hidden", timeout=15000)
+    p.wait_for_timeout(300)
+    assert sorted(stored_video_sizes(p)) == ["a2", "a3", "v1"], stored_video_sizes(p)
+    # Borrar la figura borra su vídeo y los de sus intentos, no los de otras figuras.
+    p.evaluate("() => window.__bachateca.deleteFigure('f1')")
+    p.wait_for_timeout(300)
+    assert sorted(stored_video_sizes(p)) == ["a3"], stored_video_sizes(p)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_conserva_intentos_locales(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 3, "figures": {"f1": fig(1, "Cerrada", "Sombra", intentos=[att(1, "a1")])}, "logs": {}},
+                              videos=["a1"])
+    old = {"app": "bachateca", "version": 3, "schema": 2, "figures": {"f1": fig(1, "Cerrada", "Sombra", nombre="Renombrada")}, "logs": {}}
+    import_text(p, json.dumps(old))
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert f["nombre"] == "Renombrada", "se aplica la copia"
+    assert [a["id"] for a in f["intentos"]] == ["i1"], "el intento que solo está en este dispositivo se queda"
     assert not errors, errors
     ctx.close()
 

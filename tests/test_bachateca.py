@@ -9,7 +9,7 @@ Cada prueba abre la app limpia (sin datos), así que no toca nada de tu iPhone n
 En WebKit: BROWSER=webkit python3 tests/test_bachateca.py (se saltan las pruebas de cámara y micrófono).
 Si tienes Chrome instalado y no quieres descargar Chromium: CHROME=/ruta/a/chrome python3 tests/test_bachateca.py
 """
-import functools, http.server, json, os, signal, socketserver, sys, threading, traceback
+import functools, http.server, json, os, shutil, signal, socketserver, sys, tempfile, threading, traceback
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -3983,6 +3983,40 @@ def practica_guiada_ignora_las_opciones_de_enlazar(browser):
 LIMITE_PRUEBA = int(os.environ.get("LIMITE_PRUEBA", "90"))
 
 
+class WebkitConDisco:
+    """WebKit con un perfil en disco nuevo para cada contexto.
+
+    Playwright abre WebKit como una ventana privada, y así WebKit no guarda vídeos (Blobs) en
+    IndexedDB: la siembra falla con «Page.evaluate: null» y las pruebas que guardan un vídeo real se
+    quedan esperando para siempre. La app instalada en el iPhone sí guarda en disco, así que cada
+    contexto se abre con launch_persistent_context en su propia carpeta temporal; todas se borran al cerrar.
+    Imita lo que las pruebas usan de un Browser: new_context, contexts, is_connected y close."""
+
+    def __init__(self, pw):
+        self.pw = pw
+        self.contexts = []
+        self.raiz = tempfile.mkdtemp(prefix="bachateca-webkit-")
+
+    def new_context(self, **kw):
+        ctx = self.pw.webkit.launch_persistent_context(tempfile.mkdtemp(dir=self.raiz), **kw)
+        for pagina in list(ctx.pages):   # la que abre sola el perfil: las pruebas crean la suya
+            pagina.close()
+        self.contexts.append(ctx)
+        ctx.on("close", lambda _: ctx in self.contexts and self.contexts.remove(ctx))
+        return ctx
+
+    def is_connected(self):
+        return True
+
+    def close(self):
+        for ctx in list(self.contexts):
+            try:
+                ctx.close()
+            except Exception:
+                pass
+        shutil.rmtree(self.raiz, ignore_errors=True)
+
+
 def matar_navegador():
     """Mata los procesos del navegador (descendientes del controlador de Playwright, no el controlador)."""
     hijos = {}
@@ -4019,7 +4053,7 @@ def main():
                 # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
                 args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
                 return pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
-            return pw.webkit.launch()
+            return WebkitConDisco(pw)
         browser = lanzar()
         for fn in results:
             if nombre == "webkit" and fn.solo_chromium:

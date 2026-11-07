@@ -1439,7 +1439,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.55";
+const APP_VERSION = "1.56";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -2750,6 +2750,9 @@ async function rcCam(){
   if(!rc) return;
   if(rc.stream) rc.stream.getTracks().forEach(t=>t.stop());
   const st = $("#rc-st"), go = $("#rc-go"); go.disabled = true;
+  // Antes de pedir la cámara: con la sesión en «playback» (la pone el conteo), iOS no deja usar el micrófono
+  // y la petición falla entera. Con micrófono, «play-and-record»; sin él, «playback» para que el conteo se oiga.
+  setAudioSession(rc.mic ? "play-and-record" : "playback");
   try{
     const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:rc.facing, width:{ideal:1280}, height:{ideal:720}},
       audio: rc.mic ? {echoCancellation:false, noiseSuppression:false, autoGainControl:false} : false});

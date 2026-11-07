@@ -91,6 +91,12 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
 - **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
   una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
 
+## Arreglo (versión 1.56)
+
+- **Grabarme con conteo** vuelve a encender la cámara con «Grabar también el sonido del micrófono» marcado. Desde la
+  1.51 la app ponía el audio en «solo reproducir» (para que el conteo se oiga con el iPhone en silencio) y en ese modo
+  iOS no deja usar el micrófono: la cámara solo se encendía desmarcándolo.
+
 ## Pruebas automáticas
 
 Antes de publicar un cambio, comprueba que no se ha roto nada (repaso, enlaces, migración de datos, importar copias, vídeos):

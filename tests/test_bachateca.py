@@ -2511,7 +2511,8 @@ def simulacro_sin_posiciones(browser):
 @test
 def simulacro_solo_falta_el_agarre(browser):
     figs = {f["id"]: f for f in [fig(1, "Cerrada", "Sombra", agarreOut="Dos manos"),
-                                 fig(2, "Sombra", "Cerrada", agarreIn="Izq–der")]}
+                                 fig(2, "Sombra", "Cerrada", agarreIn="Izq–der"),
+                                 fig(3, "Sombra", "Abierta", agarreIn="Izq–der", estado="disponible")]}
     ctx, p, errors = open_app(browser, seed={"figures": figs})
     p.evaluate("() => window.__bachateca.simForce([{pos: 'Sombra', hold: 'Dos manos'}])")
     p.click('nav.tabs [data-tab="social"]')
@@ -2521,7 +2522,10 @@ def simulacro_solo_falta_el_agarre(browser):
     t = p.inner_text("[data-sim]")
     assert "Con Dos manos aún no tienes salida desde aquí." in t and "Figura 2" in t, t
     assert "pide una en clase" not in t, t
+    assert p.locator("[data-sim] .exits.dim-all li").count() == 2
     assert p.locator("[data-sim] .exits li.dim").count() == 1
+    seg = [x for x in p.locator("[data-sim] .exits li").all_inner_texts() if "Figura 3" in x]
+    assert len(seg) == 1 and "en práctica" not in seg[0], seg
     qs = p.evaluate("() => Object.values(window.__bachateca.state().preguntas || {}).filter(q => !q.resuelta)")
     assert qs == [], qs
     assert not errors, errors

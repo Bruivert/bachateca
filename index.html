@@ -375,6 +375,7 @@ button.card:active{background:var(--surface2)}
 .sim-beat{font-size:3.4rem;font-weight:800;line-height:1.1;min-height:1.1em;text-align:center;font-variant-numeric:tabular-nums}
 .sim-ok{min-height:64px;font-size:1.1rem}
 .sim-n .chip{min-height:44px}
+.dim-all li{opacity:.6}
 .rc-beat{position:absolute;right:14px;bottom:10px;font-size:3.4rem;font-weight:800;line-height:1;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.7);font-variant-numeric:tabular-nums}
 .cmp-v figcaption{position:absolute;left:10px;top:8px;padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.62);color:#fff;font-size:0.8236rem;font-weight:600;font-variant-numeric:tabular-nums}
 .cmp-now{display:flex;align-items:baseline;gap:10px;margin-bottom:-6px}
@@ -2621,7 +2622,7 @@ function simDecide(late){
       ${late ? `<p class="note" role="alert"><b>Se acabó el tiempo</b></p>` : `<p class="small muted">Decidiste en ${fmtBeats(beats)} tiempos.</p>`}
       <div class="answer" id="sim-ans" tabindex="-1">
         ${ex.length ? `<ul class="exits">${ex.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>`
-          : otras.length ? `<div class="note">Con ${holdName(q.hold)} aún no tienes salida desde aquí.</div><ul class="exits">${otras.map(f=>exitLi(f,{dim:true})).join("")}</ul>`
+          : otras.length ? `<div class="note">Con ${holdName(q.hold)} aún no tienes salida desde aquí.</div><ul class="exits dim-all">${otras.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>`
           : `<div class="note">Desde aquí aún no tienes salida: básico y pide una en clase.</div>`}
         <p class="small muted">¿Cómo te ha salido?</p>
         <div class="grade"><button type="button" class="btn" data-simg="no">No me salió</button><button type="button" class="btn" data-simg="dudas">Dudé</button>${late ? "" : `<button type="button" class="btn" data-simg="fluida">La tenía</button>`}</div>

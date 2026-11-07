@@ -601,6 +601,8 @@ details.info summary::after{inset:-10px -4px}
 .in-next h2{color:var(--neon-ink);font-size:1.3rem;line-height:1.2}
 .in-next p{font-size:0.9412rem}
 .in-next .btn{background:var(--neon-ink);color:#fff;margin-top:4px}
+.q-row{display:flex;flex-direction:column;gap:8px;padding-top:12px;margin-top:12px;border-top:1px solid var(--line)}
+.in-h + .q-row{border-top:0;margin-top:8px;padding-top:0}
 .eyebrow{display:flex;align-items:center;gap:6px;font-size:0.7059rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .eyebrow .ico{width:16px;height:16px}
 .in-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -1051,7 +1053,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 6;
+const SCHEMA = 7;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1092,6 +1094,22 @@ const MIGRATIONS = [
   // (con f.parteFecha y f.parteNota). La lista empieza vacía.
   c => {
     Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.partes)) f.partes=[]; });
+  },
+  // 6 → 7: preguntas para clase ({id, pos, baile, creada, resuelta?, figId?}). Cada posición donde te bloqueaste
+  // en los últimos 60 días pasa a ser una pregunta abierta (fecha: el último bloqueo). Si ya hay una abierta
+  // para esa posición no se crea otra: así repetir el paso no duplica.
+  c => {
+    const q = (c.preguntas && typeof c.preguntas==="object" && !Array.isArray(c.preguntas)) ? c.preguntas : {};
+    const desde = todayStr(-60), last = {};
+    Object.values(c.logs||{}).forEach(l=>{
+      if(!l || typeof l!=="object" || typeof l.bloqueo!=="string" || !l.bloqueo || typeof l.fecha!=="string" || l.fecha<desde) return;
+      if(!last[l.bloqueo] || l.fecha>last[l.bloqueo]) last[l.bloqueo]=l.fecha;
+    });
+    Object.entries(last).forEach(([pos, d])=>{
+      if(Object.values(q).some(x=>x && x.pos===pos && !x.resuelta)) return;
+      const id = uid(); q[id] = {id, pos, baile:"Bachata", creada:d};
+    });
+    c.preguntas = q;
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1110,6 +1128,7 @@ function applyData(c){
   S = { ...c, figures:c.figures||{}, logs:c.logs||{}, positions:arrOr(c.positions,DEFAULT_POS), holds:arrOr(c.holds,DEFAULT_HOLDS),
         classes:Array.isArray(c.classes)?[...c.classes]:[...DEFAULT_CLASSES], linkRep:(c.linkRep&&typeof c.linkRep==="object")?c.linkRep:{},
         actividad:(c.actividad&&typeof c.actividad==="object")?c.actividad:{},
+        preguntas:(c.preguntas&&typeof c.preguntas==="object"&&!Array.isArray(c.preguntas))?c.preguntas:{},
         schema: Number.isInteger(c.schema) ? c.schema : SCHEMA };
 }
 function lsGet(k){ try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; } catch { return null; } }
@@ -1386,8 +1405,36 @@ async function initStore(){
 }
 
 // ---------- mutaciones ----------
+// Preguntas para clase: «Desde Sombra, ¿qué figura sencilla puedo hacer?». Una por posición y baile mientras esté abierta.
+const qBaile = q => q.baile || "Bachata";
+const openQs = () => Object.values(S.preguntas||{}).filter(q=>q && !q.resuelta).sort((a,b)=>(a.creada||"").localeCompare(b.creada||""));
+function askFor(pos, fecha){
+  if(!pos) return;
+  if(openQs().some(q=>q.pos===pos && qBaile(q)===baileSel)) return;
+  const id = uid(); (S.preguntas ||= {})[id] = {id, pos, baile:baileSel, creada:fecha||todayStr()};
+  persist({t:"meta"});
+}
+function resolveQuestion(id, figId){
+  const q = S.preguntas && S.preguntas[id]; if(!q) return;
+  q.resuelta = todayStr(); if(figId) q.figId = figId; else delete q.figId;
+  persist({t:"meta"}); render();
+}
+// saveFigure apunta aquí la pregunta abierta a la que podría responder la figura que acaba de entrar en juego.
+// Quien enseña su propio aviso al guardar (la ficha, cambiar de estado) lo junta con la pregunta en uno solo
+// con qToast; si no, el aviso de la pregunta se pisaría al momento. Los demás lo ignoran.
+let qMatch = null;
+function qToast(msg){
+  const m = qMatch; qMatch = null;
+  if(!m || !S.preguntas?.[m.id] || S.preguntas[m.id].resuelta) return toast(msg);
+  toast(`${msg}. ¿Responde a tu pregunta desde ${m.pos}?`, {label:"Sí", fn:()=>{ resolveQuestion(m.id, m.fig); toast("Pregunta resuelta"); }});
+}
 function saveFigure(f){
   const prev = S.figures[f.id];
+  qMatch = null;
+  if(usable(f) && placed(f) && (!prev || !usable(prev))){
+    const q = openQs().find(q=>q.pos===f.entrada && qBaile(q)===baileOf(f));
+    if(q) qMatch = {id:q.id, pos:q.pos, fig:f.id};
+  }
   if(!prev) f.hist = f.hist || [{e:f.estado, d:todayStr()}];
   else if(prev.estado !== f.estado){
     const h = Array.isArray(f.hist) ? [...f.hist] : (Array.isArray(prev.hist) ? [...prev.hist] : [{e:prev.estado, d:dayOf(prev.creado)}]);
@@ -1620,6 +1667,13 @@ function renderInicio(){
   const days=[...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); const k=d.toISOString().slice(0,10); return {k, n:(S.actividad||{})[k]||0, l:"LMXJVSD"[i], today:k===todayStr()}; });
   const maxN=Math.max(4, ...days.map(d=>d.n)), stk=streak(), weekN=days.filter(d=>d.n).length;
   const lgFigs = lg ? (lg.figs||[]).filter(id=>S.figures[id]).length : 0;
+  // Preguntas abiertas de todos los bailes; el baile solo se nombra si hay más de uno.
+  const qs = openQs(), qMulti = new Set([...bailes(), ...qs.map(qBaile)]).size > 1;
+  const qsHTML = qs.length ? `<section class="panel" aria-labelledby="in-q">
+      <div class="in-h"><h2 id="in-q">Para tu próxima clase</h2></div>
+      ${qs.map(q=>`<div class="q-row"><p>${qMulti?`<span class="muted">${esc(qBaile(q))} · </span>`:""}Desde ${esc(q.pos)}, ¿qué figura sencilla puedo hacer?</p>
+        <div class="row"><button class="btn sm" data-act="q-done" data-id="${esc(q.id)}" aria-label="Ya tengo salida desde ${esc(q.pos)}">Ya tengo salida</button><button class="btn ghost sm" data-act="q-del" data-id="${esc(q.id)}" aria-label="Quitar la pregunta desde ${esc(q.pos)}">Quitar</button></div></div>`).join("")}
+    </section>` : "";
   v.innerHTML = `
     ${staleHTML()}${nudgeHTML()}${installHTML()}
     <p class="in-date"><span>${esc(new Date().toLocaleDateString("es-ES",{weekday:"long", day:"numeric", month:"long"}))}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar">${pl(dueN,"repaso pendiente","repasos pendientes")}</button>`:""}</p>
@@ -1645,6 +1699,7 @@ function renderInicio(){
       <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${esc(f.id)}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
     </section>` : ""}
     ${next ? `<section class="in-next" aria-labelledby="in-next"><span class="eyebrow">${ico("spark")}Tu siguiente paso</span>${next}</section>` : ""}
+    ${qsHTML}
     <div class="in-two">
       <section class="panel" aria-label="Racha"><span class="muted small">Racha</span><b class="in-big">${stk ? (stk===1?"1 día":`${stk} días`) : "—"}</b><span class="muted small">${weekN} ${weekN===1?"día":"días"} esta semana</span></section>
       <section class="panel" aria-label="Seguras en el social"><span class="muted small">Seguras en el social</span><b class="in-big lime">${readyN}</b><span class="muted small">disponibles o consolidadas</span></section>
@@ -2150,7 +2205,7 @@ function openLog(fresh){
       <label class="f" for="lg-prox">Para practicar la próxima vez<input type="text" id="lg-prox" placeholder="Una sola cosa"></label>
       <button class="btn pri" data-act="log-save">Guardar registro</button>
     </div>`}
-    ${!done && blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
+    ${!done && blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">${openQs().some(q=>q.pos===blockList[0][0] && qBaile(q)===baileSel) ? "Ya la tienes apuntada en Inicio, en «Para tu próxima clase»." : "La posición que más se repite es tu pregunta para la próxima clase."}</p></div>`:""}
     ${!done && logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
       const names=(l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean);
       return `<div class="log"><span class="d">${fmtDate(l.fecha)}</span>
@@ -2185,6 +2240,7 @@ function saveLog(){
   });
   if(counted){ S.actividad ||= {}; S.actividad[l.fecha] = (+S.actividad[l.fecha]||0) + 1; persist({t:"act"}); }
   S.logs[l.id]=l; persist({t:"log",id:l.id});
+  if(l.bloqueo) askFor(l.bloqueo, l.fecha);
   logSel = new Set(); logBloq = ""; saveSel(); setNight(false);
   if(backupInfo().stale) lsSet(LS_NUDGE, 1);
   render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
@@ -2828,7 +2884,7 @@ function promoteFig(id, to, fromView, el){
     if(fin) fieldError([!f.entrada && fin, !f.salida && fout].filter(Boolean), fin.closest(".grid2"), `Para ${to==="practica"?"empezar a practicarla":"pasarla a "+EST[to].t.toLowerCase()} indica dónde empieza y dónde acaba.`);
     return;
   }
-  f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`);
+  f.estado=to; saveFigure(f); qToast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`);
   if($('[data-sheet="log"]')) openLog(); else if(fromView || $("#sheet-root [data-viewfig]")) openView(f.id); else if(el) el.remove();
 }
 // ---------- partes: figuras que enseñan en varias clases ----------
@@ -3080,7 +3136,7 @@ function openFigure(id, opts={}){
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();
     if(opts.fromView) openView(out.id);
-    toast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
+    qToast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
   };
   const cmpUpd = ()=>{ const el=$("#ff-cmp"); if(el) el.innerHTML = compas({tiempo:$("#ff-tiempo").value, tiempos:$("#ff-dur").value}, true); };
   ["ff-tiempo","ff-dur"].forEach(k=>$("#"+k)?.addEventListener("change", cmpUpd));
@@ -3905,7 +3961,7 @@ function openSettings(){
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
   markClean();
 }
-function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{}},null,2); }
+function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{},preguntas:S.preguntas||{}},null,2); }
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const isObj = o => !!o && typeof o==="object" && !Array.isArray(o);
 // test() convierte a texto: sin comprobar el tipo, un id ausente pasaría como «undefined».
@@ -3941,7 +3997,17 @@ function sanitizeImport(d){
   const fs = isObj(d&&d.figures) ? Object.values(d.figures) : [], ls = isObj(d&&d.logs) ? Object.values(d.logs) : [];
   fs.forEach(f=>{ if(isObj(f) && okId(f.id) && typeof f.nombre==="string" && f.nombre.trim()){ const r = sanitizeFig(f); figures[f.id]=r.f; descartadas += r.malas; } else descartadas++; });
   ls.forEach(l=>{ if(isObj(l) && okId(l.id) && typeof l.fecha==="string") logs[l.id]={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []}; else descartadas++; });
-  return {figures, logs, descartadas};
+  // Preguntas para clase: id seguro y posición con texto; las fechas mal escritas se quitan.
+  const preguntas={}, ps = isObj(d&&d.preguntas) ? Object.values(d.preguntas) : [];
+  ps.forEach(q=>{
+    if(!(isObj(q) && okId(q.id) && typeof q.pos==="string" && q.pos.trim())){ descartadas++; return; }
+    const r = {...q};
+    ["creada","resuelta"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; });
+    if("figId" in r && !okId(r.figId)) delete r.figId;
+    if("baile" in r && !(typeof r.baile==="string" && r.baile.trim())) delete r.baile;
+    preguntas[q.id] = r;
+  });
+  return {figures, logs, preguntas, descartadas};
 }
 // Compara dos figuras sin intentos ni partes (esos se fusionan aparte); el orden de las claves no cuenta.
 const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : isObj(v) ? Object.fromEntries(Object.keys(v).sort().map(k=>[k, sortKeys(v[k])])) : v;
@@ -3966,9 +4032,9 @@ async function importData1(replace){
   d = migrate(d);
   // Lo que venía en la copia aunque esté mal formado: en «Reemplazar» eso no se borra de este dispositivo.
   const rawIds = o => new Set(isObj(o) ? Object.entries(o).flatMap(([k,v])=>[k, ...(isObj(v)&&typeof v.id==="string"?[v.id]:[])]) : []);
-  const inFigs = rawIds(d.figures), inLogs = rawIds(d.logs);
+  const inFigs = rawIds(d.figures), inLogs = rawIds(d.logs), inQs = rawIds(d.preguntas);
   const san = sanitizeImport(d), desc = san.descartadas ? ` · ${san.descartadas} descartadas por estar mal formadas` : "";
-  d.figures = san.figures; d.logs = san.logs;
+  d.figures = san.figures; d.logs = san.logs; d.preguntas = san.preguntas;
   const inc=Object.values(d.figures), nIn=inc.length;
   if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."+desc); return; }
   if(!nIn && !Object.keys(d.logs).length){ toast("Esa copia no tiene figuras ni registros que añadir."+desc); return; }
@@ -4005,6 +4071,14 @@ async function importData1(replace){
       if(ni || np) persist({t:"fig",id:f.id});
     });
     Object.values(d.logs).forEach(l=>{ if(replace || !S.logs[l.id]){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
+    // Preguntas: «Reemplazar» deja las de la copia (sin borrar las que venían mal formadas); «Añadir», las que faltan.
+    // Al añadir, una abierta para una posición y baile que ya tienes abierta no se duplica (p. ej. la crea la migración de una copia antigua).
+    S.preguntas ||= {};
+    if(replace) Object.keys(S.preguntas).forEach(id=>{ if(!d.preguntas[id] && !inQs.has(id)) delete S.preguntas[id]; });
+    Object.values(d.preguntas).forEach(q=>{
+      if(!replace && (S.preguntas[q.id] || (!q.resuelta && openQs().some(x=>x.pos===q.pos && qBaile(x)===qBaile(q))))) return;
+      S.preguntas[q.id]=q;
+    });
     const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
     S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
     if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
@@ -4134,6 +4208,12 @@ document.addEventListener("click", async e=>{
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
   if(a==="goto-pos"){ linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
+  if(a==="q-done" || a==="q-del"){
+    const q = S.preguntas?.[d.id]; if(!q) return;
+    const copy = clone(q);
+    if(a==="q-done") resolveQuestion(q.id); else { delete S.preguntas[q.id]; persist({t:"meta"}); render(); }
+    return toast(a==="q-done" ? `Resuelta: salida desde ${copy.pos}` : "Pregunta quitada", {label:"Deshacer", fn:()=>{ S.preguntas[copy.id]=copy; persist({t:"meta"}); render(); }});
+  }
   if(a==="goto-filter"){ filt.estado=d.f; filt.q=""; return go("repertorio"); }
   if(a==="chain"){ learn("chain"); chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; blockHold=null; blockPick=null; return showBlock(); }

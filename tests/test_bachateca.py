@@ -2260,6 +2260,117 @@ def social_de_ayer_no_cuenta_si_ya_repasaste_hoy(browser):
     ctx.close()
 
 
+@test
+def migracion_7_preguntas(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, t = B.todayStr;
+      const old = {schema: 6, figures: {}, logs: {a: {id: "a", fecha: t(-10), bloqueo: "Sombra"}, b: {id: "b", fecha: t(-3), bloqueo: "Sombra"},
+        c: {id: "c", fecha: t(-90), bloqueo: "Cerrada"}, d: {id: "d", fecha: t(-1), bloqueo: ""}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 6});
+      const sinPreg = B.migrate({schema: 6, figures: {}});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2), n3: Object.keys(m3.preguntas).length, sinPreg: sinPreg.preguntas, t3: t(-3), S: B.SCHEMA}; }""")
+    assert r["S"] == 7 and r["m"]["schema"] == 7, r
+    qs = list(r["m"]["preguntas"].values())
+    assert len(qs) == 1 and qs[0]["pos"] == "Sombra" and qs[0]["creada"] == r["t3"] and qs[0]["baile"] == "Bachata" and not qs[0].get("resuelta"), qs
+    assert r["same"] and r["n3"] == 1, "repetir la migración no duplica"
+    assert r["sinPreg"] == {}, r["sinPreg"]
+    assert len(r["m"]["logs"]) == 4, "no borra registros"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def bloqueo_crea_pregunta_y_figura_la_resuelve(browser):
+    ctx, p, errors = open_app(browser, seed={"figures": {"f1": fig(1, "Cerrada", "Sombra")}})
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.select_option("#lg-bloq", "Sombra")
+    p.click('[data-act="log-save"]')
+    p.click('[data-act="log-again"]')
+    p.select_option("#lg-bloq", "Sombra")
+    p.click('[data-act="log-save"]')
+    p.click('[data-act="close"]')
+    qs = p.evaluate("() => Object.values(window.__bachateca.state().preguntas)")
+    assert len(qs) == 1 and qs[0]["pos"] == "Sombra" and qs[0]["baile"] == "Bachata", qs
+    p.click('nav.tabs [data-tab="inicio"]')
+    assert "Desde Sombra, ¿qué figura sencilla puedo hacer?" in p.locator("#v-inicio").inner_text()
+    assert "Para tu próxima clase" in p.locator("#v-inicio").inner_text()
+    # Una figura nueva en práctica desde Sombra: un solo aviso con su mensaje y la pregunta.
+    p.click("#btn-new")
+    p.click('[data-act="to-full"]')
+    p.fill("#ff-nombre", "Salida nueva")
+    p.click('#ff-estado [data-est="practica"]')
+    p.select_option("#ff-in", "Sombra")
+    p.select_option("#ff-out", "Cerrada")
+    p.click('#fig-form button[type="submit"]')
+    t = p.locator(".toast").inner_text()
+    assert "Figura guardada. ¿Responde a tu pregunta desde Sombra?" in t, t
+    p.click(".toast .undo")
+    q, fid = p.evaluate("""() => { const S = window.__bachateca.state(); return [Object.values(S.preguntas)[0],
+      Object.values(S.figures).find(f => f.nombre === "Salida nueva").id]; }""")
+    assert q["resuelta"] == p.evaluate("() => window.__bachateca.todayStr()") and q["figId"] == fid, q
+    assert "Para tu próxima clase" not in p.locator("#v-inicio").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def preguntas_ya_tengo_salida_y_quitar_con_deshacer(browser):
+    import datetime
+    hoy = datetime.date.today().isoformat()
+    seed = {"schema": 7, "figures": {"f1": fig(1, "Cerrada", "Sombra")},
+            "preguntas": {"q1": {"id": "q1", "pos": "Sombra", "baile": "Bachata", "creada": hoy},
+                          "q2": {"id": "q2", "pos": "Hammerlock", "baile": "Bachata", "creada": hoy}}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    assert p.locator('#v-inicio [data-act="q-done"]').count() == 2
+    p.click('#v-inicio [data-act="q-done"][data-id="q1"]')
+    assert p.evaluate("() => window.__bachateca.state().preguntas.q1.resuelta") == hoy
+    assert "Desde Sombra" not in p.locator("#v-inicio").inner_text()
+    p.click(".toast .undo")
+    assert not p.evaluate("() => window.__bachateca.state().preguntas.q1.resuelta")
+    assert "Desde Sombra" in p.locator("#v-inicio").inner_text()
+    p.click('#v-inicio [data-act="q-del"][data-id="q2"]')
+    assert "q2" not in p.evaluate("() => window.__bachateca.state().preguntas")
+    p.click(".toast .undo")
+    assert "q2" in p.evaluate("() => window.__bachateca.state().preguntas")
+    p.wait_for_timeout(300)
+    assert set(stored_state(p)["preguntas"]) == {"q1", "q2"}
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_preguntas(browser):
+    import datetime
+    hoy = datetime.date.today().isoformat()
+    seed = {"schema": 7, "figures": {"f1": fig(1, "Cerrada", "Sombra")},
+            "preguntas": {"q1": {"id": "q1", "pos": "Sombra", "baile": "Bachata", "creada": hoy}}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    exp = json.loads(p.evaluate("() => window.__bachateca.exportData()"))
+    assert exp["preguntas"]["q1"]["pos"] == "Sombra", exp.get("preguntas")
+    exp["preguntas"]["mal id!"] = {"id": "mal id!", "pos": "Cerrada"}
+    exp["preguntas"]["q3"] = {"id": "q3", "pos": "Cerrada", "creada": "ayer", "resuelta": "2026-11-01"}
+    p.click('#v-inicio [data-act="q-del"][data-id="q1"]')
+    assert p.evaluate("() => window.__bachateca.state().preguntas") == {}
+    import_text(p, json.dumps(exp))
+    assert "1 descartadas" in p.locator(".toast").inner_text(), p.locator(".toast").inner_text()
+    qs = p.evaluate("() => window.__bachateca.state().preguntas")
+    assert set(qs) == {"q1", "q3"} and qs["q1"]["pos"] == "Sombra", qs
+    assert "creada" not in qs["q3"] and qs["q3"]["resuelta"] == "2026-11-01", qs["q3"]
+    # Reemplazar: se queda solo lo de la copia.
+    p.evaluate("() => { window.__bachateca.state().preguntas.qx = {id: 'qx', pos: 'Hammerlock', baile: 'Bachata', creada: '2026-11-01'}; }")
+    p.click('[data-act="close"]')
+    exp2 = {**exp, "preguntas": {"q1": exp["preguntas"]["q1"]}}
+    import_text(p, json.dumps(exp2), replace=True)
+    p.click('.confirm [data-cf="ok"]')
+    p.wait_for_timeout(300)
+    assert set(p.evaluate("() => window.__bachateca.state().preguntas")) == {"q1"}
+    r = p.evaluate("() => window.__bachateca.sanitizeImport({figures: {}, preguntas: {a: {id: 'a', pos: ''}, b: 5, c: {id: 'c', pos: 'Sombra'}}})")
+    assert set(r["preguntas"]) == {"c"} and r["descartadas"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

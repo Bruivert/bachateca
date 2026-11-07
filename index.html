@@ -1949,14 +1949,15 @@ function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
       steps.push({dead: prev?prev.salida:pos, hold: prev?prev.agarreOut:"", usedUp}); break;
     }
     const f = opts[Math.floor(rnd()*opts.length)];
-    // vago: el enlace con el paso anterior (o con el agarre elegido) se apoyó en un agarre sin indicar.
-    const h = prev ? prev.agarreOut : hold;
-    used.add(f.id); steps.push({f, vago: !h || !f.agarreIn}); prev=f;
+    // vago: el enlace se apoyó en un agarre sin indicar. En el primer paso solo cuenta si elegiste agarre («Cualquiera» no avisa).
+    const vago = prev ? (!prev.agarreOut || !f.agarreIn) : (!!hold && !f.agarreIn);
+    used.add(f.id); steps.push({f, vago}); prev=f;
   }
   return {steps};
 }
 const LS_CHAIN = "bachateca.cadena";
-let {safe: chainSafe = false, strict: chainStrict = false} = lsGet(LS_CHAIN) || {};
+const chainLS = lsGet(LS_CHAIN), chainV = chainLS && typeof chainLS==="object" ? chainLS : {};
+let chainSafe = chainV.safe === true, chainStrict = chainV.strict === true;
 function makeChain(start){
   const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
   return buildChain(pool, {start, hold: linkHold, strict: chainStrict});

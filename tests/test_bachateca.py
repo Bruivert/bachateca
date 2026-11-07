@@ -2125,6 +2125,21 @@ def cadena_solo_seguras_y_avisos(browser):
 
 
 @test
+def cadena_aviso_de_agarre_solo_si_cuenta(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos", agarreIn="Dos manos"),
+                                 fig(2, "Abierta 2 manos", "Cerrada")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    r = p.evaluate("""() => { const B = window.__bachateca, a = Object.values(B.state().figures);
+      return [B.buildChain([a[0]], {start: "Cerrada", hold: ""}).steps[0].vago,
+              B.buildChain([a[1]], {start: "Abierta 2 manos", hold: "Dos manos"}).steps[0].vago,
+              B.buildChain([a[1]], {start: "Abierta 2 manos", hold: ""}).steps[0].vago]; }""")
+    assert r == [False, True, False], r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def buildChain_es_pura(browser):
     ctx, p, errors = open_app(browser)
     figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Cerrada", "Abierta 2 manos"),

@@ -3162,6 +3162,97 @@ def avance_fino_en_comparar(browser):
     ctx.close()
 
 
+@test
+def migracion_11_notas_video(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 10, figures: {a: {id: "a", nombre: "A"}, b: {id: "b", nombre: "B", notasVid: [{id: "n1", s: 1.5, texto: "x"}]}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 10});
+      const k = B.sanitizeImport({figures: {f1: {id: "f1", nombre: "A", notasVid: [{id: "n1", s: 2, texto: "ok"}, {id: "n2", s: -1, texto: "x"}, {id: "n3", s: 1, texto: ""}, {id: "n4", s: 1, texto: "y".repeat(141)}, {id: "n5", s: "2", texto: "z"}, {id: "bad id", s: 1, texto: "z"}],
+        partes: [{id: "p1", notasVid: [{id: "n1", s: 1, texto: "a"}, {id: "n2", s: NaN, texto: "b"}]}]}}}).figures.f1;
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k, S: B.SCHEMA}; }""")
+    assert r["S"] >= 11 and r["m"]["schema"] == r["S"], r
+    assert r["m"]["figures"]["a"]["notasVid"] == [], r["m"]
+    assert r["m"]["figures"]["b"]["notasVid"][0]["texto"] == "x", "no pisa lo que ya hay"
+    assert r["same"], "repetir la migración no cambia nada"
+    assert [n["id"] for n in r["k"]["notasVid"]] == ["n1"], r["k"]["notasVid"]
+    assert [n["id"] for n in r["k"]["partes"][0]["notasVid"]] == ["n1"], r["k"]["partes"]
+    assert not errors, errors
+    ctx.close()
+
+
+def nv_seed(**kw):
+    return {"schema": 11, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", **kw)}, "logs": {}}
+
+
+def nv_open(browser, seed):
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("(() => { const v = document.querySelector('.player video'); return v && v.readyState >= 2; })()")
+    return ctx, p, errors
+
+
+@test
+def nota_en_el_video(browser):
+    """«Nota aquí» pausa y pide el texto en línea; la nota sale en la lista, se va a su segundo y se ve mientras suena."""
+    ctx, p, errors = nv_open(browser, nv_seed())
+    p.evaluate("() => { const v = document.querySelector('.player video'); v.pause(); v.currentTime = 0.5; }")
+    p.wait_for_function("!document.querySelector('.player video').seeking")
+    p.click('[data-act="nv-add"]')
+    assert p.evaluate("() => document.querySelector('.player video').paused")
+    p.fill("#nv-txt", "  Suelta la mano aquí  ")
+    p.click('[data-act="nv-save"]')
+    p.wait_for_selector('[data-nv-list] [data-act="nv-go"]')
+    assert "Suelta la mano aquí" in p.inner_text("[data-nv-list]") and "0:00,5" in p.inner_text("[data-nv-list]"), p.inner_text("[data-nv-list]")
+    n = p.evaluate("() => window.__bachateca.state().figures.f1.notasVid")
+    assert len(n) == 1 and n[0]["texto"] == "Suelta la mano aquí" and abs(n[0]["s"] - 0.5) < 0.051, n
+    # cancelar no guarda; vacío no guarda
+    p.click('[data-act="nv-add"]'); p.click('[data-act="nv-cancel"]')
+    p.click('[data-act="nv-add"]'); p.click('[data-act="nv-save"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.notasVid.length") == 1
+    p.click('[data-act="nv-cancel"]')
+    # tocarla lleva el vídeo a 0,5
+    p.evaluate("() => { const v = document.querySelector('.player video'); v.currentTime = 0; }")
+    p.wait_for_function("!document.querySelector('.player video').seeking")
+    p.click('[data-act="nv-go"]')
+    p.wait_for_function("(() => { const v = document.querySelector('.player video'); return !v.seeking && Math.abs(v.currentTime - 0.5) < 0.06; })()")
+    # se ve durante la reproducción
+    p.evaluate("() => { const v = document.querySelector('.player video'); v.currentTime = 0; v.muted = true; v.play(); }")
+    p.wait_for_function("document.querySelector('.vcap').textContent.includes('Suelta la mano')")
+    assert p.get_attribute(".vcap", "aria-live") == "polite"
+    # quitar con Deshacer
+    p.click('[data-act="nv-del"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.notasVid.length") == 0
+    p.click(".toast .undo")
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.notasVid.length") == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def nota_pasa_a_la_parte_anterior(browser):
+    """Al añadir una parte nueva, las notas del vídeo de ahora se van con él a la parte anterior."""
+    seed = {"schema": 11, "figures": {"f1": inc_fig(notasVid=[{"id": "n1", "s": 0.5, "texto": "Cuidado con el giro"}])}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="pt-new"]')
+    p.set_input_files("#ff-file", FIXTURE)
+    p.wait_for_selector("#pt-form #ff-prev")
+    p.wait_for_function("document.querySelector('#ff-prev').readyState >= 1")
+    p.click('#pt-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]', timeout=15000)
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert f["notasVid"] == [], "el vídeo nuevo empieza sin notas"
+    assert [(x["vid"], x["notasVid"][0]["texto"]) for x in f["partes"]] == [("v1", "Cuidado con el giro")], f["partes"]
+    p.click(f'[data-act="pt-open"][data-pt="{f["partes"][0]["id"]}"]')
+    p.wait_for_selector("[data-viewpt] video")
+    assert "Cuidado con el giro" in p.locator("[data-viewpt]").inner_text() and p.locator('[data-viewpt] [data-act="nv-del"]').count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

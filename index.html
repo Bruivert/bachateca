@@ -450,6 +450,11 @@ details .inner{display:flex;flex-direction:column;gap:12px}
 .vprog{font-size:0.8824rem;color:var(--link);font-weight:600}
 .player{display:flex;flex-direction:column;gap:8px}
 .player video.mirror{transform:scaleX(-1)}
+.vwrap{position:relative}
+.vcap{position:absolute;left:8px;right:8px;top:8px;text-align:center;pointer-events:none;font-weight:600;font-size:0.9rem;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000}
+.vcap:empty{display:none}
+.vcap:not(:empty){background:rgba(0,0,0,.55);border-radius:8px;padding:4px 8px}
+.nv-list .btn{text-align:left;white-space:normal;height:auto}
 .pctl{display:flex;gap:6px;flex-wrap:wrap}
 .pctl button{border:0;background:var(--fill);border-radius:99px;padding:6px 12px;font-size:0.8236rem;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
 .pctl button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
@@ -1114,7 +1119,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 10;
+const SCHEMA = 11;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1199,6 +1204,11 @@ const MIGRATIONS = [
         if(typeof e.ultima!=="string" || !e.ultima) e.ultima = (typeof e.fecha==="string" && e.fecha) ? e.fecha : todayStr();
       });
     });
+  },
+  // 10 → 11: notas sobre el vídeo de la clase (f.notasVid: [{id, s, texto}], s = segundo del vídeo). Cada figura empieza con la lista vacía;
+  // las partes la llevan solo si tenían notas, así que no se tocan.
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.notasVid)) f.notasVid=[]; });
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -2486,7 +2496,7 @@ function openView(id){
     </section>` : "";
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${esc(f.id)}">
     <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${esc(f.id)}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    ${f.vid ? `<div class="fv-media">${playerHTML(f)}</div>` : f.thumb ? `<div class="fv-media"><img class="fv-img" src="${esc(f.thumb)}" alt=""></div>` : ""}
+    ${f.vid ? `<div class="fv-media">${playerHTML(f, true)}</div>` : f.thumb ? `<div class="fv-media"><img class="fv-img" src="${esc(f.thumb)}" alt=""></div>` : ""}
     <div class="fv-title">
       <h2 id="sheet-t" tabindex="-1">${esc(f.nombre)}</h2>
       ${isMove(f) && placed(f) ? `<p class="route-big">${routeTxt(f, true)}</p>` : (!isMove(f) && f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
@@ -2502,6 +2512,7 @@ function openView(id){
     ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
     ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
     ${f.vid && assetsApi ? pkCardHTML(f.pulso, f.vid, f.id) : ""}
+    ${f.vid ? nvCardHTML(f, f.id) : ""}
     ${mem}
     ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
     ${errCardHTML(f)}
@@ -2511,7 +2522,9 @@ function openView(id){
       ? `<div class="menu">${nexts.map(x=>`<div class="nx-row"><button type="button" class="mrow" data-view="${esc(x.id)}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>${lnHTML(f, x)}</div>`).join("")}</div>`
       : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
   </div></div>`;
+  nvAdd = null;
   hydrateVideos($("#sheet-root"));
+  nvBind(()=>S.figures[f.id]?.notasVid);
   ["att-cam","att-lib"].forEach(k=>{ const fi=$("#"+k); if(fi) fi.onchange=()=>{ const file=fi.files[0]; if(file) openAttemptNew(f.id, file); }; });
   const s=$(".sheet"); if(s) s.scrollTop=0;
   markClean();
@@ -3043,6 +3056,54 @@ function errCardHTML(f){
       <p class="small muted">Salen al repasar la figura. Márcalos como resueltos cuando ya no te pasen.</p>` : `<p class="small muted">Ninguno activo. Si vuelve a pasarte alguno, recupéralo abajo.</p>`}
     ${res.length ? `<details><summary>Resueltos (${res.length})</summary><ul class="cmp-marks">${res.map(e=>`<li><span>${nota(e)} <span class="small muted">· ×${e.veces||1} · resuelto ${esc(e.resuelto)}</span></span><button type="button" class="btn ghost sm" data-act="err-reopen" data-id="${esc(f.id)}" data-err="${esc(e.id)}">Me ha vuelto a pasar</button></li>`).join("")}</ul></details>` : ""}</section>`;
 }
+// ---------- notas sobre el vídeo de la clase ----------
+// f.notasVid = [{id, s, texto}]: s es el segundo del vídeo (a décimas). Se apuntan con «Nota aquí» (el vídeo se pausa y el texto
+// se escribe en línea, sin prompt()); tocar una nota lleva el vídeo ahí, y la que está a menos de 1 s se ve sobre el vídeo.
+const erroresNv = a => Array.isArray(a) ? a : [];
+const nvT = s => { const t = Math.round(s*10); return `${Math.floor(t/600)}:${String(Math.floor(t%600/10)).padStart(2,"0")},${t%10}`; };
+let nvAdd = null;   // {s} mientras se escribe una nota nueva
+// figId: figura editable; null: lista de solo lectura (parte)
+function nvCardHTML(o, figId){
+  const ns = [...erroresNv(o.notasVid)].sort((a,b)=>a.s-b.s);
+  if(!figId && !ns.length) return "";
+  const rows = ns.map(n=>`<li><button type="button" class="btn ghost sm" data-act="nv-go" data-s="${n.s}" aria-label="Ir al ${nvT(n.s)}: ${esc(n.texto)}"><b>${nvT(n.s)}</b> ${esc(n.texto)}</button>${figId?`<button type="button" class="icon-btn" data-act="nv-del" data-id="${esc(figId)}" data-nv="${esc(n.id)}" aria-label="Quitar la nota del ${nvT(n.s)}">✕</button>`:""}</li>`).join("");
+  const form = figId && nvAdd ? `<div class="nv-form"><label class="f" for="nv-txt">Nota en el ${nvT(nvAdd.s)}<input type="text" id="nv-txt" maxlength="140" autocomplete="off" placeholder="Ej.: aquí suelta la mano"></label>
+      <div class="row"><button type="button" class="btn pri sm" data-act="nv-save" data-id="${esc(figId)}">Guardar</button><button type="button" class="btn ghost sm" data-act="nv-cancel" data-id="${esc(figId)}">Cancelar</button></div></div>` : "";
+  return `<section class="fv-card" id="fv-nv" aria-labelledby="fv-nvh"><h3 id="fv-nvh">Notas del vídeo</h3>
+    ${ns.length ? `<ul class="cmp-marks nv-list" data-nv-list>${rows}</ul>` : `<p class="small muted" data-nv-list>Apunta lo que dice el profe en un momento del vídeo.</p>`}
+    ${form}${figId && !nvAdd ? `<div class="fv-actions"><button type="button" class="btn" data-act="nv-add" data-id="${esc(figId)}">Nota aquí</button></div>` : ""}</section>`;
+}
+// Vuelve a pintar solo la tarjeta, para no reiniciar el vídeo.
+function nvRefresh(figId){
+  const f = S.figures[figId], c = $("#fv-nv"); if(!f || !c) return;
+  c.outerHTML = nvCardHTML(f, figId);
+}
+// El subtítulo sigue al vídeo: la nota más cercana a menos de 1 s.
+function nvBind(get){
+  const v = $(".fv-media video"), cap = $(".fv-media .vcap"); if(!v || !cap) return;
+  const upd = () => { const t = v.currentTime; let best = null;
+    erroresNv(get()).forEach(n=>{ const d = Math.abs(n.s - t); if(d<1 && (!best || d<best.d)) best = {d, n}; });
+    const txt = best ? best.n.texto : ""; if(cap.textContent!==txt) cap.textContent = txt; };
+  v.addEventListener("timeupdate", upd); v.addEventListener("seeked", upd);
+}
+function nvAct(a, d, t){
+  const v = (t.closest(".sheet")||document).querySelector(".fv-media video");
+  if(a==="nv-go"){ if(!v) return; v.pause(); try{ v.currentTime = +d.s||0; }catch{} return; }
+  const f = S.figures[d.id]; if(!f) return;
+  if(a==="nv-add"){ if(v) v.pause(); nvAdd = {s: Math.round((v ? v.currentTime : 0)*10)/10}; nvRefresh(d.id); $("#nv-txt")?.focus(); return; }
+  if(a==="nv-cancel"){ nvAdd = null; nvRefresh(d.id); return; }
+  if(a==="nv-save"){
+    const texto = ($("#nv-txt").value||"").trim().slice(0,140);
+    if(!texto){ toast("Escribe la nota."); $("#nv-txt").focus(); return; }
+    f.notasVid = [...erroresNv(f.notasVid), {id:uid(), s:nvAdd.s, texto}]; nvAdd = null;
+    persist({t:"fig", id:f.id}); nvRefresh(f.id); announce("Nota guardada"); return;
+  }
+  if(a==="nv-del"){
+    const list = erroresNv(f.notasVid), i = list.findIndex(n=>n.id===d.nv); if(i<0) return;
+    const n = list[i]; f.notasVid = list.filter(x=>x.id!==d.nv); persist({t:"fig", id:f.id}); nvRefresh(f.id);
+    toast("Nota quitada", {label:"Deshacer", fn:()=>{ const g=S.figures[f.id]; if(!g) return; const l=[...erroresNv(g.notasVid)]; l.splice(i,0,n); g.notasVid=l; persist({t:"fig",id:g.id}); if($(`[data-viewfig="${CSS.escape(g.id)}"]`)) nvRefresh(g.id); }});
+  }
+}
 function errDelete(figId, errId){
   const f = S.figures[figId], es = erroresOf(f), i = es.findIndex(e=>e.id===errId); if(i<0) return;
   const e = es[i]; f.errores = es.filter(x=>x.id!==errId); persist({t:"fig", id:figId}); openView(figId);
@@ -3336,10 +3397,11 @@ function openParteNew(figId){
     if(fig.vid || fig.parteNota){
       const x = {id:uid(), fecha:parteHoy(fig), creado:Date.now()};
       if(fig.parteNota) x.nota = fig.parteNota;
-      if(fig.vid){ x.vid = fig.vid; ["vidTrim","vidInfo","thumb"].forEach(k=>{ if(fig[k]) x[k] = fig[k]; }); if(fig.vidSaved===fig.vid) x.vidSaved = fig.vid; }
+      if(fig.vid){ x.vid = fig.vid; ["vidTrim","vidInfo","thumb"].forEach(k=>{ if(fig[k]) x[k] = fig[k]; }); if(fig.vidSaved===fig.vid) x.vidSaved = fig.vid; if(erroresNv(fig.notasVid).length) x.notasVid = fig.notasVid; }
       fig.partes = [...partesOf(fig), x];
     }
     fig.vid = res.vid; fig.vidTrim = res.vidTrim; fig.vidInfo = res.vidInfo;
+    fig.notasVid = [];   // las notas se fueron con su vídeo a la parte anterior
     if(res.thumb) fig.thumb = res.thumb; else delete fig.thumb;
     delete fig.vidSaved;
     fig.parteFecha = todayStr(); if(nota) fig.parteNota = nota; else delete fig.parteNota;
@@ -3355,14 +3417,16 @@ function openParteView(figId, ptId){
   const x = ps[i], info = [x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "", x.vidInfo?.bytes ? fmtMB(x.vidInfo.bytes) : ""].filter(Boolean).join(" · ");
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewpt="${esc(x.id)}">
     <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${esc(f.id)}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    ${x.vid ? `<div class="fv-media">${playerHTML({vid:x.vid, vidTrim:x.vidTrim, thumb:x.thumb})}</div>` : ""}
+    ${x.vid ? `<div class="fv-media">${playerHTML({vid:x.vid, vidTrim:x.vidTrim, thumb:x.thumb}, erroresNv(x.notasVid).length>0)}</div>` : ""}
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Parte ${i+1} · ${esc(fmtDate(x.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${x.nota ? `<section class="fv-card"><p class="txt">${esc(x.nota)}</p></section>` : ""}
+    ${x.vid ? nvCardHTML(x, null) : ""}
     ${x.vid ? `${x.vidSaved===x.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
     <div class="fv-actions"><button type="button" class="btn" data-act="pt-savevid" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Guardar en Fotos</button></div>` : ""}
     <button type="button" class="btn danger wide del-row" data-act="pt-del" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Borrar parte</button>
   </div></div>`;
   hydrateVideos($("#sheet-root"));
+  nvBind(()=>S.figures[figId] && partesOf(S.figures[figId]).find(y=>y.id===ptId)?.notasVid);
   ptBlob = null; if(x.vid) vidGet(x.vid).then(b=>{ ptBlob = b ? {vid:x.vid, b} : null; }).catch(()=>{});
   markClean();
 }
@@ -3538,6 +3602,7 @@ function openFigure(id, opts={}){
       const {thumb, ...v} = res; Object.assign(out, v); if(thumb) out.thumb = thumb;
     } else if(vstate.remove){ delete out.vid; delete out.vidInfo; delete out.vidTrim; delete out.thumb; }
     if(out.profesor && !S.classes.includes(out.profesor)){ S.classes.push(out.profesor); persist({t:"meta"}); }
+    if((oldVid||null)!==(out.vid||null)) out.notasVid = [];   // las notas hablan del vídeo anterior
     justSaved = out.id; saveFigure(out);
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();
@@ -3710,9 +3775,10 @@ async function genMissingThumbs(){
     }
   } finally { thumbsRunning=false; }
 }
-function playerHTML(f){
-  const t=f.vidTrim||{};
-  return `<div class="player" data-loop="1"><video data-vid="${esc(f.vid)}" data-s="${+t.start||0}" data-e="${+t.end||0}" ${f.thumb?`poster="${esc(f.thumb)}"`:""} controls playsinline preload="metadata"></video>
+function playerHTML(f, caps){
+  const t=f.vidTrim||{}, vid=`<video data-vid="${esc(f.vid)}" data-s="${+t.start||0}" data-e="${+t.end||0}" ${f.thumb?`poster="${esc(f.thumb)}"`:""} controls playsinline preload="metadata"></video>`;
+  // caps: con subtítulo encima del vídeo (la nota que toca ahora, para la ficha y las partes)
+  return `<div class="player" data-loop="1">${caps ? `<div class="vwrap">${vid}<div class="vcap" aria-live="polite"></div></div>` : vid}
     <div class="pctl" role="group" aria-label="Reproducción"><button type="button" data-speed="0.5" aria-pressed="false">0,5×</button><button type="button" data-speed="0.75" aria-pressed="false">0,75×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-mirror aria-pressed="false">Espejo</button><button type="button" data-loopbtn aria-pressed="true">Bucle</button><button type="button" data-step="-0.1" aria-label="Atrás 0,1 segundos">‹ 0,1 s</button><button type="button" data-step="0.1" aria-label="Adelante 0,1 segundos">0,1 s ›</button></div></div>`;
 }
 function backfillThumb(vidId, v){
@@ -4393,7 +4459,10 @@ function sanitizeFig(f0){
   // Solo se tocan las listas que vienen: añadir una vacía haría que tu propia copia pareciera distinta.
   const marcas = a => { const b={...a}; if("marcadores" in b) b.marcadores = lista(a.marcadores, m=>({...m})).filter(m=>{ if(Number.isFinite(m.b)) return true; malas++; return false; }); return b; };
   if("intentos" in f) f.intentos = lista(f.intentos, marcas);
-  if("partes" in f) f.partes = lista(f.partes);
+  // Notas del vídeo: segundo finito ≥ 0 y texto de 1 a 140 caracteres; las que no valen se descartan.
+  const nvs = a => { const b={...a}; if("notasVid" in b) b.notasVid = lista(a.notasVid, n=>({...n})).filter(n=>{ if(Number.isFinite(n.s) && n.s>=0 && typeof n.texto==="string" && n.texto.trim() && n.texto.length<=140) return true; malas++; return false; }); return b; };
+  if("notasVid" in f) f.notasVid = nvs(f).notasVid;
+  if("partes" in f) f.partes = lista(f.partes, nvs);
   // Errores recurrentes: veces entero ≥ 1 (si no, 1); ultima y resuelto, fecha ISO o se quitan.
   const iso = v => typeof v==="string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
   const err = e => { const o={...e};
@@ -4713,6 +4782,7 @@ document.addEventListener("click", async e=>{
   if(a==="cmp-open") return openCompare(d.id, d.att);
   if(a==="rc-open") return openRecCount(d.id);
   if(a==="cmp-back"){ const c=cmp; cmpStop(); cmp=null; return c ? openAttemptView(c.figId, c.attId) : null; }
+  if(a.startsWith("nv-")) return nvAct(a, d, t);
   if(a==="err-del") return errDelete(d.id, d.err);
   if(a==="err-res") return errResolve(d.id, d.err);
   if(a==="err-reopen") return errReopen(d.id, d.err);

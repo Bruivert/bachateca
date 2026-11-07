@@ -31,14 +31,15 @@ El código queda público, pero **tus datos no**: figuras, registros y vídeos s
 
 Todo vive en el iPhone: si borras la app, se pierde. Cada cierto tiempo:
 - **Ajustes → Exportar copia** (figuras, registros y ajustes) y guárdala en Archivos o iCloud Drive.
-- Los vídeos ya están en tu carrete; desde cada figura puedes usar **Guardar en Fotos**.
+- Los vídeos: **Ajustes → Copia completa** los guarda después de la copia. Guárdalos también en **Archivos o iCloud Drive**
+  (no en Fotos, que puede cambiarles el nombre): así **Restaurar o importar → Recuperar vídeos** los devuelve a su figura.
 
 **Ajustes → Instantáneas**: la app guarda sola una copia al día y otra antes de importar o restaurar; no sustituyen a
 Exportar, porque viven en el mismo iPhone.
 
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v51` → `bachateca-v52`).
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v54` → `bachateca-v55`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
 
 ## Practicar para el social
@@ -55,6 +56,39 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
 - Una figura marcada en un social cuenta como un repaso «Fluida» (una vez al día); si borras el registro, se deshace.
   «Atrasada» ya no se confunde con «Olvidada».
 - La cuenta pide a iOS el audio de reproducción, para que suene aunque el iPhone esté en silencio.
+- **Aprender a enlazar** (versión 1.52):
+  - El repaso de enlaces ahora es independiente en cada baile.
+  - **«Lo he bailado»** marca los enlaces que ya has probado, en la ficha («Y después») y en las cadenas. Las cadenas
+    prefieren los enlaces probados. Tras un social en el que marcas dos figuras seguidas, la app te pregunta si
+    bailaste A → B.
+  - **«Preguntas de memoria»** (en Repasar): ¿Dónde termina?, ¿Desde dónde entras? y ¿Qué puedes hacer después?
+    Cuentan como repaso de la figura, una vez al día.
+  - En **«Errores que cometo»** se cuentan las repeticiones (×N). Puedes marcar un error como **«Ya no me pasa»** y
+    volver a ponerlo con **«Me ha vuelto a pasar»**. Mientras un error siga activo, la figura se repasa como mucho
+    cada 7 días.
+  - **«Opciones de la cadena»**: terminar en una posición, incluir una figura, dejar fuera otras, y elegir la longitud (de 2 a 6).
+
+## Vídeo y práctica (versión 1.53)
+
+- **Paso fino**: en el vídeo de la figura y en **Comparar** puedes avanzar o retroceder 0,1 s para ver bien un movimiento.
+- **«Nota aquí»**: mientras ves el vídeo de la clase, apunta una nota en el momento exacto. Se muestra mientras suena
+  esa parte del vídeo y queda en una lista con su tiempo. Si añades una parte al vídeo, las notas pasan a la parte
+  anterior; si reemplazas el vídeo, se borran.
+- **«Superponer»** (en Comparar): pone tu vídeo encima del de referencia, con transparencia y con espejo para tu vídeo.
+- **«Práctica guiada»** (en Repasar): una sesión de 10 o 20 minutos con figuras, enlaces y una cadena con la cuenta
+  de la voz. Te calificas después de cada bloque, y puedes marcar **«Con pareja»**.
+- **Dos medidas por figura**, en la ficha: **«La recuerdo»** y **«Me sale con pareja»**. La segunda solo sube con
+  pruebas reales: socials, práctica guiada con pareja o intentos en los que solo marcas «Bien». En Social salen
+  primero las figuras que te salen mejor con pareja.
+
+## Tus datos (versión 1.54)
+
+- **Copia completa** (Ajustes): guarda un JSON con todas tus figuras y registros, más todos tus vídeos. Guárdala en
+  **Archivos o iCloud Drive**, no en Fotos: Fotos puede cambiar el nombre de los archivos y entonces un vídeo no
+  sabría a qué figura volver.
+- **Recuperar vídeos**: elige en Archivos los vídeos de la copia; cada uno vuelve a su figura por el id que lleva en el nombre.
+- **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
+  una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
 
 ## Pruebas automáticas
 
@@ -73,7 +107,7 @@ Abren la app en un navegador sin ventana y con datos de prueba: no tocan tus dat
 
 Los datos guardados llevan un número de versión (`schema`). Si un cambio necesita guardar las figuras de otra forma,
 se sube `SCHEMA` en `index.html` y se añade un paso en `MIGRATIONS`: al abrir la app, los datos antiguos se ponen al día
-solos, sin borrar nada. La versión 1.51 pasa los datos a la versión 7 (añade las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
+solos, sin borrar nada. La versión 1.54 deja los datos en la versión 11 (la 1.53 los pasó a la 11, la 1.52 a la 10 y la versión 1.51 los había pasado a la 7 con las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
 
 ## Limitaciones conocidas
 

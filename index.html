@@ -226,6 +226,13 @@ button.card:active{background:var(--surface2)}
 .mrow{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:0 12px 0 16px;border:0;background:none;color:var(--fg);font-size:0.9412rem;text-align:left;position:relative}
 .mrow+.mrow::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
 .mrow:active{background:var(--fill)}
+.nx-row{display:flex;align-items:center;position:relative}
+.nx-row+.nx-row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+.nx-row .mrow{flex:1;min-width:0}
+.ln-tg{flex:none;min-height:44px;margin-right:8px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--fg);font-size:0.8235rem}
+.ln-tg.on{background:var(--fill);font-weight:600}
+.ln-ok{color:var(--muted);margin-top:4px}
+.ln-btn{min-height:44px;margin-top:6px}
 .mrow>span:first-child{flex:1}
 .mrow .mv{color:var(--muted);font-variant-numeric:tabular-nums}
 .mrow svg{flex:none;width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -367,6 +374,15 @@ button.card:active{background:var(--surface2)}
 .cmp-v{position:relative;margin:0;background:#000}
 .cmp-v video{display:block;width:100%;height:25vh;object-fit:contain;background:#000}
 .cmp-v video.mirror{transform:scaleX(-1)}
+/* Superponer: las dos figuras comparten caja; la tuya encima con opacidad variable (la sincronización no se toca) */
+.cmp-vids.overlay{display:block;position:relative;height:40vh;background:#000}
+.cmp-vids.overlay .cmp-v{position:absolute;inset:0}
+.cmp-vids.overlay .cmp-v video{height:100%}
+.cmp-vids.overlay .cmp-v:last-child{opacity:var(--cmp-op,.5)}
+.cmp-vids.overlay .cmp-v:last-child figcaption{left:auto;right:10px}
+.cmp-over-row{align-items:center}
+.cmp-over-row label{display:flex;align-items:center;gap:8px;min-height:44px}
+.cmp-over-row input[type=range]{width:120px}
 /* grabarme con conteo: la cámara en directo y el número que suena encima */
 .rc-media{position:relative;background:#000}
 .rc-media video{width:100%;height:46vh;object-fit:cover;display:block;background:#000}
@@ -443,6 +459,11 @@ details .inner{display:flex;flex-direction:column;gap:12px}
 .vprog{font-size:0.8824rem;color:var(--link);font-weight:600}
 .player{display:flex;flex-direction:column;gap:8px}
 .player video.mirror{transform:scaleX(-1)}
+.vwrap{position:relative}
+.vcap{position:absolute;left:8px;right:8px;top:8px;text-align:center;pointer-events:none;font-weight:600;font-size:0.9rem;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000}
+.vcap:empty{display:none}
+.vcap:not(:empty){background:rgba(0,0,0,.55);border-radius:8px;padding:4px 8px}
+.nv-list .btn{text-align:left;white-space:normal;height:auto}
 .pctl{display:flex;gap:6px;flex-wrap:wrap}
 .pctl button{border:0;background:var(--fill);border-radius:99px;padding:6px 12px;font-size:0.8236rem;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
 .pctl button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
@@ -681,6 +702,7 @@ details.info summary::after{inset:-10px -4px}
 .ring.sm{width:70px;height:70px}
 .ring.sm b{font-size:0.9412rem}
 .fv-mem-t{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.fv-bar{display:grid;grid-template-columns:minmax(0,9.5em) 1fr;gap:8px;align-items:center}
 .fg{color:var(--fg)}
 
 /* Formulario: campos con borde fino y altura cómoda. */
@@ -701,9 +723,9 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .flash .big{font-size:2rem;line-height:1.08}
 .flash-tag{align-self:flex-start}
 .grade .btn{min-height:64px;border-radius:16px;font-weight:800}
-.grade [data-simg="no"],.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
-.grade [data-simg="dudas"],.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
-.grade [data-simg="fluida"],.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
+.grade [data-simg="no"],.grade [data-guiag="no"],.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.grade [data-simg="dudas"],.grade [data-guiag="dudas"],.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.grade [data-simg="fluida"],.grade [data-guiag="fluida"],.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
 .progress{height:6px}
 
 /* Enlazar y Social: tarjetas sueltas con borde. */
@@ -804,7 +826,7 @@ const PROMOTE_DISP = 2;   // usos en socials para proponer «Disponible»
 const PROMOTE_CONS = 6;   // usos para proponer «Consolidada»
 
 // ---------- estado ----------
-let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOLDS], classes:[...DEFAULT_CLASSES], linkRep:{} };
+let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOLDS], classes:[...DEFAULT_CLASSES], linkRep:{}, enlaces:{} };
 let tab = "repertorio";
 let filt = { q:"", baile:"todos", estado:"todos", vista:"pos" };
 let linkPos = null, linkHold = "";
@@ -912,7 +934,25 @@ const allPositions = () => [...S.positions, ...extraPositions()];
 const isDue = f => active(f) && (!f.rep || !f.rep.due || f.rep.due <= todayStr());
 const dueFigs = () => figs().filter(isDue).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||"") || (a.rep?.step||0)-(b.rep?.step||0));
 const linkPositions = () => allPositions().filter(p=>exitsFrom(p).length);
-const dueLinks = () => { const t=todayStr(); return linkPositions().filter(p=>{ const r=S.linkRep[p]; return !r || !r.due || r.due<=t; }); };
+// El repaso de cada posición es por baile: «Cerrada» en bachata y en salsa se repasan por separado. Clave: baile␟posición.
+// Enlaces comprobados: pares de figuras que has bailado de verdad una detrás de otra.
+const linkKey = (a, b) => a + ">" + b;
+const linkDone = (a, b) => !!(S.enlaces && S.enlaces[a.id + ">" + b.id]);
+function markLink(aId, bId){
+  if(!S.figures[aId] || !S.figures[bId]) return;
+  const k = linkKey(aId, bId), e = (S.enlaces ||= {})[k];
+  S.enlaces[k] = e ? {...e, veces:(+e.veces||0)+1, fecha:todayStr()} : {a:aId, b:bId, fecha:todayStr(), veces:1};
+  persist({t:"meta"});
+}
+function unmarkLink(k){ if(S.enlaces) delete S.enlaces[k]; persist({t:"meta"}); }
+// «Lo he bailado»: en la cadena, «comprobado» si ya está marcado; en la ficha, un botón que alterna.
+function lnHTML(a, b, enCadena){
+  const on = linkDone(a, b), d = `data-act="ln-mark" data-a="${esc(a.id)}" data-b="${esc(b.id)}"`;
+  if(enCadena) return on ? `<div class="small ln-ok">✓ comprobado</div>` : `<div><button type="button" class="btn ghost ln-btn" ${d}>Lo he bailado</button></div>`;
+  return `<button type="button" class="ln-tg${on?" on":""}" ${d} aria-pressed="${on}" aria-label="Lo he bailado: de ${esc(a.nombre)} a ${esc(b.nombre)}">${on?"✓ ":""}Lo he bailado</button>`;
+}
+const lrKey = (pos, baile = baileSel) => baile + "␟" + pos;
+const dueLinks = () => { const t=todayStr(); return linkPositions().filter(p=>{ const r=S.linkRep[lrKey(p)]; return !r || !r.due || r.due<=t; }); };
 let toastT, toastEl = null, toastEnd = null;
 // Con una hoja abierta, el aviso va dentro de ella: fuera, VoiceOver no puede llegar a «Deshacer».
 const toastHost = () => $("#sheet-root [role=dialog]") || document.body;
@@ -974,7 +1014,7 @@ const fieldDirty = el => {
 function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!carried}; }
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
-  if($("[data-sim]")) return false;   // cerrar el simulacro solo lo para: lo ya puntuado está guardado
+  if($("[data-sim]") || $("[data-guia]")) return false;   // cerrar el simulacro o la práctica guiada solo los para: lo ya puntuado está guardado
   if(sheetBase.carried) return true;
   if(pk && pk.dirty && $("[data-pulso]")) return true;
   if(rc && rc.rec && $("[data-recc]")) return true;
@@ -1006,9 +1046,10 @@ function backupStatus(b){
 async function exportBackup(){
   // En modo seguro S no son tus datos (no se han podido leer): exportarlo daría una copia vacía o vieja por buena.
   if(safeMode){ toast("Modo seguro: no se puede exportar."); return; }
-  if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return;
+  if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return false;
   lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copia exportada"); render();
   if($('[aria-label="Ajustes"]')) openSettings(); else if($('[data-sheet="log"]')) openLog();
+  return true;
 }
 function nextRep(r0,g){
   const r=Object.assign({step:0,aciertos:0,fallos:0}, r0||{});
@@ -1016,6 +1057,48 @@ function nextRep(r0,g){
   else if(g==="dudas"){ r.due=todayStr(Math.max(1, Math.floor(LADDER[r.step]/2))); }
   else { r.step=Math.min(r.step+1, LADDER.length-1); r.due=todayStr(LADDER[r.step]); r.aciertos++; }
   r.last=todayStr(); return r;
+}
+
+// Preguntas de memoria: salen solo de tus figuras del baile elegido (con ruta y ya enseñadas), nunca de ejemplos de otro baile.
+// Devuelve todas las posibles, las pendientes y olvidadas primero; la sesión elige una por figura.
+function quizItems(){
+  const hold = h => h ? ` (${h})` : "";
+  const out = [];
+  figs().filter(f=>usable(f) && placed(f) && baileOf(f)===baileSel).sort((a,b)=> (isDue(b)?1:0)-(isDue(a)?1:0) || byMem(a,b)).forEach(f=>{
+    out.push({tipo:"acaba", figId:f.id, q:`¿Dónde termina «${f.nombre}»?`, a:f.salida+hold(f.agarreOut)});
+    out.push({tipo:"desde", figId:f.id, q:`¿Desde dónde entras en «${f.nombre}»?`, a:f.entrada+hold(f.agarreIn)});
+    const nx = figs().filter(x=>x.id!==f.id && usable(x) && placed(x) && baileOf(x)===baileSel && canFollow(f,x));
+    if(nx.length) out.push({tipo:"despues", figId:f.id, q:`Acabas «${f.nombre}» en ${f.salida}${hold(f.agarreOut)}. ¿Qué puedes hacer después?`, a:nx.map(x=>x.nombre).join(", ")});
+  });
+  return out;
+}
+// Nota de un repaso que no es la tarjeta de Repasar (preguntas de memoria): sube como mucho una vez al día, pero cuenta como actividad.
+// D8: mientras una figura tenga errores activos (sin `resuelto`), su repaso no se espacia más de 7 días (peldaño 2 de LADDER):
+// el paso se limita a 2 y la fecha no pasa de hoy+7. Se llama tras CADA actualización de f.rep (Repasar, preguntas, social).
+// No adelanta fechas que ya sean anteriores ni toca las incompletas (su due=mañana ya es menor).
+function capByErrors(f){
+  if(!f || !f.rep || !erroresOf(f).some(e=>!e.resuelto)) return f;
+  f.rep.step = Math.min(f.rep.step, 2);
+  const tope = todayStr(LADDER[2]); if(!f.rep.due || f.rep.due>tope) f.rep.due = tope;
+  return f;
+}
+// D9: «Me sale con pareja» (f.ejec = {nivel 0..3, last}) sube solo con evidencia de ejecución real y como mucho una vez al día;
+// baja con un «No» con pareja. Ausente = 0. Devuelve true si cambió algo (para poder deshacerlo desde el registro del social).
+const ejecN = f => { const n = Math.floor(+(f && f.ejec && f.ejec.nivel)); return n>=1 ? Math.min(n,3) : 0; };
+function bumpEjec(f, delta){
+  if(!f || !S.figures[f.id]) return false;
+  const hoy = todayStr(), n0 = ejecN(f), n = Math.max(0, Math.min(3, n0 + (delta>0 ? 1 : -1)));
+  if(delta>0 && f.ejec && f.ejec.last===hoy) return false;
+  if(n===n0 && (delta<0 || n0===3)) return false;
+  f.ejec = {nivel:n, last: delta>0 ? hoy : (f.ejec && f.ejec.last) || hoy};
+  persist({t:"fig", id:f.id}); return true;
+}
+function reviewFig(f, g){
+  if(!(g==="fluida" && f.rep && f.rep.last===todayStr())) f.rep = nextRep(f.rep, g);
+  if(f.estado==="incompleta") f.rep.due = todayStr(1);
+  capByErrors(f);
+  S.figures[f.id]=f; persist({t:"fig",id:f.id});
+  const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
 }
 
 // ---------- pulso de un vídeo ----------
@@ -1058,7 +1141,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 7;
+const SCHEMA = 11;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1115,6 +1198,39 @@ const MIGRATIONS = [
       const id = uid(); q[id] = {id, pos, baile:"Bachata", creada:d};
     });
     c.preguntas = q;
+  },
+  // 7 → 8: el repaso de enlaces pasa a ser por baile. Cada clave antigua (solo la posición) pasa a «Bachata␟posición»
+  // (hasta ahora solo había bachata). Si ya existe la nueva se queda esa; repetir el paso no cambia nada.
+  c => {
+    const lr = (c.linkRep && typeof c.linkRep==="object" && !Array.isArray(c.linkRep)) ? c.linkRep : {};
+    Object.keys(lr).forEach(k=>{
+      if(k.includes("␟")) return;
+      const nk = "Bachata␟" + k;
+      if(!(nk in lr)) lr[nk] = lr[k];
+      delete lr[k];
+    });
+    c.linkRep = lr;
+  },
+  // 8 → 9: enlaces comprobados ({"idA>idB": {a, b, fecha, veces}}): los que has bailado de verdad. Empieza vacío.
+  c => {
+    if(!(c.enlaces && typeof c.enlaces==="object" && !Array.isArray(c.enlaces))) c.enlaces = {};
+  },
+  // 9 → 10: errores recurrentes. Cada error de «Errores que cometo» gana veces (cuántas te ha pasado) y ultima (la última vez);
+  // resuelto (fecha en que dejó de pasarte) es opcional. Los de antes cuentan una vez, en su fecha (o hoy si no tenían).
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{
+      if(!f || typeof f!=="object" || !Array.isArray(f.errores)) return;
+      f.errores.forEach(e=>{
+        if(!e || typeof e!=="object") return;
+        if(!Number.isInteger(e.veces) || e.veces<1) e.veces = 1;
+        if(typeof e.ultima!=="string" || !e.ultima) e.ultima = (typeof e.fecha==="string" && e.fecha) ? e.fecha : todayStr();
+      });
+    });
+  },
+  // 10 → 11: notas sobre el vídeo de la clase (f.notasVid: [{id, s, texto}], s = segundo del vídeo). Cada figura empieza con la lista vacía;
+  // las partes la llevan solo si tenían notas, así que no se tocan.
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.notasVid)) f.notasVid=[]; });
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1133,6 +1249,7 @@ function applyData(c){
   S = { ...c, figures:c.figures||{}, logs:c.logs||{}, positions:arrOr(c.positions,DEFAULT_POS), holds:arrOr(c.holds,DEFAULT_HOLDS),
         classes:Array.isArray(c.classes)?[...c.classes]:[...DEFAULT_CLASSES], linkRep:(c.linkRep&&typeof c.linkRep==="object")?c.linkRep:{},
         actividad:(c.actividad&&typeof c.actividad==="object")?c.actividad:{},
+        enlaces:(c.enlaces&&typeof c.enlaces==="object"&&!Array.isArray(c.enlaces))?c.enlaces:{},
         preguntas:(c.preguntas&&typeof c.preguntas==="object"&&!Array.isArray(c.preguntas))?c.preguntas:{},
         schema: Number.isInteger(c.schema) ? c.schema : SCHEMA };
 }
@@ -1226,6 +1343,7 @@ new MutationObserver(ms=>{
     if(rc && !$("[data-recc]") && (n.matches("[data-recc]") || n.querySelector("[data-recc]"))) rcCleanup();
     // Igual con el simulacro: sin su hoja no sigue sonando el conteo.
     if(sim && !$("[data-sim]") && (n.matches("[data-sim]") || n.querySelector("[data-sim]"))) simStop();
+    if(guia && !$("[data-guia]") && (n.matches("[data-guia]") || n.querySelector("[data-guia]"))) guiaStop();
     (n.tagName==="VIDEO" ? [n] : n.querySelectorAll("video")).forEach(v=>{ if(!v.isConnected && !v.dataset.aux) releaseVideo(v); });
   }
 }).observe(document.body, {childList:true, subtree:true});
@@ -1321,7 +1439,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.51";
+const APP_VERSION = "1.54";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1408,7 +1526,8 @@ async function initStore(){
   }
   assetsApi = idb && !safeMode ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
-  takeDaily().catch(()=>{});   // sin esperar: el arranque no depende del almacén de instantáneas
+  // Sin esperar: el arranque no depende del almacén de instantáneas. La limpieza va después de la diaria.
+  takeDaily().catch(()=>{}).then(()=>cleanOrphans()).catch(()=>{});
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
   await loadCoverKeys(); render();
   setTimeout(genMissingThumbs, 1200);
@@ -1457,10 +1576,10 @@ function saveFigure(f){
 }
 function deleteFigureUndo(id){
   const f=S.figures[id]; if(!f) return;
-  const copy=clone(f); delete S.figures[id]; persist({t:"figdel",id}); render();
-  let undone=false;
-  toast(`«${f.nombre}» borrada`, {label:"Deshacer", fn:()=>{ undone=true; S.figures[id]=copy; persist({t:"fig",id}); render(); toast(`«${copy.nombre}» recuperada`); },
-    onExpire:()=>{ if(!undone) figVids(copy).forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel",id:v}); }); }});
+  const copy=clone(f), vs=figVids(copy); delete S.figures[id]; persist({t:"figdel",id}); render();
+  let undone=false; pendAdd(vs);
+  toast(`«${f.nombre}» borrada`, {label:"Deshacer", fn:()=>{ undone=true; pendDel(vs); S.figures[id]=copy; persist({t:"fig",id}); render(); toast(`«${copy.nombre}» recuperada`); },
+    onExpire:()=>{ pendDel(vs); if(!undone) vs.forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel",id:v}); }); }});
 }
 function deleteFigure(id){ const vs=figVids(S.figures[id]); delete S.figures[id]; persist({t:"figdel",id}); vs.forEach(v=>persist({t:"assetdel",id:v})); render(); }
 // Vídeos guardados de una figura: el de la clase, los de las partes anteriores y los de sus intentos.
@@ -1468,6 +1587,87 @@ const intentosOf = f => (f && Array.isArray(f.intentos)) ? f.intentos : [];
 const partesOf = f => (f && Array.isArray(f.partes)) ? f.partes : [];
 const figVids = f => f ? [f.vid, ...partesOf(f).map(x=>x.vid), ...intentosOf(f).map(a=>a.vid)].filter(Boolean) : [];
 const vidInUse = v => Object.values(S.figures).some(x=>figVids(x).includes(v));
+// ---------- vídeos sin figura ----------
+// Un vídeo (o su portada «cover:<id>») que no está en ninguna figura ni en ninguna instantánea se apunta con la fecha
+// en que se vio así (LS_HUERF = {clave: fecha ISO}) y se borra cuando lleva HUERF_DIAS días. Si vuelve a usarse, sale de la lista.
+// Si una instantánea no se puede leer no se borra nada: podría ser la única que guarda ese vídeo.
+const LS_HUERF = "bachateca.huerfanos", HUERF_DIAS = 7;
+// Todos los «vid» de unos datos, a cualquier profundidad (además de figVids): más amplio a propósito, por si hay datos
+// antiguos o de otra versión; equivocarse por exceso solo cuesta espacio, por defecto costaría un vídeo.
+function vidsIn(o, out = new Set(), d = 0){
+  if(!o || typeof o!=="object" || d>20) return out;
+  if(Array.isArray(o)){ o.forEach(x=>vidsIn(x, out, d+1)); return out; }
+  for(const k in o){ const v = o[k]; if(k==="vid" && typeof v==="string" && v) out.add(v); else if(v && typeof v==="object") vidsIn(v, out, d+1); }
+  return out;
+}
+// Vídeos de lo que acabas de borrar mientras «Deshacer» sigue disponible: cuentan como usados.
+const undoPend = new Set();
+const pendAdd = vs => vs.forEach(v=>{ if(v) undoPend.add(v); }), pendDel = vs => vs.forEach(v=>undoPend.delete(v));
+const refsNow = () => { const r = vidsIn(S); undoPend.forEach(v=>r.add(v)); Object.values(S.figures||{}).forEach(f=>figVids(f).forEach(v=>r.add(v))); return r; };
+const vidOfKey = k => k.startsWith("cover:") ? k.slice(6) : k;
+// Solo con los datos bien leídos y sin una importación o restauración a medias.
+const canClean = () => loaded && !safeMode && !!idb && !importing && !restoring;
+// Ids referenciados por S y por todas las instantáneas. De cada instantánea se guardan solo los ids. Si una falla, lanza.
+async function videoRefs(){
+  const refs = refsNow();
+  for(const k of await snapKeys()){
+    const v = await kvGet(k);
+    if(!v || !v.state || typeof v.state!=="object") throw new Error("instantánea ilegible");
+    vidsIn(v.state, refs);
+  }
+  return refs;
+}
+// Claves del almacén de vídeos (y portadas) que nadie usa. Las instantáneas solo se leen si hay alguna candidata.
+async function orphanVideos(){
+  if(!canClean()) return [];
+  const ks = ((await tx("videos","readonly",st=>st.getAllKeys()))||[]).filter(k=>typeof k==="string");
+  const inS = refsNow(), cand = ks.filter(k=>!inS.has(vidOfKey(k)));
+  if(!cand.length) return [];
+  const refs = await videoRefs(), out = [];
+  for(const k of cand) if(!refs.has(vidOfKey(k))){ const b = await vidGet(k).catch(()=>null); out.push({id:k, bytes:(b && b.size) || 0}); }
+  return out;
+}
+// Biblioteca sin figuras (recién instalada, vaciada o leída a medias): la limpieza automática no apunta ni borra nada.
+const libEmpty = () => !(Object.keys(S.figures||{}).length > 0) || !(lastFigN > 0);
+// Borra los huérfanos que llevan 7 días (o todos con {ahora:true}, para «Liberar ahora»). Devuelve {n, bytes} o null si no se ha podido.
+// Una sola a la vez; antes de cada borrado se vuelve a mirar S, por si mientras tanto se ha guardado algo que lo usa.
+let cleaning = Promise.resolve();
+function cleanOrphans(opts = {}){
+  const run = async () => {
+    if(!canClean() || (!opts.ahora && libEmpty())) return null;
+    let orf; try{ orf = await orphanVideos(); }catch{ return null; }
+    const now = opts.now ?? Date.now(), m0 = lsGet(LS_HUERF), marks = isObj(m0) ? m0 : {}, next = {};
+    const keys = new Set(orf.map(x=>x.id)), size = new Map(orf.map(x=>[x.id, x.bytes])), gone = new Set();
+    let n = 0, bytes = 0;
+    const del = async k => { await tx("videos","readwrite",st=>st.delete(k)); gone.add(k); bytes += size.get(k)||0;
+      const id = vidOfKey(k), c = k===id ? vidCache : coverCache, u = c.get(id);
+      if(u){ try{ URL.revokeObjectURL(u); }catch{} c.delete(id); }
+      if(k===id){ vidKinds.delete(id); n++; } else coverSet.delete(id); };
+    // Primero los vídeos: al borrar uno se va también su portada.
+    for(const k of [...keys].sort((a,b)=>a.startsWith("cover:")-b.startsWith("cover:"))){
+      if(gone.has(k)) continue;
+      const t = Date.parse(marks[k]), first = Number.isFinite(t) && t <= now ? t : now;
+      if(!opts.ahora && now - first < HUERF_DIAS*864e5){ next[k] = new Date(first).toISOString(); continue; }
+      if(!canClean() || (!opts.ahora && libEmpty())) return null;
+      if(refsNow().has(vidOfKey(k))) continue;
+      try{ await del(k); if(k===vidOfKey(k) && keys.has(COVER(k)) && !gone.has(COVER(k))) await del(COVER(k)); }
+      catch{ next[k] = new Date(first).toISOString(); }
+    }
+    lsSet(LS_HUERF, next);
+    return {n, bytes};
+  };
+  return cleaning = cleaning.then(run, run);
+}
+async function freeOrphans(){
+  if(safeMode){ toast("Modo seguro: no se puede liberar espacio."); return; }
+  let l; try{ l = (await orphanVideos()).filter(x=>!x.id.startsWith("cover:")); }catch{ l = null; }
+  if(!l){ toast("No se han podido leer las instantáneas. No he borrado nada."); return; }
+  if(l.length && await askConfirm({title:`¿Borrar ${pl(l.length,"vídeo sin figura","vídeos sin figura")}?`, msg:"No están en ninguna figura ni en ninguna instantánea. No se puede deshacer.", ok:"Borrar"})){
+    const r = await cleanOrphans({ahora:true});
+    toast(r ? `${pl(r.n,"vídeo borrado","vídeos borrados")} · ${fmtMB(r.bytes)} liberados` : "No se han podido leer las instantáneas. No he borrado nada.");
+  }
+  if(setView==="espacio") openSettings();
+}
 function saveMeta(){ persist({t:"meta"}); render(); }
 
 // ---------- navegación ----------
@@ -1662,7 +1862,7 @@ function renderInicio(){
   const items = [
     fStep && `<li>${ico("brain")}<span><b>Recuerda ${pl(fStep.ids.length,"figura","figuras")}</b><span>${esc(names(fStep.ids))}</span></span></li>`,
     lStep && `<li>${ico("link")}<span><b>Salidas desde ${esc(joinY(lStep.ids))}</b><span>${plan.bloq && lStep.ids[0]===plan.bloq ? "Donde te bloqueaste en el último social" : "Nombra dos salidas y márcalas con el cuerpo"}</span></span></li>`,
-    cStep && `<li>${ico("music")}<span><b>Cadena desde ${esc(cStep.pos)}</b><span>Hasta 4 figuras seguidas, con una canción</span></span></li>`
+    cStep && `<li>${ico("music")}<span><b>Cadena desde ${esc(cStep.pos)}</b><span>Hasta ${chainN} figuras seguidas, con una canción</span></span></li>`
   ].filter(Boolean);
   const carr = dF.slice().sort(byMem).slice(0,8);
   // Siguiente paso: la posición a la que llegas y desde la que te faltan salidas seguras.
@@ -1813,9 +2013,20 @@ function renderRepasar(){
           : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
       </div>
       <div class="panel">
+        <h3>Preguntas de memoria</h3>
+        <p class="small muted">Dónde acaba una figura, desde dónde entras o qué puedes hacer después. Salen de tus propias figuras.</p>
+        ${quizItems().length ? `<button class="btn" data-act="start-quiz">Empezar</button>` : `<p class="small muted">Necesitas al menos una figura con dónde empieza y dónde acaba, ya enseñada entera.</p>`}
+      </div>
+      <div class="panel">
         <h3>Simulacro de social</h3>
         <p class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</p>
         <button class="btn" data-act="sim-open">Simulacro</button>
+      </div>
+      <div class="panel">
+        <h3>Práctica guiada</h3>
+        <p class="small muted">Te digo qué bailar y cuántas veces mientras suena el conteo: figuras pendientes, enlaces y una cadena.</p>
+        <div class="chips sim-n" role="group" aria-label="Duración de la práctica">${[10,20].map(m=>`<button type="button" class="chip" data-act="guia-mins" data-m="${m}" aria-pressed="${guiaCfg.mins===m}">${m} min</button>`).join("")}</div>
+        <button class="btn" data-act="guia-open">Empezar</button>
       </div>
       ${progressHTML()}
       <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
@@ -1823,11 +2034,11 @@ function renderRepasar(){
   }
   if(session.i>=session.ids.length){
     learn("rev");
-    const d=session.done, c=k=>d.filter(x=>x===k).length, link=session.kind==="link";
+    const d=session.done, c=k=>d.filter(x=>x===k).length, link=session.kind==="link", quiz=session.kind==="quiz";
     const res=[c("fluida") && pl(c("fluida"),"fluida","fluidas"), c("dudas") && `${c("dudas")} con dudas`, c("no") && `${c("no")} sin recordar`].filter(Boolean);
     // Qué viene después: lo que queda hoy o cuándo toca el siguiente.
     const left = link ? dueLinks().length : dueFigs().length, t=todayStr();
-    const nx = (link ? linkPositions().map(p=>S.linkRep[p]?.due) : figs().filter(active).map(f=>f.rep?.due)).filter(x=>x && x>t).sort()[0];
+    const nx = (link ? linkPositions().map(p=>S.linkRep[lrKey(p)]?.due) : figs().filter(active).map(f=>f.rep?.due)).filter(x=>x && x>t).sort()[0];
     const other = left ? 0 : (link ? dueFigs().length : dueLinks().length);
     const next = left ? `Quedan ${left} para hoy.`
       : other ? (link ? `También ${other===1?"toca":"tocan"} hoy ${pl(other,"figura","figuras")}.` : `En enlaces también ${other===1?"toca":"tocan"} hoy ${pl(other,"posición","posiciones")}.`)
@@ -1835,18 +2046,19 @@ function renderRepasar(){
     // Cada una con cómo salió y cuándo vuelve; primero las que hay que mirar.
     const when = due => !due ? "" : due<=todayStr() ? "vuelve hoy" : due===todayStr(1) ? "vuelve mañana" : `vuelve el ${fmtDate(due)}`;
     const GR = {fluida:"Fluida", dudas:"Con dudas", no:"Sin recordar"}, ORD = {no:0, dudas:1, fluida:2};
-    const items = session.ids.slice(0, d.length).map((id,i)=>({g:d[i], name: link ? id : S.figures[id]?.nombre, due: link ? S.linkRep[id]?.due : S.figures[id]?.rep?.due}))
+    const items = session.ids.slice(0, d.length).map((id,i)=>({g:d[i], name: link ? id : quiz ? S.figures[id.figId]?.nombre : S.figures[id]?.nombre, due: link ? S.linkRep[lrKey(id)]?.due : S.figures[quiz ? id.figId : id]?.rep?.due}))
       .filter(x=>x.name).sort((a,b)=>ORD[a.g]-ORD[b.g]);
     const allOk = d.length>=3 && c("fluida")===d.length;
     v.innerHTML = `
       <h2>${allOk?"Todo a compás":"Repaso terminado"}</h2>
-      <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
+      <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):quiz?pl(d.length,"pregunta","preguntas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
       <ul class="rv-list">${items.map((x,n)=>`<li class="rv-${x.g}" style="--n:${n}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
       <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${esc(i)}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
       ${next?`<p class="small muted">${next}</p>`:""}
       ${training && training.i < training.steps.length-1 ? `<button class="btn pri" data-act="train-next">Seguir el entreno: ${esc(trainLabel(training.steps[training.i+1]))}</button><button class="btn" data-act="end">Terminar aquí</button>` :
+        quiz?`<button class="btn pri" data-act="end">Hecho</button>` :
         left?`<button class="btn pri" data-act="start-${link?"link":"fig"}">Repasar ${Math.min(left,MAX_SESSION)} más</button><button class="btn" data-act="end">Hecho por hoy</button>`
         : other?`<button class="btn pri" data-act="start-${link?"fig":"link"}">${link?"Repasar figuras":"Repasar enlaces"}</button><button class="btn" data-act="end">Hecho por hoy</button>`
         :`<button class="btn pri" data-act="end">Hecho</button>`}</div>`;
@@ -1856,6 +2068,19 @@ function renderRepasar(){
   const head = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><p class="muted small">${session.i+1} de ${session.ids.length}</p>`;
   const gradeHTML = `<div class="grade-bar"><p class="small muted">¿Cómo te ha salido?</p>
     <div class="grade"><button class="btn" data-grade="no">No la recordé</button><button class="btn" data-grade="dudas">Con dudas</button><button class="btn" data-grade="fluida">Fluida</button></div></div>`;
+  if(session.kind==="quiz"){
+    const it=session.ids[session.i];
+    const qGrade = gradeHTML.replace(">No la recordé<",">No<").replace(">Fluida<",">Sí<").replace("¿Cómo te ha salido?","¿La sabías?");
+    v.innerHTML = `${head}
+      <div class="flash">
+        <div class="route"><span>Pregunta de memoria</span></div>
+        <div class="big">${esc(it.q)}</div>
+        ${!session.revealed ? `<p class="muted">Respóndete antes de mirar.</p><button class="btn pri" data-act="reveal">Ver respuesta</button>` : `
+          <div class="answer"><p><b>${esc(it.a)}</b></p>${qGrade}</div>`}
+      </div>
+      <button class="btn ghost sm" data-act="end">Salir del repaso</button>`;
+    return;
+  }
   if(session.kind==="link"){
     const p=session.ids[session.i], ex=exitsFrom(p), ar=arrivals(p);
     v.innerHTML = `${head}
@@ -1882,7 +2107,7 @@ function renderRepasar(){
       ${ms && ms!=="nueva" ? `<span class="tagx ${MEM[ms][1]} flash-tag">${MEM[ms][0]}</span>` : ""}
       <div class="route"><span>${isMove(f)?`Empiezas en ${esc(f.entrada)}${holdTxt(f.agarreIn)}`:esc(TIPO[tipoOf(f)].t)+(f.entrada?` · en ${esc(f.entrada)}`:"")}</span></div>
       <div class="big">${esc(f.nombre)}</div>
-      ${erroresOf(f).length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${erroresOf(f).map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}
+      ${erroresActivos(f).length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${erroresActivos(f).map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}
       ${!session.revealed ? `
         <p class="muted">${isMove(f)?"Hazla sin mirar. ¿Qué señal das y dónde terminas?":"Hazlo sin mirar, contando los tiempos."}</p>
         <button class="btn pri" data-act="reveal">Ver respuesta</button>
@@ -1910,15 +2135,22 @@ function nextFrom(f){
   return `<p class="small muted">Para enlazar desde ${esc(f.salida)}: ${opts.map(o=>`<b style="color:var(--fg)">${esc(o.nombre)}</b>`).join(", ")}.</p>`;
 }
 function grade(g){
+  if(session.kind==="quiz"){
+    const f = S.figures[session.ids[session.i].figId];
+    if(f) reviewFig(f, g);
+    session.done.push(g); session.i++; session.revealed=false;
+    render(); focusReview(); return;
+  }
   if(session.kind==="link"){
     const p=session.ids[session.i];
-    S.linkRep[p]=nextRep(S.linkRep[p], g); persist({t:"lr"});
+    S.linkRep[lrKey(p)]=nextRep(S.linkRep[lrKey(p)], g); persist({t:"lr"});
     if(exitsFrom(p).length<2) session.weak.push(p);
   } else {
     const f = S.figures[session.ids[session.i]]; if(!f) return;
     f.rep = nextRep(f.rep, g);
     // Incompleta: vuelve cada día hasta que te la terminen de enseñar, te salga como te salga.
     if(f.estado==="incompleta") f.rep.due = todayStr(1);
+    capByErrors(f);
     S.figures[f.id]=f; persist({t:"fig",id:f.id});
     if(g==="fluida" && f.estado==="practica" && f.rep.step>=2) session.promote.push(f.id);
   }
@@ -1931,6 +2163,14 @@ function focusReview(){
   const el=$("#v-repasar .flash .big") || $("#v-repasar h2"); if(!el) return;
   el.tabIndex=-1; el.focus({preventScroll:true});
   if(session && session.i < session.ids.length) announce(`${session.i+1} de ${session.ids.length}`);
+}
+function startQuiz(){
+  // Una pregunta por figura (el tipo, al azar) y hasta MAX_SESSION; ya vienen las pendientes primero.
+  const by = new Map(); quizItems().forEach(it=>{ if(!by.has(it.figId)) by.set(it.figId, []); by.get(it.figId).push(it); });
+  const ids = [...by.values()].slice(0,MAX_SESSION).map(a=>a[Math.floor(Math.random()*a.length)]);
+  if(!ids.length) return;
+  session = {kind:"quiz", ids, i:0, revealed:false, done:[], promote:[], weak:[]};
+  render();
 }
 function startSession(kind, any){
   let ids;
@@ -1983,15 +2223,30 @@ function renderEnlazar(){
         ${sel.into.length ? `<p class="small muted">Llegas aquí desde: ${sel.into.map(f=>esc(f.nombre)+(f.agarreOut?` (${esc(f.agarreOut)})`:"")).join(", ")}.</p>`:""}
         ${sel.out.length ? `<div class="practice">
           <h3>Practicar enlaces</h3>
-          ${firstHelp("chain", "Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
+          ${firstHelp("chain", "Varias figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
           <div class="chips">
             <button class="chip sm" data-chainopt="safe" aria-pressed="${chainSafe}">Solo seguras</button>
             <button class="chip sm" data-chainopt="strict" aria-pressed="${chainStrict}">Agarres exactos</button>
           </div>
+          ${chainOptsHTML()}
           <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
       </div>` : ""}`;
+}
+function chainOptsHTML(){
+  // Antes de repintar, el panel viejo sigue en el DOM: leer de él si estaba abierto evita perder el estado (el evento toggle llega tarde).
+  const live = document.querySelector("#v-enlazar details.chainopts"); if(live) chainOptsOpen = live.open;
+  const pool = chainPool().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+  const ends = [...new Set([...pool.map(f=>f.salida), ...(chainEnd?[chainEnd]:[])])].sort((a,b)=>a.localeCompare(b,"es"));   // la guardada se muestra aunque ya no llegue nadie
+  const musts = chainMust && !pool.some(f=>f.id===chainMust) ? [{id: chainMust, nombre: "(figura no disponible)"}] : [];
+  const opt = (v, t, cur) => `<option value="${esc(v)}"${v===cur?" selected":""}>${esc(t)}</option>`;
+  return `<details class="chainopts"${chainOptsOpen?" open":""}><summary>Opciones de la cadena</summary><div class="inner">
+    <label class="f">Terminar en<select data-chainsel="end">${opt("", "Donde sea", chainEnd)}${ends.map(p=>opt(p, p, chainEnd)).join("")}</select></label>
+    <label class="f">Incluir<select data-chainsel="must">${opt("", "Ninguna en concreto", chainMust)}${[...musts, ...pool].map(f=>opt(f.id, f.nombre, chainMust)).join("")}</select></label>
+    <div role="group" aria-label="Sin estas figuras"><span class="small muted">Sin</span><div class="chips">${pool.map(f=>`<button class="chip sm" data-chainx="${esc(f.id)}" aria-pressed="${chainExclude.includes(f.id)}">${esc(f.nombre)}</button>`).join("")}</div></div>
+    <label class="f">Longitud<select data-chainsel="n">${[2,3,4,5,6].map(k=>opt(String(k), k+" figuras", String(chainN))).join("")}</select></label>
+  </div></details>`;
 }
 function mapHTML(cov, gaps, incN){
   return `
@@ -2011,7 +2266,11 @@ function mapHTML(cov, gaps, incN){
 }
 const holdFits = (a,b,strict) => strict ? (!!a && !!b && a===b) : holdOk(a,b);
 // Pura: recibe la reserva ya filtrada (usables, con posiciones, del baile y, si toca, solo seguras) y no toca S ni el DOM.
-function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
+// prefer(prev, f) → 0..1 (prev es null en el primer paso): cada opción pesa 1 + 3·prefer; sin prefer todas pesan igual.
+// Con end (posición donde acaba) y/o must (id de una figura que debe entrar) busca caminos en vez de pasear al azar; exclude (ids) quita figuras de la reserva.
+function buildChain(pool, {start, hold="", strict=false, n=4, end="", must="", exclude=[], prefer}, rnd=Math.random){
+  if(end || must) return buildGoalChain(pool, {start, hold, strict, n, end, must, exclude, prefer}, rnd);
+  if(exclude.length) pool = pool.filter(f=>!exclude.includes(f.id));
   const steps=[]; const used=new Set(); let prev=null;
   let pos = start || (pool[Math.floor(rnd()*pool.length)]||{}).entrada;
   const fits = f => prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
@@ -2023,21 +2282,57 @@ function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
       const usedUp = pool.some(f=> used.has(f.id) && fits(f));
       steps.push({dead: prev?prev.salida:pos, hold: prev?prev.agarreOut:"", usedUp}); break;
     }
-    const f = opts[Math.floor(rnd()*opts.length)];
+    let f;
+    if(prefer){
+      const w = opts.map(o=>1+3*(+prefer(prev, o)||0)); let r = rnd()*w.reduce((a,b)=>a+b,0), j = 0;
+      while(j<opts.length-1 && r>=w[j]){ r-=w[j]; j++; }
+      f = opts[j];
+    } else f = opts[Math.floor(rnd()*opts.length)];
     // vago: el enlace se apoyó en un agarre sin indicar. En el primer paso solo cuenta si elegiste agarre («Cualquiera» no avisa).
     const vago = prev ? (!prev.agarreOut || !f.agarreIn) : (!!hold && !f.agarreIn);
     used.add(f.id); steps.push({f, vago}); prev=f;
   }
   return {steps};
 }
+// Búsqueda en profundidad: sin repetir figuras, ≤ n pasos, misma regla de encaje que el paseo (con agarre/estricto en el primer paso).
+// Cada camino que acaba en end (si hay) e incluye must (si hay) es válido, aunque sea más corto que n. Tope de caminos y de nodos para ir fluido en el móvil.
+// Elección: azar ponderado por la SUMA de (1+3·prefer) de sus pasos (como en el paseo, pero por camino entero; la suma, no el producto, para no hundir los largos).
+function buildGoalChain(pool, {start, hold, strict, n, end, must, exclude, prefer}, rnd){
+  pool = pool.filter(f=>!exclude.includes(f.id));
+  const paths=[]; let nodes=0; const MAXP=2000, MAXN=50000;
+  const dfs = (path, prev, w) => {
+    if(paths.length>=MAXP || nodes>=MAXN) return;
+    const opts = pool.filter(f=> !path.includes(f) && (prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
+                                                           : ((!start || f.entrada===start) && holdFits(hold, f.agarreIn, strict))));
+    for(const f of opts){
+      if(paths.length>=MAXP || ++nodes>MAXN) return;
+      const np = [...path, f], nw = w + 1 + 3*(prefer ? (+prefer(prev, f)||0) : 0);
+      if((!end || f.salida===end) && (!must || np.some(x=>x.id===must))) paths.push({np, w: nw});
+      if(np.length<n) dfs(np, f, nw);
+    }
+  };
+  dfs([], null, 0);
+  if(!paths.length) return {steps: [], noPath: true};
+  let r = rnd()*paths.reduce((a,c)=>a+c.w,0), j = 0;
+  while(j<paths.length-1 && r>=paths[j].w){ r-=paths[j].w; j++; }
+  const path = paths[j].np;
+  return {steps: path.map((f,i)=>({f, vago: i ? (!path[i-1].agarreOut || !f.agarreIn) : (!!hold && !f.agarreIn)}))};
+}
 const LS_CHAIN = "bachateca.cadena";
 const chainLS = lsGet(LS_CHAIN), chainV = chainLS && typeof chainLS==="object" ? chainLS : {};
 let chainSafe = chainV.safe === true, chainStrict = chainV.strict === true;
+// Opciones de objetivo, validadas al leer (el almacenamiento puede traer cualquier cosa).
+let chainEnd = typeof chainV.end==="string" ? chainV.end : "", chainMust = typeof chainV.must==="string" ? chainV.must : "";
+let chainExclude = Array.isArray(chainV.exclude) ? chainV.exclude.filter(x=>typeof x==="string") : [];
+let chainN = Number.isInteger(chainV.n) && chainV.n>=2 && chainV.n<=6 ? chainV.n : 4;
+let chainOptsOpen = !!(chainEnd || chainMust || chainExclude.length || chainN!==4);   // abierto si hay condiciones guardadas; luego manda el usuario
+const saveChainOpts = () => lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict, end: chainEnd, must: chainMust, exclude: chainExclude, n: chainN});
+const chainPool = () => figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
 function makeChain(start){
-  const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
-  return buildChain(pool, {start, hold: linkHold, strict: chainStrict});
+  return buildChain(chainPool(), {start, hold: linkHold, strict: chainStrict, n: chainN, end: chainEnd, must: chainMust, exclude: chainExclude, prefer: (p, f) => p && linkDone(p, f) ? 1 : 0});
 }
 function renderChain(){
+  if(chain.noPath) return `<p class="muted small" role="status">No hay ninguna cadena así con tus figuras. Prueba con más pasos o quita una condición.</p>`;
   if(!chain.steps.length) return `<p class="muted small">Aún no hay figuras para encadenar.</p>`;
   let n=0;
   // Barra de la canción: cada figura ocupa sus tiempos (8 si no los tiene) y el básico final, una frase.
@@ -2046,11 +2341,11 @@ function renderChain(){
   let m=0;
   const bar = `<div class="chain-bar" aria-hidden="true">${chain.steps.map(s=>`<span class="${s.dead?"dead":""}" style="flex:${beats(s)}">${s.dead?"básico":++m}</span>`).join("")}</div>
     <p class="small muted">${total} tiempos: ${fr===1?"una frase de 8":`unas ${fr} frases de 8`} seguidas.</p>`;
-  return `${bar}<div class="chain">${chain.steps.map(s=> s.dead
+  return `${bar}<div class="chain">${chain.steps.map((s,i)=> s.dead
     ? `<div class="step"><span class="k">↺</span><div><b>Básico</b><div class="small muted">${s.usedUp
         ? `Las salidas desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} ya están en la cadena. Vuelve al básico y empieza otra vuelta.`
         : `Desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} aún no tienes salidas. Vuelve al básico: también es una transición.`}</div></div></div>`
-    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}${ready(s.f)?"":" · en práctica"}${s.vago?" · agarre sin indicar":""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
+    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b>${i>0 && chain.steps[i-1].f ? lnHTML(chain.steps[i-1].f, s.f, true) : ""}<div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}${ready(s.f)?"":" · en práctica"}${s.vago?" · agarre sin indicar":""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
 }
 
 // ---------- vista: social ----------
@@ -2058,7 +2353,7 @@ function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && ba
 // Lo que ya marcaste esta noche se ve siempre, aunque esté en práctica o quede fuera de las primeras.
 const socOk = f => ready(f) || socialIncl || logSel.has(f.id);
 const socTop = (list, n) => [...list.slice(0,n), ...list.slice(n).filter(f=>logSel.has(f.id))];
-const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
+const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || (ejecN(b)-ejecN(a)) || ((b.usos||0)-(a.usos||0));
 const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" pathLength="1"/></svg></span>`;
 function socLi(f, sub){
   return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${esc(f.id)}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}<span class="sr">, salió esta noche</span></span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
@@ -2249,9 +2544,11 @@ function saveLog(){
     // No cuenta si ya se repasó ese día o después (un social atrasado no mueve `last` hacia atrás ni suma encima).
     if(usable(f) && !(f.rep && f.rep.last && f.rep.last >= l.fecha)){
       (l.repAntes ||= {})[id] = clone(f.rep || null);
-      f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; counted = true;
+      f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; capByErrors(f); counted = true;
       (l.repDespues ||= {})[id] = clone(f.rep);
     }
+    // Marcarla en un social es ejecución real: «Me sale con pareja» +1 (una vez al día); se guarda cómo estaba para deshacerlo al borrar el registro.
+    if(usable(f)){ const antes = clone(f.ejec || null); if(bumpEjec(f, 1)){ (l.ejecAntes ||= {})[id] = antes; (l.ejecDespues ||= {})[id] = clone(f.ejec); } }
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
@@ -2262,6 +2559,10 @@ function saveLog(){
   if(backupInfo().stale) lsSet(LS_NUDGE, 1);
   render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
   const s=$(".sheet"); if(s) s.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); announce("Registro guardado");
+  // Si marcaste dos figuras que encajan una detrás de otra y ese enlace aún no está comprobado, se ofrece una vez (solo la primera pareja).
+  const fs = l.figs.map(id=>S.figures[id]).filter(x=>x && placed(x));
+  for(const A of fs){ const B = fs.find(x=>x!==A && canFollow(A,x) && !linkDone(A,x)); if(B){
+    toast(`¿Bailaste ${A.nombre} → ${B.nombre}?`, {label:"Sí", fn:()=>{ markLink(A.id, B.id); announce("Enlace comprobado"); }}); break; } }
 }
 function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
@@ -2272,13 +2573,20 @@ function deleteLog(id){
   const same = (a,b) => JSON.stringify(a||null)===JSON.stringify(b||null);
   const quitados = {};
   Object.entries(l.repAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
-    if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){ quitados[fid]={rep:clone(f.rep), antes}; if(antes) f.rep=clone(antes); else delete f.rep; persist({t:"fig",id:fid}); } });
+    if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){
+      const rep=clone(f.rep); if(antes) f.rep=clone(antes); else delete f.rep;
+      // El repaso de antes puede ser de cuando no había errores activos: también se limita (antes = lo que queda, para el Deshacer).
+      capByErrors(f); quitados[fid]={rep, antes: clone(f.rep||null)}; persist({t:"fig",id:fid}); } });
+  const ejQuitados = {};
+  Object.entries(l.ejecAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
+    if(f && same(f.ejec, (l.ejecDespues||{})[fid])){ ejQuitados[fid]={ejec:clone(f.ejec), antes}; if(antes) f.ejec=clone(antes); else delete f.ejec; persist({t:"fig",id:fid}); } });
   delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
     // Vuelve a poner los repasos que quitó el borrado, solo si la figura sigue como la dejó el borrado.
-    Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; persist({t:"fig",id:fid}); } });
+    Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; capByErrors(f); persist({t:"fig",id:fid}); } });
+    Object.entries(ejQuitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.ejec, q.antes)){ f.ejec=q.ejec; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
 }
@@ -2301,14 +2609,18 @@ function openView(id){
   const keys = String(f.senal||"").split(/\s*(?:[;\n]|\.(?:\s|$))\s*/).map(x=>x.trim()).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1));
   const ms = memState(f), r = f.rep || {}, step = Math.max(0, Math.min(Math.floor(+r.step)||0, LADDER.length-1));
   const when = d => !d ? "" : d<=todayStr() ? "hoy" : d===todayStr(1) ? "mañana" : fmtDate(d);
+  const eN = ejecN(f), rN = step/(LADDER.length-1);
+  const barra = (lbl, v, max) => `<div class="fv-bar"><span class="small">${lbl}</span><div class="progress" role="meter" aria-label="${lbl}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${v}"><i style="width:${Math.round(v/max*100)}%"></i></div></div>`;
   const mem = active(f) ? `<section class="fv-card fv-mem" aria-labelledby="fv-mem">
       <div class="ring sm">${ringSVG((step+1)/LADDER.length, 70, 8)}<b>${LADDER[step]} d</b></div>
       <div class="fv-mem-t"><div class="in-h"><h3 id="fv-mem">Memoria</h3><span class="tagx ${(MEM[ms]||MEM.nueva)[1]}">${(MEM[ms]||MEM.nueva)[0]}</span></div>
-        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p></div>
+        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p>
+        ${barra("La recuerdo", step, LADDER.length-1)}${barra("Me sale con pareja", eN, 3)}
+        ${eN/3 < rN ? `<p class="small muted">Te sale de memoria; ahora pruébala con pareja en el social.</p>` : ""}</div>
     </section>` : "";
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${esc(f.id)}">
     <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${esc(f.id)}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    ${f.vid ? `<div class="fv-media">${playerHTML(f)}</div>` : f.thumb ? `<div class="fv-media"><img class="fv-img" src="${esc(f.thumb)}" alt=""></div>` : ""}
+    ${f.vid ? `<div class="fv-media">${playerHTML(f, true)}</div>` : f.thumb ? `<div class="fv-media"><img class="fv-img" src="${esc(f.thumb)}" alt=""></div>` : ""}
     <div class="fv-title">
       <h2 id="sheet-t" tabindex="-1">${esc(f.nombre)}</h2>
       ${isMove(f) && placed(f) ? `<p class="route-big">${routeTxt(f, true)}</p>` : (!isMove(f) && f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
@@ -2324,16 +2636,19 @@ function openView(id){
     ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
     ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
     ${f.vid && assetsApi ? pkCardHTML(f.pulso, f.vid, f.id) : ""}
+    ${f.vid ? nvCardHTML(f, f.id) : ""}
     ${mem}
     ${f.notas ? `<section class="fv-card" aria-labelledby="fv-n"><h3 id="fv-n">Notas</h3><p class="txt">${esc(f.notas)}</p></section>` : ""}
     ${errCardHTML(f)}
     ${attCardHTML(f, CHEV)}
     ${f.estado!=="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
-      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${esc(x.id)}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
+      ? `<div class="menu">${nexts.map(x=>`<div class="nx-row"><button type="button" class="mrow" data-view="${esc(x.id)}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>${lnHTML(f, x)}</div>`).join("")}</div>`
       : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
   </div></div>`;
+  nvAdd = null;
   hydrateVideos($("#sheet-root"));
+  nvBind(()=>S.figures[f.id]?.notasVid);
   ["att-cam","att-lib"].forEach(k=>{ const fi=$("#"+k); if(fi) fi.onchange=()=>{ const file=fi.files[0]; if(file) openAttemptNew(f.id, file); }; });
   const s=$(".sheet"); if(s) s.scrollTop=0;
   markClean();
@@ -2633,7 +2948,7 @@ function simGrade(g){
   if(!sim || sim.fase!=="revela") return;
   const r = sim.res[sim.i]; r.g = g;
   // Un solo paso hacia arriba por posición y día: «La tenía» repetida el mismo día no vuelve a subir el intervalo.
-  if(!(g==="fluida" && S.linkRep[r.pos]?.last===todayStr())){ S.linkRep[r.pos] = nextRep(S.linkRep[r.pos], g); persist({t:"lr"}); }
+  if(!(g==="fluida" && S.linkRep[lrKey(r.pos)]?.last===todayStr())){ S.linkRep[lrKey(r.pos)] = nextRep(S.linkRep[lrKey(r.pos)], g); persist({t:"lr"}); }
   const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
   sim.i++;
   if(sim.i < sim.rondas) return simRound();
@@ -2650,6 +2965,179 @@ function simEnd(){
     ${dud.length ? `<div class="panel"><h3>Dónde dudaste</h3><ul class="exits">${dud.map(p=>`<li><span>${esc(p)}</span><button type="button" class="btn sm" data-act="goto-pos" data-p="${esc(p)}">Ver salidas</button></li>`).join("")}</ul></div>` : ""}
     <div class="row sheet-foot"><button type="button" class="btn pri" data-simact="again" style="flex:1">Otra vez</button><button type="button" class="btn" data-act="close">Hecho</button></div>`;
   $("#sim-fin").focus({preventScroll:true});
+  render();
+}
+// ---------- práctica guiada ----------
+// Una sesión con el móvil delante: la app dice qué bailar (una figura pendiente, un enlace, una cadena) y cuántas
+// veces, y suena el conteo mientras lo haces. Luego te pones nota y eso cuenta como repaso (una subida al día).
+// Mismo ciclo de vida que el simulacro: al cerrar la hoja, salir de la app o terminar, nada sigue sonando.
+const GUIA = {10:{n:3, f:1, l:1}, 20:{n:6, f:3, l:2}};
+let guia = null;      // {plan, i, fase:"listo"|"cuenta"|"nota"|"fin", rep, bpmFix, beat, t0, end, nodes, raf, timeout, res:[g|null]}
+let guiaCfg = {mins:10, bpm:0, voz:true}, guiaForced = null;
+// Pulso por defecto: la media de tus figuras de este baile con el pulso marcado; si no hay ninguna, 110.
+function guiaBpm(){
+  const bs = figs().filter(f=>baileOf(f)===baileSel && pulsoOk(f.pulso, f.vid)).map(f=>pulsoBpm(f.pulso)).filter(Boolean);
+  return bs.length ? Math.max(90, Math.min(150, Math.round(bs.reduce((a,b)=>a+b,0)/bs.length))) : 110;
+}
+function guidedPlan(mins){
+  const c = GUIA[mins] || GUIA[10], bpm = guiaCfg.bpm || guiaBpm();
+  const mine = f => f && active(f) && baileOf(f)===baileSel;
+  const fs = figs().filter(f=>mine(f) && (isDue(f) || memState(f)==="olvidada"))
+    .sort((a,b)=> (erroresActivos(b).length>0) - (erroresActivos(a).length>0) || byMem(a,b) || (a.rep?.due||"").localeCompare(b.rep?.due||""));
+  // Enlaces: primero los comprobados que llevan a una figura pendiente (bailar la transición también la repasa),
+  // luego las posiciones con el repaso pendiente y, si aún hay sitio, el resto de comprobados.
+  const done = Object.values(S.enlaces||{}).filter(e=>e && mine(S.figures[e.a]) && mine(S.figures[e.b]))
+    .sort((x,y)=> isDue(S.figures[y.b]) - isDue(S.figures[x.b]) || String(x.fecha||"").localeCompare(String(y.fecha||"")));
+  const ls = [...done.filter(e=>isDue(S.figures[e.b])).map(e=>({a:e.a, b:e.b})), ...dueLinks().map(pos=>({pos, baile:baileSel})),
+    ...done.filter(e=>!isDue(S.figures[e.b])).map(e=>({a:e.a, b:e.b}))];
+  // La cadena empieza donde empieza la primera figura del plan (si tiene ruta) o en la primera posición con salidas.
+  // Sin las opciones de Enlazar (agarre elegido, terminar en, incluir, dejar fuera, longitud): una cadena normal de 4.
+  const f0 = fs.find(placed), st = f0 ? f0.entrada : linkPositions()[0];
+  const ch = st ? buildChain(chainPool(), {start: st, n: 4, prefer: (p, f) => p && linkDone(p, f) ? 1 : 0}) : null;
+  const cs = ch && !ch.noPath ? (ch.steps||[]).filter(s=>s.f) : [];
+  const cad = cs.length>=2 ? {pos: cs[0].f.entrada, ids: cs.map(s=>s.f.id)} : null;
+  const room = c.n - (cad ? 1 : 0);
+  let nf = Math.min(c.f, fs.length), nl = Math.min(c.l, ls.length);
+  // Si falta de un tipo, se rellena con el otro.
+  while(nf+nl < room && (nf<fs.length || nl<ls.length)){ if(nf<fs.length) nf++; else nl++; }
+  const out = [...fs.slice(0,nf).map(f=>({tipo:"figura", ref:f.id, reps:4, bpm})), ...ls.slice(0,nl).map(ref=>({tipo:"enlace", ref, reps:4, bpm}))];
+  // La cadena se baila una vez seguida: tantas frases de 8 como tiempos sumen sus figuras.
+  if(cad) out.push({tipo:"cadena", ref:cad, reps: Math.max(1, Math.round(cad.ids.reduce((s,id)=>s+(+S.figures[id].tiempos||8),0)/8)), bpm});
+  return out;
+}
+// Qué se enseña de un bloque (texto plano: se escapa al pintarlo). null si sus figuras ya no existen.
+function guiaInfo(b){
+  const F = S.figures, veces = pl(b.reps, "vez", "veces");
+  if(b.tipo==="figura"){ const f = F[b.ref]; return f && {name:f.nombre, title:`${f.nombre}, ${veces}`, senal:f.senal||"", errs:erroresActivos(f)}; }
+  if(b.tipo==="enlace" && b.ref.pos) return {name:`Salidas desde ${b.ref.pos}`, title:`Salidas desde ${b.ref.pos}, ${veces}`, sub:"Una salida distinta cada vez: " + exitsFrom(b.ref.pos).map(f=>f.nombre).join(", "), senal:"", errs:[]};
+  if(b.tipo==="enlace"){ const A = F[b.ref.a], B = F[b.ref.b]; return A && B && {name:`${A.nombre} → ${B.nombre}`, title:`${A.nombre} → ${B.nombre}, ${veces}`, senal:B.senal||"", errs:erroresActivos(B)}; }
+  const fs = b.ref.ids.map(id=>F[id]); if(fs.some(f=>!f)) return null;
+  return {name:"Cadena", title:"La cadena seguida, una vez", sub: fs.map(f=>f.nombre).join(" → "), senal:"", errs:[], cad:true};
+}
+function guiaQuiet(){
+  if(!guia) return;
+  (guia.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} }); guia.nodes = [];
+  cancelAnimationFrame(guia.raf); clearTimeout(guia.timeout);
+}
+function guiaStop(keep){
+  if(!guia) return;
+  guiaQuiet(); setAudioSession("auto");
+  if(tab!=="social" && !busy && !socialLive()) releaseWake();
+  if(!keep) guia = null;
+}
+function openGuia(){
+  guiaStop(); simStop();
+  if(!guiaCfg.bpm) guiaCfg.bpm = guiaBpm();
+  const plan = guidedPlan(guiaCfg.mins), fz = guiaForced; guiaForced = null;
+  if(fz && fz.reps) plan.forEach(b=>{ b.reps = fz.reps; });
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-guia>
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Práctica guiada</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div id="guia-body">${plan.length ? "" : `<p>Hoy no hay nada que practicar. Añade dónde empiezan y acaban tus figuras, o repasa al azar.</p>`}</div>
+  </div></div>`;
+  $("[data-guia]").onclick = guiaClick;
+  if(!plan.length) return;
+  cntLoad().catch(()=>{});   // la voz se carga ya; si no llega, suenan pitidos
+  guia = {plan, i:0, fase:"listo", rep:0, bpmFix: fz && fz.bpm || 0, nodes:[], res:[]};
+  guiaShow();
+}
+function guiaHead(b, inf){
+  return `<p class="small muted">Bloque ${guia.i+1} de ${guia.plan.length}${bailes().length>1 ? ` · ${esc(baileSel)}` : ""}</p>
+    <div class="flash"><div class="big">${esc(inf.title)}</div>${inf.sub ? `<p>${esc(inf.sub)}</p>` : ""}${inf.senal ? `<p class="small">Señal: ${esc(inf.senal)}</p>` : ""}
+      ${inf.errs.length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${inf.errs.map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}`;
+}
+// Bloque listo para empezar. Si sus figuras se han borrado, se salta solo.
+function guiaShow(note){
+  const b = guia.plan[guia.i], inf = guiaInfo(b);
+  if(!inf){ guia.res[guia.i] = null; return guiaNext(); }
+  guia.fase = "listo"; guia.rep = 0;
+  $("#guia-body").innerHTML = `${guiaHead(b, inf)}</div>
+    ${note ? `<p class="note">${esc(note)}</p>` : ""}
+    <label class="f" for="guia-bpm">Golpes por minuto<input type="number" id="guia-bpm" min="90" max="150" step="1" value="${guiaCfg.bpm}" inputmode="numeric"></label>
+    <div class="seg neutral" role="group" aria-label="Sonido del conteo"><button type="button" data-guiasnd="voz" aria-pressed="${guiaCfg.voz}">Voz</button><button type="button" data-guiasnd="pitido" aria-pressed="${!guiaCfg.voz}">Pitidos</button></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" id="guia-go" style="flex:1">Empezar</button><button type="button" class="btn" data-guiaact="skip">Saltar</button></div>`;
+  const bi = $("#guia-bpm"); bi.onchange = ()=>{ guiaCfg.bpm = Math.max(90, Math.min(150, Math.round(+bi.value)||110)); bi.value = guiaCfg.bpm; };
+  $("#guia-go").focus({preventScroll:true});
+  announce(`Bloque ${guia.i+1}: ${inf.title}`);
+}
+function guiaClick(e){
+  const b = e.target.closest("button"); if(!b || !guia) return;
+  const d = b.dataset;
+  if(d.guiasnd){ guiaCfg.voz = d.guiasnd==="voz"; document.querySelectorAll("[data-guiasnd]").forEach(x=>x.setAttribute("aria-pressed", x===b)); return; }
+  if(d.guiag) return guiaGrade(d.guiag);
+  if(d.guiaact==="skip"){ guiaQuiet(); guia.res[guia.i] = null; return guiaNext(); }
+  if(d.guiaact==="done"){ if(guia.fase==="cuenta") guiaEnd(); return; }
+  if(b.id==="guia-go") return guiaGo();
+}
+// Suena el conteo durante reps × 8 tiempos; en pantalla, el tiempo y la repetición (o la frase, en la cadena).
+function guiaGo(){
+  if(!guia || guia.fase!=="listo") return;
+  const bi = $("#guia-bpm"); if(bi) bi.onchange();
+  const c = cntAudio(); setAudioSession("playback"); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const b = guia.plan[guia.i], inf = guiaInfo(b), n = b.reps*8;
+  b.bpm = guia.bpmFix || guiaCfg.bpm;
+  guia.fase = "cuenta"; guia.rep = 1; guia.beat = 60/b.bpm; guia.t0 = c.currentTime + .3; guia.end = guia.t0 + n*guia.beat; guia.nodes = [];
+  for(let k=0; k<n; k++) guia.nodes.push(...cntPlay([c.destination], guia.t0 + k*guia.beat, k%8+1, guiaCfg.voz && !!cntVoz));
+  askWake();
+  const lbl = r => `${inf.cad ? "Frase" : "Vez"} ${r} de ${b.reps}`;
+  $("#guia-body").innerHTML = `${guiaHead(b, inf)}
+      <p id="guia-rep" aria-live="polite"><b>${lbl(1)}</b></p>
+      <div class="sim-beat" id="guia-beat" aria-hidden="true"></div></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" data-guiaact="done" style="flex:1">Ya está</button><button type="button" class="btn" data-guiaact="skip">Saltar</button></div>`;
+  const g0 = guia, end = guia.end;
+  const tick = ()=>{
+    if(guia!==g0 || guia.fase!=="cuenta") return;
+    if(c.currentTime >= end) return guiaEnd();
+    const t = c.currentTime - guia.t0, k = t<0 ? -1 : Math.floor(t/guia.beat);
+    const el = $("#guia-beat"); if(el) el.textContent = k<0 ? "" : String(k%8+1);
+    const r = Math.min(b.reps, Math.max(1, Math.floor(k/8)+1));
+    if(r!==guia.rep){ guia.rep = r; const re = $("#guia-rep"); if(re) re.innerHTML = `<b>${lbl(r)}</b>`; }
+    guia.raf = requestAnimationFrame(tick);
+  };
+  tick();
+  // Como en el simulacro: si el reloj del audio se para, el bloque acaba igual un segundo más tarde.
+  const arm = ()=>{ if(guia!==g0 || guia.fase!=="cuenta" || guia.end!==end) return; clearTimeout(guia.timeout);
+    guia.timeout = setTimeout(()=>{ if(guia===g0 && guia.fase==="cuenta") guiaEnd(); }, (end - c.currentTime + 1)*1000); };
+  if(c.state==="running") arm(); else Promise.resolve(c.resume()).then(arm, ()=>{});
+}
+function guiaEnd(){
+  if(!guia || guia.fase!=="cuenta") return;
+  guiaQuiet(); guia.fase = "nota";
+  const b = guia.plan[guia.i], inf = guiaInfo(b);
+  if(!inf){ guia.res[guia.i] = null; return guiaNext(); }
+  $("#guia-body").innerHTML = `${guiaHead(b, inf)}
+      <div class="answer" id="guia-ans" tabindex="-1"><p>¿Cómo ha ido?</p>
+        ${b.tipo==="figura" || (b.tipo==="enlace" && b.ref.b) ? `<label class="small row" for="guia-par" style="gap:10px;min-height:44px"><input type="checkbox" id="guia-par"> Con pareja</label>` : ""}
+        <div class="grade"><button type="button" class="btn" data-guiag="no">No</button><button type="button" class="btn" data-guiag="dudas">Con dudas</button><button type="button" class="btn" data-guiag="fluida">Bien</button></div></div></div>`;
+  $("#guia-ans").focus({preventScroll:true});
+}
+// La nota cuenta como repaso: la figura con reviewFig; el enlace comprobado, en la figura a la que llegas;
+// la posición pendiente, en su repaso de enlaces; la cadena, solo como actividad. «Bien» sube una vez al día.
+function guiaGrade(g){
+  if(!guia || guia.fase!=="nota") return;
+  const b = guia.plan[guia.i], hoy = todayStr(), F = b.tipo==="figura" ? S.figures[b.ref] : b.tipo==="enlace" && b.ref.b ? S.figures[b.ref.b] : null;
+  const par = !!$("#guia-par")?.checked;   // con pareja = ejecución real: «Bien» sube «Me sale con pareja», «No» la baja
+  if(F){ reviewFig(F, g); if(par && g==="fluida") bumpEjec(F, 1); else if(par && g==="no") bumpEjec(F, -1); }
+  else {
+    if(b.tipo==="enlace" && b.ref.pos){ const k = lrKey(b.ref.pos, b.ref.baile);
+      if(!(g==="fluida" && S.linkRep[k]?.last===hoy)){ S.linkRep[k] = nextRep(S.linkRep[k], g); persist({t:"lr"}); } }
+    S.actividad = S.actividad || {}; S.actividad[hoy] = (S.actividad[hoy]||0)+1; persist({t:"act"});
+  }
+  guia.res[guia.i] = g;
+  guiaNext();
+}
+function guiaNext(){
+  guia.i++;
+  if(guia.i < guia.plan.length) return guiaShow();
+  guiaFin();
+}
+function guiaFin(){
+  guia.fase = "fin"; guia.rep = 0; guiaStop(true);
+  const N = {no:"No", dudas:"Con dudas", fluida:"Bien"}, ok = guia.res.filter(g=>g==="fluida").length;
+  $("#guia-body").innerHTML = `<div class="panel"><h3 id="guia-fin" tabindex="-1">Práctica terminada</h3>
+      <p>Bien en <b>${ok} de ${guia.plan.length}</b> ${guia.plan.length===1?"bloque":"bloques"}.</p>
+      <ul class="exits">${guia.plan.map((b,i)=>{ const inf = guiaInfo(b); return `<li><span>${esc(inf ? inf.name : "Figura borrada")}</span><span class="small muted">${N[guia.res[i]] || "Saltado"}</span></li>`; }).join("")}</ul></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" data-act="close" style="flex:1">Hecho</button></div>`;
+  $("#guia-fin").focus({preventScroll:true});
   render();
 }
 // Hoja «Nuevo intento»: el vídeo ya elegido, con el mismo recorte que el vídeo de la clase.
@@ -2706,9 +3194,8 @@ function openAttemptView(figId, attId){
 async function attSaveVid(figId, attId){
   const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!a) return;
   if(!attBlob || attBlob.vid!==a.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
-  const b = attBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-  const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
-  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
+  const b = attBlob.b, ty=b.type||"video/mp4";
+  const ok = await confirmSaved(await shareOrDownload(new File([b], vidFileName(attName(f, a), a.vid, ty), {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
 }
 // ---------- pulso: marcar los tiempos de la música en un vídeo ----------
@@ -2841,6 +3328,8 @@ async function pkBack(){
 // Así el 5 de la clase coincide con tu 5 aunque bailes más rápido, más lento o con otra canción: no es un fallo.
 const marcasOf = a => (a && Array.isArray(a.marcadores)) ? a.marcadores : [];
 const erroresOf = f => (f && Array.isArray(f.errores)) ? f.errores : [];
+// Los que aún te pasan, el más repetido primero (a igualdad, el más reciente).
+const erroresActivos = f => erroresOf(f).filter(e=>!e.resuelto).sort((a,b)=>(b.veces||1)-(a.veces||1) || String(b.ultima||"").localeCompare(String(a.ultima||"")));
 const cmpReady = (f, a) => !!(f && a && f.vid && pulsoOk(f.pulso, f.vid) && pulsoOk(a.pulso, a.vid));
 function cmpCardHTML(f, a){
   if(cmpReady(f, a)) return `<div class="fv-actions"><button type="button" class="btn pri" data-act="cmp-open" data-id="${esc(f.id)}" data-att="${esc(a.id)}">Comparar con la clase</button></div>${marcasHTML(a)}`;
@@ -2856,20 +3345,89 @@ function marcasHTML(a){
 }
 function errCardHTML(f){
   const es = erroresOf(f); if(!es.length) return "";
-  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3><ul class="cmp-marks">${es.map(e=>`<li><span>${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}</span><button type="button" class="icon-btn" data-act="err-del" data-id="${esc(f.id)}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
-    <p class="small muted">Salen al repasar la figura. Quítalos cuando ya no te pasen.</p></section>`;
+  const act = erroresActivos(f), res = es.filter(e=>e.resuelto);
+  const nota = e => `${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}`;
+  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3>
+    ${act.length ? `<ul class="cmp-marks">${act.map(e=>`<li><span>${nota(e)} <span class="small muted">· ×${e.veces||1}${e.fecha?` · desde ${esc(e.fecha)}`:""}</span></span><button type="button" class="btn ghost sm" data-act="err-res" data-id="${esc(f.id)}" data-err="${esc(e.id)}">Ya no me pasa</button><button type="button" class="icon-btn" data-act="err-del" data-id="${esc(f.id)}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
+      <p class="small muted">Salen al repasar la figura. Márcalos como resueltos cuando ya no te pasen.</p>` : `<p class="small muted">Ninguno activo. Si vuelve a pasarte alguno, recupéralo abajo.</p>`}
+    ${res.length ? `<details><summary>Resueltos (${res.length})</summary><ul class="cmp-marks">${res.map(e=>`<li><span>${nota(e)} <span class="small muted">· ×${e.veces||1} · resuelto ${esc(e.resuelto)}</span></span><button type="button" class="btn ghost sm" data-act="err-reopen" data-id="${esc(f.id)}" data-err="${esc(e.id)}">Me ha vuelto a pasar</button></li>`).join("")}</ul></details>` : ""}</section>`;
+}
+// ---------- notas sobre el vídeo de la clase ----------
+// f.notasVid = [{id, s, texto}]: s es el segundo del vídeo (a décimas). Se apuntan con «Nota aquí» (el vídeo se pausa y el texto
+// se escribe en línea, sin prompt()); tocar una nota lleva el vídeo ahí, y la que está a menos de 1 s se ve sobre el vídeo.
+const erroresNv = a => Array.isArray(a) ? a : [];
+const nvT = s => { const t = Math.round(s*10); return `${Math.floor(t/600)}:${String(Math.floor(t%600/10)).padStart(2,"0")},${t%10}`; };
+let nvAdd = null;   // {s} mientras se escribe una nota nueva
+// figId: figura editable; null: lista de solo lectura (parte)
+function nvCardHTML(o, figId){
+  const ns = [...erroresNv(o.notasVid)].sort((a,b)=>a.s-b.s);
+  if(!figId && !ns.length) return "";
+  const rows = ns.map(n=>`<li><button type="button" class="btn ghost sm" data-act="nv-go" data-s="${n.s}" aria-label="Ir al ${nvT(n.s)}: ${esc(n.texto)}"><b>${nvT(n.s)}</b> ${esc(n.texto)}</button>${figId?`<button type="button" class="icon-btn" data-act="nv-del" data-id="${esc(figId)}" data-nv="${esc(n.id)}" aria-label="Quitar la nota del ${nvT(n.s)}">✕</button>`:""}</li>`).join("");
+  const form = figId && nvAdd ? `<div class="nv-form"><label class="f" for="nv-txt">Nota en el ${nvT(nvAdd.s)}<input type="text" id="nv-txt" maxlength="140" autocomplete="off" placeholder="Ej.: aquí suelta la mano"></label>
+      <div class="row"><button type="button" class="btn pri sm" data-act="nv-save" data-id="${esc(figId)}">Guardar</button><button type="button" class="btn ghost sm" data-act="nv-cancel" data-id="${esc(figId)}">Cancelar</button></div></div>` : "";
+  return `<section class="fv-card" id="fv-nv" aria-labelledby="fv-nvh"><h3 id="fv-nvh">Notas del vídeo</h3>
+    ${ns.length ? `<ul class="cmp-marks nv-list" data-nv-list>${rows}</ul>` : `<p class="small muted" data-nv-list>Apunta lo que dice el profe en un momento del vídeo.</p>`}
+    ${form}${figId && !nvAdd ? `<div class="fv-actions"><button type="button" class="btn" data-act="nv-add" data-id="${esc(figId)}">Nota aquí</button></div>` : ""}</section>`;
+}
+// Vuelve a pintar solo la tarjeta, para no reiniciar el vídeo.
+function nvRefresh(figId){
+  const f = S.figures[figId], c = $("#fv-nv"); if(!f || !c) return;
+  c.outerHTML = nvCardHTML(f, figId);
+}
+// El subtítulo sigue al vídeo: la nota más cercana a menos de 1 s.
+function nvBind(get){
+  const v = $(".fv-media video"), cap = $(".fv-media .vcap"); if(!v || !cap) return;
+  const upd = () => { const t = v.currentTime; let best = null;
+    erroresNv(get()).forEach(n=>{ const d = Math.abs(n.s - t); if(d<1 && (!best || d<best.d)) best = {d, n}; });
+    const txt = best ? best.n.texto : ""; if(cap.textContent!==txt) cap.textContent = txt; };
+  v.addEventListener("timeupdate", upd); v.addEventListener("seeked", upd);
+}
+function nvAct(a, d, t){
+  const v = (t.closest(".sheet")||document).querySelector(".fv-media video");
+  if(a==="nv-go"){ if(!v) return; v.pause(); try{ v.currentTime = +d.s||0; }catch{} return; }
+  const f = S.figures[d.id]; if(!f) return;
+  if(a==="nv-add"){ if(v) v.pause(); nvAdd = {s: Math.round((v ? v.currentTime : 0)*10)/10}; nvRefresh(d.id); $("#nv-txt")?.focus(); return; }
+  if(a==="nv-cancel"){ nvAdd = null; nvRefresh(d.id); return; }
+  if(a==="nv-save"){
+    const texto = ($("#nv-txt").value||"").trim().slice(0,140);
+    if(!texto){ toast("Escribe la nota."); $("#nv-txt").focus(); return; }
+    f.notasVid = [...erroresNv(f.notasVid), {id:uid(), s:nvAdd.s, texto}]; nvAdd = null;
+    persist({t:"fig", id:f.id}); nvRefresh(f.id); announce("Nota guardada"); return;
+  }
+  if(a==="nv-del"){
+    const list = erroresNv(f.notasVid), i = list.findIndex(n=>n.id===d.nv); if(i<0) return;
+    const n = list[i]; f.notasVid = list.filter(x=>x.id!==d.nv); persist({t:"fig", id:f.id}); nvRefresh(f.id);
+    toast("Nota quitada", {label:"Deshacer", fn:()=>{ const g=S.figures[f.id]; if(!g) return; const l=[...erroresNv(g.notasVid)]; l.splice(i,0,n); g.notasVid=l; persist({t:"fig",id:g.id}); if($(`[data-viewfig="${CSS.escape(g.id)}"]`)) nvRefresh(g.id); }});
+  }
 }
 function errDelete(figId, errId){
   const f = S.figures[figId], es = erroresOf(f), i = es.findIndex(e=>e.id===errId); if(i<0) return;
   const e = es[i]; f.errores = es.filter(x=>x.id!==errId); persist({t:"fig", id:figId}); openView(figId);
-  toast("Error quitado", {label:"Deshacer", fn:()=>{ const g=S.figures[figId]; if(!g) return; g.errores=[...erroresOf(g)]; g.errores.splice(i,0,e); persist({t:"fig",id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); }});
+  toast("Error quitado", {label:"Deshacer", fn:()=>{ const g=S.figures[figId]; if(!g) return; g.errores=[...erroresOf(g)]; g.errores.splice(i,0,e); capByErrors(g); persist({t:"fig",id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); }});
+}
+// «Ya no me pasa» / «Me ha vuelto a pasar»: cambian `resuelto` (y al reabrir, veces y ultima); Deshacer devuelve el error tal cual estaba.
+function errSet(figId, errId, antes, despues, msg){
+  const put = v => { const g=S.figures[figId]; if(!g) return false; const k=erroresOf(g).findIndex(e=>e.id===errId); if(k<0) return false;
+    g.errores = erroresOf(g).map((e,j)=>{ if(j!==k) return e; const n={...e}; ["veces","ultima","resuelto"].forEach(c=>{ if(v[c]===undefined) delete n[c]; else n[c]=v[c]; }); return n; });
+    capByErrors(g); persist({t:"fig", id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); return true; };
+  if(!put(despues)) return; announce(msg);
+  toast(msg, {label:"Deshacer", fn:()=>put(antes)});
+}
+function errResolve(figId, errId){
+  const e = erroresOf(S.figures[figId]).find(x=>x.id===errId); if(!e || e.resuelto) return;
+  errSet(figId, errId, {veces:e.veces, ultima:e.ultima, resuelto:undefined}, {veces:e.veces, ultima:e.ultima, resuelto:todayStr()}, "Error resuelto");
+}
+function errReopen(figId, errId){
+  const e = erroresOf(S.figures[figId]).find(x=>x.id===errId); if(!e || !e.resuelto) return;
+  errSet(figId, errId, {veces:e.veces, ultima:e.ultima, resuelto:e.resuelto}, {veces:(e.veces||1)+1, ultima:todayStr(), resuelto:undefined}, "Vuelve a tus errores");
 }
 let cmp = null;
 function cmpStop(){ if(!cmp) return; cancelAnimationFrame(cmp.raf); cmp.playing = false; ["#cmp-t","#cmp-m"].forEach(k=>{ try{ $(k)?.pause(); }catch{} }); }
+let cmpOv = {on:false, op:50, mirT:false, mirM:false}; // última elección de Superponer, solo durante la sesión
 async function openCompare(figId, attId){
   const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!cmpReady(f, a)) return;
   const [uT, uM] = await Promise.all([vidObjUrl(f.vid).catch(()=>null), vidObjUrl(a.vid).catch(()=>null)]);
-  if(!uT || !uM){ toast("Uno de los vídeos no está en este dispositivo: las copias no incluyen vídeos."); return; }
+  if(!uT || !uM){ toast("Uno de los vídeos no está en este dispositivo. Si lo guardaste, recupéralo en Ajustes → Restaurar o importar → «Recuperar vídeos»."); return; }
   const b0 = +f.tiempo===5 ? 5 : 1, n = Math.max(2, +f.tiempos||8);
   cmpStop();
   cmp = {figId, attId, pT:f.pulso, pM:a.pulso, lo:b0, hi:b0+n, A:b0, B:b0+n, b:b0, rate:1, playing:false, raf:0, pick:null, form:null};
@@ -2887,7 +3445,8 @@ async function openCompare(figId, attId){
     <div class="cmp-line" id="cmp-line" role="group" aria-label="Ir a un tiempo"></div>
     <p class="small muted" id="cmp-hint" aria-live="polite"></p>
     <div class="cmp-ctl"><button type="button" class="btn" id="cmp-prev" aria-label="Tiempo anterior">◀︎</button><button type="button" class="btn pri" id="cmp-play">Reproducir</button><button type="button" class="btn" id="cmp-next" aria-label="Tiempo siguiente">▶︎</button></div>
-    <div class="pctl" role="group" aria-label="Reproducción">${CMP_RATES.map(x=>`<button type="button" data-crate="${x}" aria-pressed="${x===1}">${String(x).replace(".",",")}×</button>`).join("")}<button type="button" id="cmp-mirror" aria-pressed="false">Espejo de la clase</button><button type="button" id="cmp-range" aria-pressed="false">Tramo: toda</button></div>
+    <div class="pctl" role="group" aria-label="Reproducción">${CMP_RATES.map(x=>`<button type="button" data-crate="${x}" aria-pressed="${x===1}">${String(x).replace(".",",")}×</button>`).join("")}<button type="button" data-cstep="-0.1" aria-label="Atrás 0,1 segundos">‹ 0,1 s</button><button type="button" data-cstep="0.1" aria-label="Adelante 0,1 segundos">0,1 s ›</button><button type="button" id="cmp-mirror" aria-pressed="false">Espejo de la clase</button><button type="button" id="cmp-range" aria-pressed="false">Tramo: toda</button></div>
+    <div class="pctl cmp-over-row" role="group" aria-label="Superponer"><button type="button" id="cmp-over" aria-pressed="false">Superponer</button><label class="small" for="cmp-op">Tu vídeo<input type="range" id="cmp-op" min="20" max="80" step="5" value="${cmpOv.op}" aria-label="Transparencia de tu vídeo"></label><button type="button" id="cmp-mirror-m" aria-pressed="false">Espejo de tu vídeo</button></div>
     <p class="small muted" id="cmp-tempo">${esc(tempo)}</p>
     <section class="fv-card" aria-labelledby="fv-cm"><h3 id="fv-cm">Marcas</h3>
       <div class="fv-actions"><button type="button" class="btn" data-cmk="error">Error aquí</button><button type="button" class="btn" data-cmk="bien">Bien hecho aquí</button></div>
@@ -2905,7 +3464,25 @@ async function openCompare(figId, attId){
   $("#cmp-prev").onclick = ()=>{ cmpPause(); cmpSeek(Math.max(cmp.lo, Math.ceil(cmp.b-1e-3)-1)); };
   $("#cmp-next").onclick = ()=>{ cmpPause(); cmpSeek(Math.min(cmp.hi-1, Math.floor(cmp.b+1e-3)+1)); };
   document.querySelectorAll("[data-crate]").forEach(b=> b.onclick=()=>{ cmp.rate=+b.dataset.crate; document.querySelectorAll("[data-crate]").forEach(x=>x.setAttribute("aria-pressed", x===b)); if(cmp.playing) T.playbackRate=cmp.rate; });
-  $("#cmp-mirror").onclick = e=>{ const on=!T.classList.contains("mirror"); T.classList.toggle("mirror", on); e.currentTarget.setAttribute("aria-pressed", on); };
+  // Avance fino: la clase se mueve una décima y el tuyo va al mismo tiempo de la música.
+  document.querySelectorAll("[data-cstep]").forEach(b=> b.onclick=()=>{
+    cmpPause();
+    const b0=secToBeat(cmp.pT, cmpClampT(T, T.currentTime + +b.dataset.cstep)); if(b0==null) return;
+    // El tiempo se queda dentro de la línea (las marcas usan floor(cmp.b)); el segundo de la clase sale del tiempo ya recortado.
+    const bb=Math.max(cmp.lo, Math.min(cmp.hi-1e-3, b0)), t=cmpClampT(T, beatToSec(cmp.pT, bb));
+    cmp.b = bb;
+    try{ T.currentTime = t; M.currentTime = cmpClampT(M, beatToSec(cmp.pM, bb)); }catch{}
+    cmpPaint(); });
+  const mir = (v, btn, k)=>{ const on=!v.classList.contains("mirror"); v.classList.toggle("mirror", on); cmpOv[k]=on; btn.setAttribute("aria-pressed", on); };
+  $("#cmp-mirror").onclick = e=> mir(T, e.currentTarget, "mirT");
+  $("#cmp-mirror-m").onclick = e=> mir(M, e.currentTarget, "mirM");
+  const vids = $(".cmp-vids"), op = $("#cmp-op"), ov = $("#cmp-over");
+  const paintOv = ()=>{ vids.classList.toggle("overlay", cmpOv.on); ov.setAttribute("aria-pressed", cmpOv.on); vids.style.setProperty("--cmp-op", cmpOv.op/100); };
+  ov.onclick = ()=>{ cmpOv.on=!cmpOv.on; paintOv(); announce(cmpOv.on ? "Tu vídeo superpuesto a la clase" : "Vídeos lado a lado"); };
+  op.oninput = ()=>{ cmpOv.op=+op.value; paintOv(); };
+  if(cmpOv.mirT){ T.classList.add("mirror"); $("#cmp-mirror").setAttribute("aria-pressed", true); }
+  if(cmpOv.mirM){ M.classList.add("mirror"); $("#cmp-mirror-m").setAttribute("aria-pressed", true); }
+  paintOv();
   $("#cmp-range").onclick = ()=>{
     if(cmp.pick || cmp.A!==cmp.lo || cmp.B!==cmp.hi){ cmp.pick=null; cmp.A=cmp.lo; cmp.B=cmp.hi; $("#cmp-hint").textContent=""; }
     else { cmp.pick=[]; cmpPause(); $("#cmp-hint").textContent="Toca en la línea el primer y el último tiempo del tramo que quieres repetir."; }
@@ -3003,31 +3580,48 @@ function cmpPaint(){
 function cmpForm(){
   const el=$("#cmp-form"); if(!el || !cmp) return;
   if(!cmp.form){ el.innerHTML=""; return; }
-  const er = cmp.form.tipo==="error";
+  const er = cmp.form.tipo==="error", activos = er ? erroresActivos(S.figures[cmp.figId]) : [];
   el.innerHTML = `<div class="cmp-fm"><p class="small"><b>${er?"Error":"Bien hecho"} en el ${beatName(cmp.form.b)}</b></p>
     <label class="f" for="cmp-nota">Nota (opcional)<input type="text" id="cmp-nota" placeholder="${er?"Ej.: el brazo izquierdo se queda bajo":"Ej.: buena preparación en el 4"}"></label>
-    ${er?`<label class="small row" for="cmp-toerr" style="gap:10px;min-height:44px"><input type="checkbox" id="cmp-toerr"> Añadir a «Errores que cometo» para verlo al repasarla</label>`:""}
+    ${er && activos.length ? `<div role="group" aria-labelledby="cmp-same-t"><p class="small" id="cmp-same-t">¿Es uno de estos?</p><div class="row" style="flex-wrap:wrap;gap:8px">${activos.map(e=>`<button type="button" class="btn ghost sm" data-esame="${esc(e.id)}" aria-pressed="${cmp.form.same===e.id}">${esc(e.nota)} <span class="small muted">×${e.veces||1}</span></button>`).join("")}</div></div>` : ""}
+    ${er && !cmp.form.same?`<label class="small row" for="cmp-toerr" style="gap:10px;min-height:44px"><input type="checkbox" id="cmp-toerr"> Añadir a «Errores que cometo» para verlo al repasarla</label>`:""}
     <div class="row"><button type="button" class="btn pri sm" id="cmp-fsave">Guardar marca</button><button type="button" class="btn ghost sm" id="cmp-fcancel">Cancelar</button></div></div>`;
+  // Elegir «uno de estos» no guarda nada todavía: al guardar la marca, ese error suma una vez en vez de crear otro.
+  el.querySelectorAll("[data-esame]").forEach(b=> b.onclick=()=>{ const nota=$("#cmp-nota").value; cmp.form.same = cmp.form.same===b.dataset.esame ? null : b.dataset.esame; cmpForm(); $("#cmp-nota").value=nota; });
   $("#cmp-fcancel").onclick = ()=>{ cmp.form=null; cmpForm(); };
   $("#cmp-fsave").onclick = ()=>{
     const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId); if(!a) return;
     const nota=$("#cmp-nota").value.trim(), m={id:uid(), b:cmp.form.b, tipo:cmp.form.tipo, nota};
     a.marcadores = [...marcasOf(a), m];
-    if($("#cmp-toerr")?.checked) addError(f, a, m);
+    const mismo = m.tipo==="error" && cmp.form.same && erroresActivos(f).find(e=>e.id===cmp.form.same);
+    const veces = mismo ? repeatError(f, a, m, mismo) : 0;
+    if(!mismo && $("#cmp-toerr")?.checked) addError(f, a, m);
+    // Un intento con marcas «Bien» y ninguna «Error» es ejecución real (una subida al día).
+    const ms = marcasOf(a); if(ms.some(x=>x.tipo==="bien") && !ms.some(x=>x.tipo==="error")) bumpEjec(f, 1);
     persist({t:"fig", id:f.id}); cmp.form=null; cmpForm(); cmpLine(); cmpMarks();
-    toast(m.tipo==="error" ? (S.figures[f.id] && erroresOf(f).some(e=>e.marca===m.id) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
+    toast(m.tipo==="error" ? (mismo ? "Error guardado: ya van ×"+veces : S.figures[f.id] && erroresOf(f).some(e=>errLinked(e, m.id)) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
   };
   setTimeout(()=>$("#cmp-nota")?.focus(), 50);
 }
+// Un error queda enlazado a su primera marca (`marca`) y a las repeticiones (`marcas`).
+const errLinked = (e, mid) => e.marca===mid || (e.marcas||[]).includes(mid);
 function addError(f, a, m){
-  if(erroresOf(f).some(e=>e.marca===m.id)) return;
-  f.errores = [...erroresOf(f), {id:uid(), nota: m.nota || `Error en el ${beatName(m.b)}`, b:m.b, desde:a.id, marca:m.id, fecha:todayStr()}];
+  if(erroresOf(f).some(e=>errLinked(e, m.id))) return;
+  f.errores = [...erroresOf(f), {id:uid(), nota: m.nota || `Error en el ${beatName(m.b)}`, b:m.b, desde:a.id, marca:m.id, fecha:todayStr(), veces:1, ultima:todayStr()}];
+  capByErrors(f);   // D8: con un error activo nuevo, el repaso ya no puede quedar a más de 7 días
+}
+// El mismo error otra vez: suma una vez, anota cuándo y enlaza la marca nueva en `marcas`; `marca` y `desde` siguen en la primera vez.
+// Devuelve las veces que lleva.
+function repeatError(f, a, m, e){
+  const veces = (e.veces||1)+1;
+  f.errores = erroresOf(f).map(x=> x.id===e.id ? {...x, veces, ultima:todayStr(), marcas:[...(x.marcas||[]), m.id]} : x);
+  capByErrors(f); return veces;
 }
 function cmpMarks(){
   const el=$("#cmp-marks"); if(!el || !cmp) return;
   const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId);
   const ms=[...marcasOf(a)].sort((x,y)=>x.b-y.b);
-  el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>e.marca===m.id);
+  el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>errLinked(e, m.id));
     return `<li><button type="button" class="btn sm" data-cgo="${esc(m.b)}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
       ${m.tipo==="error" ? (inErr ? `<span class="small muted">En tus errores</span>` : `<button type="button" class="btn ghost sm" data-cerr="${esc(m.id)}">A mis errores</button>`) : ""}
       <button type="button" class="icon-btn" data-cdel="${esc(m.id)}" aria-label="Borrar la marca del ${beatName(m.b)}">✕</button></li>`; }).join("")
@@ -3048,13 +3642,13 @@ async function attDelete(figId, attId){
   if(!ok) return;
   const a = list[i]; f.intentos = list.filter(x=>x.id!==attId); persist({t:"fig", id:figId});
   closeSheet(); render(); openView(figId);
-  let undone = false;
+  let undone = false; pendAdd([a.vid]);
   toast("Intento borrado", {label:"Deshacer", fn:()=>{
-      undone = true; const g = S.figures[figId]; if(!g) return;
+      undone = true; pendDel([a.vid]); const g = S.figures[figId]; if(!g) return;
       g.intentos = [...intentosOf(g), a].sort((x,y)=>(x.creado||0)-(y.creado||0)); persist({t:"fig", id:figId});
       render(); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); toast("Intento recuperado");
     },
-    onExpire:()=>{ if(!undone && !vidInUse(a.vid)) persist({t:"assetdel", id:a.vid}); }});
+    onExpire:()=>{ pendDel([a.vid]); if(!undone && !vidInUse(a.vid)) persist({t:"assetdel", id:a.vid}); }});
 }
 // Cambia el estado de una figura. Sin dónde empieza o acaba no sale de la lista de espera (ni de incompleta):
 // se abre la ficha con lo que falta señalado. el: el botón pulsado, que se quita si no hay hoja que repintar.
@@ -3112,10 +3706,11 @@ function openParteNew(figId){
     if(fig.vid || fig.parteNota){
       const x = {id:uid(), fecha:parteHoy(fig), creado:Date.now()};
       if(fig.parteNota) x.nota = fig.parteNota;
-      if(fig.vid){ x.vid = fig.vid; ["vidTrim","vidInfo","thumb"].forEach(k=>{ if(fig[k]) x[k] = fig[k]; }); if(fig.vidSaved===fig.vid) x.vidSaved = fig.vid; }
+      if(fig.vid){ x.vid = fig.vid; ["vidTrim","vidInfo","thumb"].forEach(k=>{ if(fig[k]) x[k] = fig[k]; }); if(fig.vidSaved===fig.vid) x.vidSaved = fig.vid; if(erroresNv(fig.notasVid).length) x.notasVid = fig.notasVid; }
       fig.partes = [...partesOf(fig), x];
     }
     fig.vid = res.vid; fig.vidTrim = res.vidTrim; fig.vidInfo = res.vidInfo;
+    fig.notasVid = [];   // las notas se fueron con su vídeo a la parte anterior
     if(res.thumb) fig.thumb = res.thumb; else delete fig.thumb;
     delete fig.vidSaved;
     fig.parteFecha = todayStr(); if(nota) fig.parteNota = nota; else delete fig.parteNota;
@@ -3131,23 +3726,24 @@ function openParteView(figId, ptId){
   const x = ps[i], info = [x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "", x.vidInfo?.bytes ? fmtMB(x.vidInfo.bytes) : ""].filter(Boolean).join(" · ");
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewpt="${esc(x.id)}">
     <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${esc(f.id)}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
-    ${x.vid ? `<div class="fv-media">${playerHTML({vid:x.vid, vidTrim:x.vidTrim, thumb:x.thumb})}</div>` : ""}
+    ${x.vid ? `<div class="fv-media">${playerHTML({vid:x.vid, vidTrim:x.vidTrim, thumb:x.thumb}, erroresNv(x.notasVid).length>0)}</div>` : ""}
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Parte ${i+1} · ${esc(fmtDate(x.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${x.nota ? `<section class="fv-card"><p class="txt">${esc(x.nota)}</p></section>` : ""}
+    ${x.vid ? nvCardHTML(x, null) : ""}
     ${x.vid ? `${x.vidSaved===x.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
     <div class="fv-actions"><button type="button" class="btn" data-act="pt-savevid" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Guardar en Fotos</button></div>` : ""}
     <button type="button" class="btn danger wide del-row" data-act="pt-del" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Borrar parte</button>
   </div></div>`;
   hydrateVideos($("#sheet-root"));
+  nvBind(()=>S.figures[figId] && partesOf(S.figures[figId]).find(y=>y.id===ptId)?.notasVid);
   ptBlob = null; if(x.vid) vidGet(x.vid).then(b=>{ ptBlob = b ? {vid:x.vid, b} : null; }).catch(()=>{});
   markClean();
 }
 async function ptSaveVid(figId, ptId){
   const f = S.figures[figId], x = partesOf(f).find(y=>y.id===ptId); if(!x || !x.vid) return;
   if(!ptBlob || ptBlob.vid!==x.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
-  const b = ptBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-  const name = parteName(f, x).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "parte";
-  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
+  const b = ptBlob.b, ty=b.type||"video/mp4";
+  const ok = await confirmSaved(await shareOrDownload(new File([b], vidFileName(parteName(f, x), x.vid, ty), {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, x.vid); toast("Vídeo guardado"); if($(`[data-viewpt="${CSS.escape(ptId)}"]`)) openParteView(figId, ptId); }
 }
 async function ptDelete(figId, ptId){
@@ -3156,13 +3752,13 @@ async function ptDelete(figId, ptId){
   if(!ok) return;
   f.partes = list.filter(y=>y.id!==ptId); persist({t:"fig", id:figId});
   closeSheet(); render(); openView(figId);
-  let undone = false;
+  let undone = false; pendAdd([x.vid]);
   toast("Parte borrada", {label:"Deshacer", fn:()=>{
-      undone = true; const g = S.figures[figId]; if(!g) return;
+      undone = true; pendDel([x.vid]); const g = S.figures[figId]; if(!g) return;
       g.partes = [...partesOf(g), x].sort((a,b)=>(a.creado||0)-(b.creado||0)); persist({t:"fig", id:figId});
       render(); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); toast("Parte recuperada");
     },
-    onExpire:()=>{ if(!undone && x.vid && !vidInUse(x.vid)) persist({t:"assetdel", id:x.vid}); }});
+    onExpire:()=>{ pendDel([x.vid]); if(!undone && x.vid && !vidInUse(x.vid)) persist({t:"assetdel", id:x.vid}); }});
 }
 // «Ya está completa»: pasa a En práctica o Disponible y entra en el repaso normal. Se puede borrar el vídeo de las
 // partes anteriores: el de la última clase ya lo tiene todo.
@@ -3314,6 +3910,7 @@ function openFigure(id, opts={}){
       const {thumb, ...v} = res; Object.assign(out, v); if(thumb) out.thumb = thumb;
     } else if(vstate.remove){ delete out.vid; delete out.vidInfo; delete out.vidTrim; delete out.thumb; }
     if(out.profesor && !S.classes.includes(out.profesor)){ S.classes.push(out.profesor); persist({t:"meta"}); }
+    if((oldVid||null)!==(out.vid||null)) out.notasVid = [];   // las notas hablan del vídeo anterior
     justSaved = out.id; saveFigure(out);
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();
@@ -3358,7 +3955,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup(); simStop();
+  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup(); simStop(); guiaStop();
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -3370,6 +3967,13 @@ function setBusyUI(on){
   document.querySelectorAll("#sheet-root form button, #sheet-root form input, #sheet-root form select, #sheet-root form textarea").forEach(x=>{ if(x.dataset.act!=="close") x.disabled=on; });
   const sb=document.querySelector('#sheet-root form button[type="submit"]'); if(sb) sb.textContent = on ? "Guardando…" : "Guardar";
   if(on) askWake(); else if(tab!=="social") releaseWake();
+}
+// Las notas del vídeo (f.notasVid) hablan del vídeo de ahora: al guardar con otro vídeo, o sin vídeo, se borran. Se avisa antes.
+function nvLossHTML(){
+  if(!vstate || vstate.kind) return "";
+  const n = erroresNv(S.figures[vstate.figId]?.notasVid).length;
+  const cambia = (vstate.file && (!vstate.fromId || vstate.compact)) || (vstate.remove && vstate.cur);
+  return n && cambia ? `<p class="small" id="nv-loss" role="status" style="color:var(--warn)">${n===1?"Su nota del vídeo se borrará":`Sus ${n} notas del vídeo se borrarán`} al guardar.</p>` : `<p id="nv-loss" role="status" hidden></p>`;
 }
 function renderVidbox(){
   const box=$("#vidbox"); if(!box||!vstate) return;
@@ -3391,7 +3995,7 @@ function renderVidbox(){
       <p class="small muted">Pausa donde empieza la figura y pulsa «Marcar inicio»; igual con el final. Al reproducirla empezará y acabará en tus marcas (${fmtT(seg)}).</p>
       <label class="small row" for="ff-compact" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ff-compact" ${vstate.compact?"checked":""}><span>Guardar solo el fragmento en calidad media: ocupa mucho menos, pero tarda lo que dura el fragmento.</span></label>
       ${vstate.fromId?"":`<p class="small muted">Vídeo de ${fmtMB(vstate.file.size)}. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`}
-      <p class="vprog" id="vprog" aria-live="polite"></p>
+      <p class="vprog" id="vprog" aria-live="polite"></p>${nvLossHTML()}
       <div class="row"><button type="button" class="btn sm" data-pick="ff-file">Elegir otro</button><button type="button" class="btn ghost sm" data-vid="cancel">${vstate.fromId?"Cancelar recorte":"No usar este vídeo"}</button>${ai}</div>${aiOut}`;
   } else if(vstate.cur && !vstate.remove){
     box.innerHTML=`${pick}${playerHTML({vid:vstate.cur, vidTrim:vstate.trim, thumb:vstate.thumb})}
@@ -3406,13 +4010,13 @@ function renderVidbox(){
       <p class="small muted">Grábate haciendo la figura entera. Luego marcas dónde empieza y acaba. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`;
   } else {
     box.innerHTML=`${pick}<button type="button" class="btn" data-pick="ff-file">Añadir vídeo de la clase</button>
-      <p class="small muted">${vstate.remove?"El vídeo se quitará al guardar. ":""}Elígelo desde Fotos. Se guarda en este dispositivo con su calidad original y marcas dónde empieza y acaba la figura.</p>`;
+      <p class="small muted">${vstate.remove?"El vídeo se quitará al guardar. ":""}Elígelo desde Fotos. Se guarda en este dispositivo con su calidad original y marcas dónde empieza y acaba la figura.</p>${nvLossHTML()}`;
   }
   ["ff-file","ff-cam"].forEach(k=>{ const fi=$("#"+k); if(fi) fi.onchange=()=>{
     const file=fi.files[0]; if(!file) return;
     useVideoFile(file);
   }; });
-  const cc=$("#ff-compact"); if(cc) cc.onchange=()=>{ vstate.compact=cc.checked; };
+  const cc=$("#ff-compact"); if(cc) cc.onchange=()=>{ vstate.compact=cc.checked; const o=$("#nv-loss"); if(o) o.outerHTML=nvLossHTML(); };
   box.querySelectorAll("[data-vid]").forEach(b=> b.onclick=async()=>{
     const k=b.dataset.vid, pv=$("#ff-prev");
     if(k==="start" && pv){ vstate.start=Math.min(pv.currentTime, Math.max(0,(vstate.end||vstate.dur)-1)); refreshTrim(); }
@@ -3421,15 +4025,15 @@ function renderVidbox(){
     else if(k==="remove"){ vstate.remove=true; renderVidbox(); }
     else if(k==="retrim"){
       const blob=vstate.curBlob || await vidGet(vstate.cur).catch(()=>null);
-      if(!blob){ toast("Este vídeo no está en este dispositivo: las copias no incluyen vídeos."); return; }
+      if(!blob){ toast("Este vídeo no está en este dispositivo. Si lo guardaste, recupéralo en Ajustes → Restaurar o importar → «Recuperar vídeos»."); return; }
       vstate.fromId=vstate.cur; vstate.file=blob; vstate.url=vidCache.get(vstate.cur)||URL.createObjectURL(blob);
       vstate.start=vstate.trim?.start||0; vstate.end=vstate.trim?.end||0; vstate.dur=0; loadPrev();
     }
     else if(k==="savevid"){
       const blob=vstate.curBlob; if(!blob){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
-      const ty=blob.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+      const ty=blob.type||"video/mp4";
       const vidId = vstate.cur, figId = vstate.figId;
-      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(how=>confirmSaved(how, "el vídeo", "Sí, está guardado")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
+      shareOrDownload(new File([blob], vidFileName($("#ff-nombre")?.value || S.figures[figId]?.nombre || "bachateca", vidId, ty), {type:ty})).then(how=>confirmSaved(how, "el vídeo", "Sí, está guardado")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
     }
     else if(k==="ai"){ prepareCapture(); }
   });
@@ -3486,10 +4090,11 @@ async function genMissingThumbs(){
     }
   } finally { thumbsRunning=false; }
 }
-function playerHTML(f){
-  const t=f.vidTrim||{};
-  return `<div class="player" data-loop="1"><video data-vid="${esc(f.vid)}" data-s="${+t.start||0}" data-e="${+t.end||0}" ${f.thumb?`poster="${esc(f.thumb)}"`:""} controls playsinline preload="metadata"></video>
-    <div class="pctl" role="group" aria-label="Reproducción"><button type="button" data-speed="0.5" aria-pressed="false">0,5×</button><button type="button" data-speed="0.75" aria-pressed="false">0,75×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-mirror aria-pressed="false">Espejo</button><button type="button" data-loopbtn aria-pressed="true">Bucle</button></div></div>`;
+function playerHTML(f, caps){
+  const t=f.vidTrim||{}, vid=`<video data-vid="${esc(f.vid)}" data-s="${+t.start||0}" data-e="${+t.end||0}" ${f.thumb?`poster="${esc(f.thumb)}"`:""} controls playsinline preload="metadata"></video>`;
+  // caps: con subtítulo encima del vídeo (la nota que toca ahora, para la ficha y las partes)
+  return `<div class="player" data-loop="1">${caps ? `<div class="vwrap">${vid}<div class="vcap" aria-live="polite"></div></div>` : vid}
+    <div class="pctl" role="group" aria-label="Reproducción"><button type="button" data-speed="0.5" aria-pressed="false">0,5×</button><button type="button" data-speed="0.75" aria-pressed="false">0,75×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-mirror aria-pressed="false">Espejo</button><button type="button" data-loopbtn aria-pressed="true">Bucle</button><button type="button" data-step="-0.1" aria-label="Atrás 0,1 segundos">‹ 0,1 s</button><button type="button" data-step="0.1" aria-label="Adelante 0,1 segundos">0,1 s ›</button></div></div>`;
 }
 function backfillThumb(vidId, v){
   const f=Object.values(S.figures).find(x=>x.vid===vidId && !x.thumb); if(!f) return;
@@ -3506,7 +4111,7 @@ function hydrateVideos(root){
   (root||document).querySelectorAll("video[data-vid]:not([data-h])").forEach(async v=>{
     v.dataset.h="1"; const id=v.dataset.vid, s=+v.dataset.s||0, e=+v.dataset.e||0;
     const url=await vidObjUrl(id).catch(()=>null);
-    if(!url){ const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted">Este vídeo no está en este dispositivo: las copias no incluyen vídeos.</p>`; return; }
+    if(!url){ const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted">Este vídeo no está en este dispositivo. Si lo guardaste, recupéralo en Ajustes → Restaurar o importar → «Recuperar vídeos».</p>`; return; }
     v.addEventListener("loadedmetadata",()=>{ if(s>0) try{ v.currentTime=s; }catch{} });
     v.addEventListener("seeked",()=>backfillThumb(id, v), {once:true});
     v.addEventListener("playing",()=>setTimeout(()=>backfillThumb(id, v),300));
@@ -3563,14 +4168,36 @@ function markVidSaved(figId, vidId){
   if(!it || it.vidSaved===vidId) return;
   it.vidSaved = vidId; persist({t:"fig", id:f.id});
 }
+// Cada vídeo que sale de la app lleva su id al final del nombre («<nombre> · <id>.mp4»): es lo único que permite
+// devolverlo a su figura, parte o intento con «Recuperar vídeos» si un día hay que reinstalar.
+const vidExt = ty => ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+const vidFileName = (nombre, id, ty) => `${String(nombre||"").replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "vídeo"} · ${id}.${vidExt(ty||"video/mp4")}`;
+// Admite el « (1)» que añaden algunas descargas repetidas. Sin id válido, null.
+function vidIdFromName(name){
+  const m = /· ([^\s·]+?)(?: ?\(\d+\))?\.[A-Za-z0-9]{1,5}$/.exec(String(name||""));
+  return m && okId(m[1]) ? m[1] : null;
+}
 const attName = (f, a) => `${f.nombre} · intento ${fmtDate(a.fecha)}`;
 const parteName = (f, x) => `${f.nombre} · parte ${partesOf(f).indexOf(x)+1} (${fmtDate(x.fecha)})`;
-// Un elemento por vídeo sin copia: {id: figura, att: intento (si lo es), vid, nombre}. La figura más reciente primero.
-const vidsUnsaved = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
-  ...(f.vid && f.vidSaved!==f.vid ? [{id:f.id, vid:f.vid, nombre:f.nombre}] : []),
-  ...partesOf(f).filter(x=>x.vid && x.vidSaved!==x.vid).map(x=>({id:f.id, parte:x.id, vid:x.vid, nombre:parteName(f,x)})),
-  ...intentosOf(f).filter(a=>a.vid && a.vidSaved!==a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a)}))
+// Un elemento por vídeo: {id: figura, parte/att (si lo es), vid, nombre, saved}. La figura más reciente primero.
+const vidsAll = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
+  ...(f.vid ? [{id:f.id, vid:f.vid, nombre:f.nombre, saved:f.vidSaved===f.vid}] : []),
+  ...partesOf(f).filter(x=>x.vid).map(x=>({id:f.id, parte:x.id, vid:x.vid, nombre:parteName(f,x), saved:x.vidSaved===x.vid})),
+  ...intentosOf(f).filter(a=>a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a), saved:a.vidSaved===a.vid}))
 ]);
+const vidsUnsaved = () => vidsAll().filter(x=>!x.saved);
+// «Copia completa»: después del JSON se mandan todos los vídeos, también los que ya tenían copia.
+// fullDone guarda los que ya han salido en esta copia completa; null fuera de esa pantalla.
+let fullDone = null;
+const fullOn = () => setView==="videos" && !!fullDone;
+// fullKeys: los vídeos que de verdad están en el dispositivo (se leen al abrir esa pantalla). Los que faltan no se cuentan como pendientes.
+let fullKeys = null;
+const vidsPending = () => fullOn() ? vidsAll().filter(x=>!fullDone.has(x.vid) && (!fullKeys || fullKeys.has(x.vid))) : vidsUnsaved();
+const fullMissing = () => fullKeys ? new Set(vidsAll().map(x=>x.vid).filter(v=>!fullKeys.has(v))).size : 0;
+async function loadFullKeys(){
+  try{ fullKeys = new Set(((idb && await tx("videos","readonly",st=>st.getAllKeys()))||[]).filter(k=>typeof k==="string")); }
+  catch{ fullKeys = null; }
+}
 // iOS comparte varios vídeos a la vez («Guardar N vídeos»), pero cada envío necesita un toque:
 // se mandan por tandas de hasta 5 y unos 200 MB, y el botón ofrece la siguiente tanda.
 const VID_BATCH = 5, VID_BATCH_BYTES = 200*1048576;
@@ -3580,26 +4207,27 @@ let vidBatch = null, vidBatchP = null;
 function prepVidBatch(){
   if(vidBatchP) return vidBatchP;
   vidBatchP = (async()=>{
-    const files = [], ids = []; let bytes = 0;
-    for(const f of vidsUnsaved()){
+    const files = [], ids = [], full = fullOn(); let bytes = 0;
+    for(const f of vidsPending()){
       if(files.length>=VID_BATCH) break;
       const b = await vidGet(f.vid).catch(()=>null); if(!b) continue;
       if(files.length && bytes + b.size > VID_BATCH_BYTES) break;
-      const ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-      const name = (f.nombre||"figura").replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "figura";
-      files.push(new File([b], `${name}.${ext}`, {type:ty})); ids.push([f.id, f.vid]); bytes += b.size;
+      const ty=b.type||"video/mp4";
+      files.push(new File([b], vidFileName(f.nombre||"figura", f.vid, ty), {type:ty})); ids.push([f.id, f.vid]); bytes += b.size;
     }
-    vidBatch = {files, ids};
-  })().catch(()=>{ vidBatch = {files:[], ids:[]}; }).finally(()=>{ vidBatchP = null; });
+    vidBatch = {files, ids, full};
+  })().catch(()=>{ vidBatch = {files:[], ids:[], full:fullOn()}; }).finally(()=>{ vidBatchP = null; });
   return vidBatchP;
 }
 async function saveVidBatch(){
-  if(!vidsUnsaved().length){ toast("Todos tus vídeos tienen copia."); return; }
+  if(!vidsPending().length){ toast(fullOn() ? "Ya están todos tus vídeos." : "Todos tus vídeos tienen copia."); return; }
+  // Una tanda preparada para la otra lista (solo sin copia / copia completa) no sirve.
+  if(vidBatch && vidBatch.full!==fullOn()) vidBatch = null;
   const batch = vidBatch;
   if(!batch){ toast("Preparando los vídeos… vuelve a pulsar."); prepVidBatch(); return; }
   if(!batch.files.length){ vidBatch = null; toast("No se encontraron los vídeos en el dispositivo."); return; }
-  // Lo que ya se guardó desde la ficha mientras tanto no se vuelve a mandar.
-  const still = new Set(vidsUnsaved().map(f=>f.vid));
+  // Lo que ya se guardó (desde la ficha o en otra tanda) mientras tanto no se vuelve a mandar.
+  const still = new Set(vidsPending().map(f=>f.vid));
   const keep = batch.ids.map((x,i)=>still.has(x[1]) ? i : -1).filter(i=>i>=0);
   if(!keep.length){ vidBatch = null; prepVidBatch(); toast("Preparando los vídeos… vuelve a pulsar."); return; }
   const files = keep.map(i=>batch.files[i]); let ids = keep.map(i=>batch.ids[i]);
@@ -3613,15 +4241,53 @@ async function saveVidBatch(){
   }
   if(!ok) return;
   vidBatch = null;
-  ids.forEach(([fid,vid])=>markVidSaved(fid, vid));
-  const left = vidsUnsaved().length;
+  ids.forEach(([fid,vid])=>{ markVidSaved(fid, vid); if(fullOn()) fullDone.add(vid); });
+  const left = vidsPending().length;
   toast(left ? `${pl(ids.length,"vídeo guardado","vídeos guardados")}. Quedan ${left}.` : "Listo: todos tus vídeos tienen copia.");
   if($('[aria-label="Ajustes"]')) openSettings();
 }
+async function exportFull(){
+  if(!(await exportBackup())) return;
+  if(!vidsAll().length) return;
+  fullDone = new Set(); vidBatch = null; await loadFullKeys(); setGo("videos");
+}
+function fullVidsHTML(){
+  const n = vidsPending().length, m = fullMissing();
+  return `<div class="panel">
+      <p><b>Ahora tus vídeos: ${n}</b></p>
+      ${m ? `<p class="small muted">${m===1?"1 no está":`${m} no están`} en este dispositivo.</p>` : ""}
+      <p class="small muted">${n ? `Se guardan por tandas de hasta ${VID_BATCH} con la hoja de compartir: elige «Guardar en Archivos» (o iCloud Drive), no «Guardar vídeos»: Fotos puede cambiarles el nombre y entonces no vuelven solos a su figura. Cada archivo lleva en el nombre el código de su vídeo, para poder devolverlo a su figura con «Recuperar vídeos».` : m ? "Listo: la copia y los vídeos de este dispositivo están guardados." : "Listo: la copia y todos tus vídeos están guardados."}</p>
+      ${n ? `<div class="row"><button class="btn pri" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)}</button></div>` : ""}
+    </div>`;
+}
+// «Recuperar vídeos»: el id sale del nombre del archivo. Solo se guarda si alguna figura, parte o intento lo usa
+// y no está ya en el dispositivo. De uno en uno: en el iPhone, leerlos a la vez puede agotar la memoria.
+let recovering = false;
+async function recoverVideos(list){
+  if(safeMode){ toast("Modo seguro: no se pueden guardar vídeos."); return; }
+  if(!loaded){ toast("Espera a que se cargue tu repertorio."); return; }
+  if(recovering || importing || restoring){ toast("Espera a que termine lo que está en marcha."); return; }
+  recovering = true;
+  let n = 0, m = 0, k = 0, skip = 0, err = null;
+  try{
+    const refs = vidsIn(S); Object.values(S.figures||{}).forEach(f=>figVids(f).forEach(v=>refs.add(v)));
+    for(const file of list){
+      const id = vidIdFromName(file.name);
+      if(!id || !refs.has(id)){ m++; continue; }
+      // Si no se puede mirar si ya está, no se escribe: podría pisar el vídeo bueno.
+      try{ if(await vidGet(id)){ k++; continue; } }catch{ skip++; continue; }
+      try{ await vidPut(id, file); n++; }catch(e){ err = e; break; }
+    }
+  }finally{ recovering = false; }
+  if(n) setTimeout(genMissingThumbs, 300);
+  render(); if($('[aria-label="Ajustes"]')) openSettings();
+  const msg = `${pl(n,"vídeo recuperado","vídeos recuperados")}${m?` · ${m} ${m===1?"no corresponde":"no corresponden"} a ninguna figura`:""}${k?` · ${k} ya estaban`:""}${skip?` · ${skip} no se ${skip===1?"pudo":"pudieron"} comprobar`:""}`;
+  toast(err ? `${err.userMsg||"No se pudo guardar un vídeo."} ${msg}` : msg);
+}
 function vidsUnsavedHTML(){
   const n = vidsUnsaved().length; if(!n) return "";
-  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. La copia de seguridad no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}.
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)} en Fotos</button></div></div>`;
+  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. La copia de seguridad no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}. Guárdalos en Archivos o iCloud Drive para poder recuperarlos con «Recuperar vídeos».
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)}</button></div></div>`;
 }
 // Social de otro día sin registrar: registrarlo con su fecha o descartarlo (con Deshacer).
 function staleHTML(){
@@ -4035,7 +4701,10 @@ function renameItem(kind, i, nw){
   });
   if(kind==="pos"){
     Object.values(S.logs).forEach(l=>{ if(l.bloqueo===old){ l.bloqueo=nw; persist({t:"log",id:l.id}); } });
-    if(S.linkRep[old]){ S.linkRep[nw]=S.linkRep[old]; delete S.linkRep[old]; persist({t:"lr"}); }
+    // El repaso de la posición se mueve en todos los bailes.
+    let moved=false;
+    Object.keys(S.linkRep).forEach(k=>{ const i=k.indexOf("␟"); if(i>=0 && k.slice(i+1)===old){ S.linkRep[k.slice(0,i+1)+nw]=S.linkRep[k]; delete S.linkRep[k]; moved=true; } });
+    if(moved) persist({t:"lr"});
     if(linkPos===old) linkPos=nw;
   }
   if(kind==="hold" && linkHold===old) linkHold=nw;
@@ -4060,7 +4729,7 @@ function listHTML(kind, bare){
 }
 // Pantalla de Ajustes abierta: null es el menú; si no, una de SET_VIEWS.
 let setView = null;
-const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas"};
+const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas", videos:"Copia completa"};
 function setGo(v){ setView=v; confirmKey=null; editKey=null; openSettings(); const sh=$(".sheet"); if(sh) sh.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); }
 const SNAP_WHY = {diaria:"Copia del día", "antes-de-importar":"Antes de importar", "antes-de-reemplazar":"Antes de reemplazar todo", "antes-de-restaurar":"Antes de restaurar", "antes-de-encoger":"Antes de borrar muchas figuras", "copia-local":"Copia guardada aparte"};
 const snapWhen = at => { try{ return new Date(at).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }catch{ return ""; } };
@@ -4089,9 +4758,15 @@ function openSettings(){
   else if(!setView && idb) snapKeys().then(ks=>{ const mv=$("#snap-n"); if(mv) mv.textContent = ks.filter(k=>snapParse(k)).length; }).catch(()=>{});
   const exN = figs().filter(f=>f.ejemplo).length;
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
+  // Vídeos sin figura: solo con los datos bien leídos (en modo seguro todos lo parecerían).
+  if(setView==="espacio" && canClean()) orphanVideos().then(l=>{ const vs = l.filter(x=>!x.id.startsWith("cover:")), el=$("#orph-st"), b=$('[data-act="orph-free"]');
+    if(!el || !b || !vs.length) return; el.textContent = `${pl(vs.length,"vídeo sin figura","vídeos sin figura")} · ${fmtMB(l.reduce((t,x)=>t+x.bytes,0))}`; el.hidden = b.hidden = false; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   const bk = backupInfo(), bs = backupStatus(bk);
-  if(!vidBatch && vidsUnsaved().length) prepVidBatch();
+  // La copia completa solo vive en su pantalla: al salir, la tanda vuelve a ser la de los vídeos sin copia.
+  if(setView!=="videos"){ fullDone = null; fullKeys = null; }
+  if(vidBatch && vidBatch.full!==fullOn()) vidBatch = null;
+  if(!vidBatch && vidsPending().length) prepVidBatch();
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
   const row = (v, t, val) => `<button type="button" class="mrow" data-setv="${v}"><span>${t}</span>${val!==""?`<span class="mv">${val}</span>`:""}${CHEV}</button>`;
   const head = setView
@@ -4105,9 +4780,17 @@ function openSettings(){
       <div class="row"><button type="button" class="btn" data-pick="imp-file">Elegir archivo de copia</button><input type="file" id="imp-file" accept="application/json,.json" class="sr" tabindex="-1" aria-hidden="true"></div>
       <textarea id="imp-text" placeholder="…o pega aquí el texto de una copia" aria-label="Texto de la copia"></textarea>
       <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">Reemplazar todo</button></div>
+    </div>
+    <div class="panel">
+      <h3>Recuperar vídeos</h3>
+      <p class="small muted">Elige en Archivos (o iCloud Drive) los vídeos que guardaste allí con «Copia completa». Cada uno vuelve a su figura por el código de su nombre; los que ya están en este dispositivo no se tocan. Los que guardaste en Fotos pueden haber perdido su nombre: esos no se reconocen.</p>
+      <div class="row"><button type="button" class="btn" data-pick="vid-rec">Elegir vídeos</button><input type="file" id="vid-rec" multiple accept="video/*" class="sr" tabindex="-1" aria-hidden="true"></div>
     </div>`;
+  else if(setView==="videos") body = fullVidsHTML();
   else if(setView==="espacio") body = `<div class="panel">
       <p class="small muted" id="vid-usage">Calculando…</p>
+      <p class="small muted" id="orph-st" hidden></p>
+      <button class="btn sm" data-act="orph-free" hidden>Liberar ahora</button>
       <p class="small muted" id="persist-st"></p>
       <button class="btn sm" data-act="persist">Proteger mis datos</button>
     </div>`;
@@ -4122,8 +4805,8 @@ function openSettings(){
   else body = `<div class="panel">
       <h3>Copia de seguridad</h3>
       <p><b class="bk-st${bk.stale?" due":""}">${esc(bs.main)}</b>${bs.since?` <span class="muted">${esc(bs.since)}</span>`:""}</p>
-      <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»).</p>
-      <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar como texto</button></div>
+      <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; los vídeos van aparte: «Copia completa» los guarda todos después de la copia).</p>
+      <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="export-full">Copia completa</button><button class="btn" data-act="copy">Copiar como texto</button></div>
       <textarea id="exp-text" readonly hidden aria-label="Texto de tu copia"></textarea>
       ${vidsUnsavedHTML()}
     </div>
@@ -4138,12 +4821,13 @@ function openSettings(){
     ${head}
     ${body}
   </div></div>`;
+  const vr=$("#vid-rec"); if(vr) vr.onchange = e=>{ const l=[...(e.target.files||[])]; e.target.value=""; if(l.length) recoverVideos(l); };
   const fi=$("#imp-file"); if(fi) fi.onchange = async e=>{ const file=e.target.files[0]; if(!file) return; try{ $("#imp-text").value = await file.text(); toast("Archivo cargado. Elige «Añadir al repertorio» o «Reemplazar todo»."); }catch{ toast("No se pudo leer el archivo."); } };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
   markClean();
 }
-function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{},preguntas:S.preguntas||{}},null,2); }
+function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{},preguntas:S.preguntas||{},enlaces:S.enlaces||{}},null,2); }
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const isObj = o => !!o && typeof o==="object" && !Array.isArray(o);
 // test() convierte a texto: sin comprobar el tipo, un id ausente pasaría como «undefined».
@@ -4159,6 +4843,9 @@ function sanitizeRep(r0){
   ["due","last"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; });
   return r;
 }
+// f.ejec solo se conserva como {nivel entero 0..3, last fecha ISO}; si no, se descarta (ausente = 0).
+function sanitizeEjec(e){ const n = e && typeof e==="object" ? cuenta(e.nivel) : null;
+  return n!=null && n<=3 && typeof e.last==="string" && /^\d{4}-\d{2}-\d{2}$/.test(e.last) ? {nivel:n, last:e.last} : null; }
 function sanitizeFig(f0){
   const f = {...f0}; let malas = 0;
   const lista = (v, fix) => { if(!Array.isArray(v)){ if(v!=null) malas++; return []; }
@@ -4166,12 +4853,23 @@ function sanitizeFig(f0){
   // Solo se tocan las listas que vienen: añadir una vacía haría que tu propia copia pareciera distinta.
   const marcas = a => { const b={...a}; if("marcadores" in b) b.marcadores = lista(a.marcadores, m=>({...m})).filter(m=>{ if(Number.isFinite(m.b)) return true; malas++; return false; }); return b; };
   if("intentos" in f) f.intentos = lista(f.intentos, marcas);
-  if("partes" in f) f.partes = lista(f.partes);
-  if("errores" in f) f.errores = lista(f.errores);
+  // Notas del vídeo: segundo finito ≥ 0 y texto de 1 a 140 caracteres; las que no valen se descartan.
+  const nvs = a => { const b={...a}; if("notasVid" in b) b.notasVid = lista(a.notasVid, n=>({...n})).filter(n=>{ if(Number.isFinite(n.s) && n.s>=0 && typeof n.texto==="string" && n.texto.trim() && n.texto.length<=140) return true; malas++; return false; }); return b; };
+  if("notasVid" in f) f.notasVid = nvs(f).notasVid;
+  if("partes" in f) f.partes = lista(f.partes, nvs);
+  // Errores recurrentes: veces entero ≥ 1 (si no, 1); ultima y resuelto, fecha ISO o se quitan.
+  const iso = v => typeof v==="string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const err = e => { const o={...e};
+    if("veces" in o){ const n=cuenta(o.veces); o.veces = n!=null && n>=1 ? n : 1; }
+    ["ultima","resuelto"].forEach(k=>{ if(k in o && !iso(o[k])) delete o[k]; });
+    if("marcas" in o && !(Array.isArray(o.marcas) && o.marcas.every(x=>typeof x==="string"))) delete o.marcas;
+    return o; };
+  if("errores" in f) f.errores = lista(f.errores, err);
   if(f.estado!==undefined && !EST[f.estado]) f.estado = "practica";
   if(f.tipo!==undefined && !TIPO[f.tipo]) f.tipo = "figura";
   if("usos" in f){ const n = cuenta(f.usos); if(n==null) delete f.usos; else f.usos = n; }
   if("rep" in f){ if(!isObj(f.rep)) delete f.rep; else f.rep = sanitizeRep(f.rep); }
+  if("ejec" in f){ const e = sanitizeEjec(f.ejec); if(e) f.ejec = e; else delete f.ejec; }
   ["tiempo","tiempos"].forEach(k=>{ if(k in f && f[k]!=="" && cuenta(f[k])==null) delete f[k]; });
   return {f, malas};
 }
@@ -4185,6 +4883,10 @@ function sanitizeImport(d){
     const mapa = m => { if(!isObj(m)) return null; const out={};
       Object.entries(m).forEach(([k,v])=>{ if(v===null) out[k]=null; else if(isObj(v)) out[k]=sanitizeRep(v); }); return out; };
     if("repAntes" in o || "repDespues" in o){ const a=mapa(o.repAntes), b=mapa(o.repDespues); if(a&&b){ o.repAntes=a; o.repDespues=b; } else { delete o.repAntes; delete o.repDespues; } }
+    // ejecAntes/ejecDespues: deleteLog los devuelve a f.ejec; misma validación, y si falla un mapa se quitan los dos.
+    const mapaE = m => { if(!isObj(m)) return null; const out={};
+      Object.entries(m).forEach(([k,v])=>{ if(v===null) out[k]=null; else { const e=sanitizeEjec(v); if(e) out[k]=e; } }); return out; };
+    if("ejecAntes" in o || "ejecDespues" in o){ const a=mapaE(o.ejecAntes), b=mapaE(o.ejecDespues); if(a&&b){ o.ejecAntes=a; o.ejecDespues=b; } else { delete o.ejecAntes; delete o.ejecDespues; } }
     logs[l.id]=o; } else descartadas++; });
   // Preguntas para clase: id seguro y posición con texto; las fechas mal escritas se quitan.
   const preguntas={}, ps = isObj(d&&d.preguntas) ? Object.values(d.preguntas) : [];
@@ -4196,7 +4898,13 @@ function sanitizeImport(d){
     if("baile" in r && !(typeof r.baile==="string" && r.baile.trim())) delete r.baile;
     preguntas[q.id] = r;
   });
-  return {figures, logs, preguntas, descartadas};
+  // Enlaces comprobados: la clave es «idA>idB» con los dos ids seguros, fecha ISO y veces entero ≥ 1.
+  const enlaces={}, es = isObj(d&&d.enlaces) ? Object.values(d.enlaces) : [];
+  es.forEach(e=>{
+    if(isObj(e) && okId(e.a) && okId(e.b) && typeof e.fecha==="string" && /^\d{4}-\d{2}-\d{2}$/.test(e.fecha) && Number.isInteger(e.veces) && e.veces>=1) enlaces[e.a+">"+e.b] = {a:e.a, b:e.b, fecha:e.fecha, veces:e.veces};
+    else descartadas++;
+  });
+  return {figures, logs, preguntas, enlaces, descartadas};
 }
 // Compara dos figuras sin intentos ni partes (esos se fusionan aparte); el orden de las claves no cuenta.
 const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : isObj(v) ? Object.fromEntries(Object.keys(v).sort().map(k=>[k, sortKeys(v[k])])) : v;
@@ -4223,7 +4931,7 @@ async function importData1(replace){
   const rawIds = o => new Set(isObj(o) ? Object.entries(o).flatMap(([k,v])=>[k, ...(isObj(v)&&typeof v.id==="string"?[v.id]:[])]) : []);
   const inFigs = rawIds(d.figures), inLogs = rawIds(d.logs), inQs = rawIds(d.preguntas);
   const san = sanitizeImport(d), desc = san.descartadas ? ` · ${san.descartadas} descartadas por estar mal formadas` : "";
-  d.figures = san.figures; d.logs = san.logs; d.preguntas = san.preguntas;
+  d.figures = san.figures; d.logs = san.logs; d.preguntas = san.preguntas; d.enlaces = san.enlaces;
   const inc=Object.values(d.figures), nIn=inc.length;
   if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."+desc); return; }
   if(!nIn && !Object.keys(d.logs).length){ toast("Esa copia no tiene figuras ni registros que añadir."+desc); return; }
@@ -4248,6 +4956,7 @@ async function importData1(replace){
       if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
       const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
       if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
+      capByErrors(f);   // D8 también para lo importado: con errores activos, el repaso no queda a más de 7 días
       S.figures[f.id]=f; persist({t:"fig",id:f.id});
       if(failImport){ failImport = false; throw new Error("fallo simulado"); }
     });
@@ -4268,6 +4977,8 @@ async function importData1(replace){
       if(!replace && (S.preguntas[q.id] || (!q.resuelta && openQs().some(x=>x.pos===q.pos && qBaile(x)===qBaile(q))))) return;
       S.preguntas[q.id]=q;
     });
+    // Enlaces comprobados: «Reemplazar» deja los de la copia; «Añadir», los que faltan.
+    S.enlaces = replace ? {...d.enlaces} : {...d.enlaces, ...(S.enlaces||{})}; persist({t:"meta"});
     const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
     S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
     if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
@@ -4303,7 +5014,7 @@ function loadExamples(){
 
 // ---------- render ----------
 // Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
-const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote","data-chainopt"];
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote","data-chainopt","data-chainx"];
 function focusKey(el){
   if(!el || el===document.body) return null;
   if(el.id) return "#"+CSS.escape(el.id);
@@ -4331,11 +5042,23 @@ function render(){
 }
 
 // ---------- eventos ----------
+document.addEventListener("change", e=>{
+  const sel = e.target.closest && e.target.closest("[data-chainsel]"); if(!sel) return;
+  const k = sel.dataset.chainsel, v = sel.value;
+  if(k==="end") chainEnd=v; else if(k==="must") chainMust=v; else if(k==="n"){ const m=+v; chainN = Number.isInteger(m)&&m>=2&&m<=6 ? m : 4; }
+  saveChainOpts(); chain=chain ? makeChain(linkPos) : null;
+  focusAfter = `[data-chainsel="${k}"]`; render();
+});
 document.addEventListener("click", async e=>{
-  const pc = e.target.closest("[data-speed],[data-mirror],[data-loopbtn]");
+  const pc = e.target.closest("[data-speed],[data-mirror],[data-loopbtn],[data-step]");
   if(pc){
     const pl=pc.closest(".player"), v=pl && pl.querySelector("video"); if(!v) return;
-    if(pc.dataset.speed){ v.playbackRate=+pc.dataset.speed; pl.querySelectorAll("[data-speed]").forEach(b=>b.setAttribute("aria-pressed", b===pc)); }
+    if(pc.dataset.step){
+      // Avance fino: pausa y una décima, sin salirse del recorte (data-s/data-e) para no caer en el bucle ni fuera del tramo.
+      const s=+v.dataset.s||0, e=+v.dataset.e||0, hi=(e>0 ? e : (isFinite(v.duration) ? v.duration : Infinity)) - .05; // 0,05 antes del final: justo en e el bucle volvería a s
+      v.pause(); try{ v.currentTime = Math.max(s, Math.min(hi, v.currentTime + +pc.dataset.step)); }catch{}
+    }
+    else if(pc.dataset.speed){ v.playbackRate=+pc.dataset.speed; pl.querySelectorAll("[data-speed]").forEach(b=>b.setAttribute("aria-pressed", b===pc)); }
     else if(pc.hasAttribute("data-mirror")){ const on=!v.classList.contains("mirror"); v.classList.toggle("mirror",on); pc.setAttribute("aria-pressed",on); }
     else { const on=pl.dataset.loop!=="1"; pl.dataset.loop=on?"1":"0"; pc.setAttribute("aria-pressed",on); }
     return;
@@ -4344,7 +5067,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-chainopt],[data-mins],[data-tema],[data-fest]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-chainopt],[data-chainx],[data-mins],[data-tema],[data-fest]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -4364,7 +5087,8 @@ document.addEventListener("click", async e=>{
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
-  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict}); chain=chain ? makeChain(linkPos) : null; return render(); }
+  if(d.chainx!==undefined){ chainExclude = chainExclude.includes(d.chainx) ? chainExclude.filter(x=>x!==d.chainx) : [...chainExclude, d.chainx]; saveChainOpts(); chain=chain ? makeChain(linkPos) : null; return render(); }
+  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; saveChainOpts(); chain=chain ? makeChain(linkPos) : null; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.fest){ filt.estado=d.fest; return render(); }
   if(d.promote){ promoteFig(d.promote, d.to||"disponible", !!t.closest("[data-viewfig]"), t); return; }
@@ -4388,6 +5112,7 @@ document.addEventListener("click", async e=>{
   if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; return render(); }
   if(a==="start-fig") return startSession("fig", false);
   if(a==="start-fig-any") return startSession("fig", true);
+  if(a==="start-quiz") return startQuiz();
   if(a==="start-link") return startSession("link", false);
   if(a==="start-link-any") return startSession("link", true);
   if(a==="reveal"){ session.revealed=true; render(); const an=$("#v-repasar .answer"); if(an){ an.tabIndex=-1; an.focus({preventScroll:true}); } return; }
@@ -4397,6 +5122,21 @@ document.addEventListener("click", async e=>{
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
   if(a==="sim-open") return openSim();
+  if(a==="guia-mins"){ guiaCfg.mins = +d.m===20 ? 20 : 10; return render(); }
+  if(a==="guia-open") return openGuia();
+  if(a==="ln-mark"){
+    const A=S.figures[d.a], B=S.figures[d.b]; if(!A || !B) return;
+    const k=linkKey(d.a, d.b), antes=S.enlaces?.[k] ? clone(S.enlaces[k]) : null;
+    if(antes) unmarkLink(k); else markLink(d.a, d.b);
+    // En la ficha se repinta conservando el scroll; en la cadena, la vista.
+    const enFicha = !!t.closest("[data-viewfig]"), sh = enFicha && $(".sheet"), y = sh ? sh.scrollTop : 0;
+    if(sh){ openView(d.a); const s2=$(".sheet"); if(s2) s2.scrollTop=y;
+      // El repintado cambia el botón: el foco vuelve al mismo para poder seguir con el teclado o VoiceOver.
+      $(`[data-viewfig] [data-act="ln-mark"][data-a="${CSS.escape(d.a)}"][data-b="${CSS.escape(d.b)}"]`)?.focus({preventScroll:true}); } else render();
+    announce(antes ? "Enlace sin comprobar" : "Enlace comprobado");
+    if(antes) toast(`Quitado: ${A.nombre} → ${B.nombre}`, {label:"Deshacer", fn:()=>{ (S.enlaces ||= {})[k]=antes; persist({t:"meta"}); if(enFicha && S.figures[d.a]) openView(d.a); else render(); }});
+    return;
+  }
   if(a==="goto-pos"){ if(t.closest("[data-sim]")) closeSheet(); linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
   if(a==="q-done" || a==="q-del"){
     const q = S.preguntas?.[d.id]; if(!q) return;
@@ -4446,7 +5186,10 @@ document.addEventListener("click", async e=>{
   if(a==="cmp-open") return openCompare(d.id, d.att);
   if(a==="rc-open") return openRecCount(d.id);
   if(a==="cmp-back"){ const c=cmp; cmpStop(); cmp=null; return c ? openAttemptView(c.figId, c.attId) : null; }
+  if(a.startsWith("nv-")) return nvAct(a, d, t);
   if(a==="err-del") return errDelete(d.id, d.err);
+  if(a==="err-res") return errResolve(d.id, d.err);
+  if(a==="err-reopen") return errReopen(d.id, d.err);
   if(a==="pk-back") return pkBack();
   if(a==="att-savevid") return attSaveVid(d.id, d.att);
   if(a==="att-del") return attDelete(d.id, d.att);
@@ -4457,6 +5200,8 @@ document.addEventListener("click", async e=>{
   if(a==="inc-done") return openIncDone(d.id);
   if(a==="export") return exportBackup();
   if(a==="save-vids") return saveVidBatch();
+  if(a==="export-full") return exportFull();
+  if(a==="orph-free") return freeOrphans();
   if(a==="persist"){
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok=>{ toast(ok?"Datos protegidos":"El sistema no lo ha permitido. Instala la app en la pantalla de inicio y vuelve a probar."); openSettings(); });
     else toast("Este navegador no lo permite.");
@@ -4534,15 +5279,17 @@ $("#confirm-root").addEventListener("click", e=>{
 });
 // Al salir de la app a mitad de un simulacro se para (el conteo no puede seguir sonando de fondo) y la hoja
 // vuelve a la pantalla de empezar, con un aviso. Lo ya puntuado queda guardado.
+// La práctica guiada vuelve al principio del bloque: lo ya puntuado se queda.
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && guia && guia.fase==="cuenta"){ guiaQuiet(); setAudioSession("auto"); if($("[data-guia]")) guiaShow("Se paró al salir de la app. Empieza otra vez cuando quieras."); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && sim && sim.fase!=="fin"){ simStop(); if($("[data-sim]")) openSim("Se paró al salir de la app. Empieza otra vez cuando quieras."); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy||socialLive()) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
-if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
-  SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
+if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, socSort, bkSort, bumpEjec, 
+  SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, vidFileName, vidIdFromName, exportData,
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, videoRefs: async ()=>[...await videoRefs()], orphanVideos, cleanOrphans, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, recoverVideos, deleteLog, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

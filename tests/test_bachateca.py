@@ -175,7 +175,7 @@ def arranque_migra_y_guarda(browser):
     assert st["schema"] == p.evaluate("() => window.__bachateca.SCHEMA"), st.get("schema")
     assert set(st["figures"]) == {"a", "b"} and st["figures"]["b"]["tipo"] == "figura"
     assert st["figures"]["a"]["rep"]["step"] == 2, "no toca el repaso"
-    assert st["logs"]["l1"]["figs"] == ["a"] and st["linkRep"]["Cerrada"]["step"] == 1
+    assert st["logs"]["l1"]["figs"] == ["a"] and st["linkRep"]["Bachata\u241fCerrada"]["step"] == 1
     assert st["campoFuturo"] == {"x": 1}, "conserva campos desconocidos"
     assert st["classes"] == [], "respeta la lista de clases vacía"
     assert p.locator("#due-badge").inner_text() != "0"
@@ -251,7 +251,7 @@ def aviso_videos_sin_copia(browser):
     assert dl.value.suggested_filename.startswith("Figura")
     p.wait_for_timeout(300)
     # Figura 2 es la más reciente, va primero; Figura 1 ya tenía copia: no queda ninguno.
-    assert dl.value.suggested_filename == "Figura 2.mp4", dl.value.suggested_filename
+    assert dl.value.suggested_filename == "Figura 2 · v2.mp4", dl.value.suggested_filename
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert "todos tus vídeos" in p.locator(".toast").inner_text()
     p.evaluate("() => window.__bachateca.flush()")
@@ -484,6 +484,7 @@ def intento_grabado(browser):
         p.click('[data-act="att-savevid"]')
     p.click('#confirm-root [data-cf="ok"]')
     assert dl.value.suggested_filename.startswith("Figura 1 · intento"), dl.value.suggested_filename
+    assert dl.value.suggested_filename.endswith(f' · {a["vid"]}.mp4'), "lleva el id del vídeo para poder recuperarlo"
     p.wait_for_timeout(200)
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert not errors, errors
@@ -712,7 +713,8 @@ def migracion_5_marcas_y_errores(browser):
     m = r["m"]["figures"]
     assert r["S"] >= 5 and r["m"]["schema"] == r["S"] and r["same"], r
     assert m["a"]["errores"] == [] and m["a"]["intentos"][0]["marcadores"] == [], m
-    assert m["b"]["errores"] == [{"id": "e", "nota": "n"}], m
+    e = m["b"]["errores"][0]  # la migración 9→10 le añade veces y ultima, sin tocar el resto
+    assert len(m["b"]["errores"]) == 1 and e["id"] == "e" and e["nota"] == "n" and e["veces"] == 1, m
     ctx.close()
 
 
@@ -2269,7 +2271,7 @@ def migracion_7_preguntas(browser):
       const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 6});
       const sinPreg = B.migrate({schema: 6, figures: {}});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), n3: Object.keys(m3.preguntas).length, sinPreg: sinPreg.preguntas, t3: t(-3), S: B.SCHEMA}; }""")
-    assert r["S"] == 7 and r["m"]["schema"] == 7, r
+    assert r["S"] >= 9 and r["m"]["schema"] == r["S"], r
     qs = list(r["m"]["preguntas"].values())
     assert len(qs) == 1 and qs[0]["pos"] == "Sombra" and qs[0]["creada"] == r["t3"] and qs[0]["baile"] == "Bachata" and not qs[0].get("resuelta"), qs
     assert r["same"] and r["n3"] == 1, "repetir la migración no duplica"
@@ -2452,7 +2454,7 @@ def simulacro_completo(browser):
     assert "Sombra" in t.split("Dónde dudaste")[1]
     assert p.locator('[data-sim] [data-act="goto-pos"][data-p="Sombra"]').count() == 1
     lr = p.evaluate("() => window.__bachateca.state().linkRep")
-    assert lr["Cerrada"]["step"] == 1 and lr["Sombra"]["fallos"] == 1, lr
+    assert lr["Bachata\u241fCerrada"]["step"] == 1 and lr["Bachata\u241fSombra"]["fallos"] == 1, lr
     hoy = p.evaluate("() => window.__bachateca.todayStr()")
     assert p.evaluate("() => window.__bachateca.state().actividad")[hoy] == 2
     p.click('[data-sim] [data-act="goto-pos"][data-p="Sombra"]')
@@ -2542,7 +2544,7 @@ def simulacro_una_subida_por_dia(browser):
     for _ in range(3):
         p.click("#sim-ok"); p.click('[data-simg="fluida"]')
     lr = p.evaluate("() => window.__bachateca.state().linkRep")
-    assert lr["Cerrada"]["step"] == 1 and lr["Sombra"]["step"] == 1, lr
+    assert lr["Bachata\u241fCerrada"]["step"] == 1 and lr["Bachata\u241fSombra"]["step"] == 1, lr
     hoy = p.evaluate("() => window.__bachateca.todayStr()")
     assert p.evaluate("() => window.__bachateca.state().actividad")[hoy] == 3
     assert not errors, errors
@@ -2576,6 +2578,1401 @@ def cadena_opciones_sin_cadena_no_generan(browser):
     p.click('#v-enlazar [data-pos="Cerrada"]')
     p.click('#v-enlazar [data-chainopt="safe"]')
     assert p.locator("#v-enlazar .chain").count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+# ---- fase 4
+@test
+def migracion_8_repaso_por_baile(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, t = B.todayStr;
+      const old = {schema: 7, figures: {}, linkRep: {Cerrada: {step: 2, due: t(3)}, "Salsa\u241fSombra": {step: 1, due: t(1)}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 7});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2), same3: JSON.stringify(m) === JSON.stringify(m3), S: B.SCHEMA}; }""")
+    assert r["S"] >= 9 and r["m"]["schema"] == r["S"], r
+    lr = r["m"]["linkRep"]
+    assert sorted(lr) == ["Bachata\u241fCerrada", "Salsa\u241fSombra"] and lr["Bachata\u241fCerrada"]["step"] == 2, lr
+    assert r["same"] and r["same3"], "repetir la migración no cambia nada"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def repaso_de_enlaces_separado_por_baile(browser):
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Abierta 2 manos", "Cerrada"),
+                                  fig(3, "Cerrada", "Abierta 2 manos", baile="Salsa"), fig(4, "Abierta 2 manos", "Cerrada", baile="Salsa")]}
+    ctx, p, errors = open_app(browser, seed={"figures": figs})
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('#v-repasar [data-act="start-link"]')
+    for _ in range(3):
+        if p.locator('[data-act="reveal"]').count() == 0: break
+        p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    lr = p.evaluate("() => window.__bachateca.state().linkRep")
+    assert "Bachata\u241fCerrada" in lr and not any(k.startswith("Salsa") for k in lr), lr
+    p.click('#v-repasar [data-act="end"]')
+    p.evaluate("() => window.__bachateca.setBaile('Salsa')")
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert p.locator('#v-repasar [data-act="start-link"]').count() == 1, "en salsa siguen pendientes"
+    assert "2 posiciones tocan" in p.inner_text("#v-repasar"), p.inner_text("#v-repasar")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def renombrar_posicion_mueve_su_repaso(browser):
+    seed = {"schema": 8, "figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada", baile="Salsa")},
+            "linkRep": {"Bachata\u241fCerrada": {"step": 1, "due": "2030-01-01"}, "Salsa\u241fCerrada": {"step": 2, "due": "2030-01-02"},
+                        "Salsa\u241fSombra": {"step": 0, "due": "2030-01-03"}}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.evaluate("() => { const B = window.__bachateca; B.renameItem('pos', B.state().positions.indexOf('Cerrada'), 'Pegados'); }")
+    lr = p.evaluate("() => window.__bachateca.state().linkRep")
+    assert sorted(lr) == ["Bachata\u241fPegados", "Salsa\u241fPegados", "Salsa\u241fSombra"], lr
+    assert lr["Salsa\u241fPegados"]["step"] == 2 and lr["Bachata\u241fPegados"]["step"] == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def marcar_enlace_desde_la_ficha(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos"), "f2": fig(2, "Abierta 2 manos", "Cerrada")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    b = p.locator('[data-act="ln-mark"]')
+    assert b.get_attribute("aria-pressed") == "false" and b.get_attribute("data-a") == "f1" and b.get_attribute("data-b") == "f2"
+    b.click()
+    e = p.evaluate("() => window.__bachateca.state().enlaces")
+    assert list(e) == ["f1>f2"] and e["f1>f2"]["veces"] == 1 and e["f1>f2"]["a"] == "f1", e
+    assert p.locator('[data-act="ln-mark"]').get_attribute("aria-pressed") == "true"
+    p.locator('[data-act="ln-mark"]').click()
+    assert p.evaluate("() => window.__bachateca.state().enlaces") == {}
+    p.click(".toast .undo")
+    assert list(p.evaluate("() => window.__bachateca.state().enlaces")) == ["f1>f2"]
+    assert p.locator('[data-act="ln-mark"]').get_attribute("aria-pressed") == "true"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_prefiere_enlaces_comprobados(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const mk = (i, e, s) => ({id: "f" + i, nombre: "F" + i, tipo: "figura", estado: "practica", entrada: e, salida: s, agarreIn: "", agarreOut: ""});
+      const pool = [mk(1, "Cerrada", "Sombra"), mk(2, "Sombra", "Cerrada"), mk(3, "Sombra", "Cerrada")];
+      const sig = (opt, rnd) => B.buildChain(pool, Object.assign({start: "Cerrada", n: 2}, opt), rnd).steps.map(s => s.f ? s.f.id : "dead").join();
+      const prefer = (p, f) => p && p.id === "f1" && f.id === "f3" ? 1 : 0;
+      // Dos opciones tras f1: pesos 1 y 4. rnd 0.5 de 5 → 2.5: sin preferencia elegiría f3 solo con rnd >= .5; aquí con .3 (1.5) ya cae en f3.
+      return {sin0: sig({}, () => 0.3), sinB: sig({}, () => 0.6), con: sig({prefer}, () => 0.3), con0: sig({prefer}, () => 0), calls: (() => { const a = []; B.buildChain(pool, {start: "Cerrada", n: 2, prefer: (p, f) => { a.push(p ? p.id : null); return 0; }}, () => 0); return a; })()}; }""")
+    assert r["sin0"] == "f1,f2" and r["sinB"] == "f1,f3", r
+    assert r["con"] == "f1,f3" and r["con0"] == "f1,f2", r
+    assert r["calls"][0] is None, "en el primer paso prev es null"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_muestra_comprobado(browser):
+    # Un solo camino: f1 → f2 → f3. El 2.º paso está comprobado; el 3.º, no.
+    figs = {"f1": fig(1, "Cerrada", "Sombra", estado="disponible"), "f2": fig(2, "Sombra", "Abierta 2 manos", estado="disponible"),
+            "f3": fig(3, "Abierta 2 manos", "Cerrada", estado="disponible")}
+    seed = {"figures": figs, "enlaces": {"f1>f2": {"a": "f1", "b": "f2", "fecha": "2030-01-01", "veces": 1}}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar [data-act="chain"]')
+    steps = p.locator("#v-enlazar .chain .step")
+    assert "comprobado" in steps.nth(1).inner_text() and steps.nth(1).locator('[data-act="ln-mark"]').count() == 0
+    assert steps.nth(0).locator('[data-act="ln-mark"]').count() == 0, "el primer paso no tiene anterior"
+    b = steps.nth(2).locator('[data-act="ln-mark"]')
+    assert b.inner_text() == "Lo he bailado" and b.get_attribute("data-a") == "f2" and b.get_attribute("data-b") == "f3"
+    b.click()
+    assert "f2>f3" in p.evaluate("() => window.__bachateca.state().enlaces")
+    assert "comprobado" in p.locator("#v-enlazar .chain .step").nth(2).inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_ofrece_comprobar_el_enlace(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.click('[data-logfig="f1"]'); p.click('[data-logfig="f2"]')
+    p.click('[data-act="log-save"]')
+    assert "¿Bailaste Figura 1 → Figura 2?" in p.inner_text(".toast")
+    p.click(".toast .undo")
+    assert list(p.evaluate("() => window.__bachateca.state().enlaces")) == ["f1>f2"]
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def migracion_9_enlaces(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const m = B.migrate({schema: 8, figures: {}}), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 8});
+      const k = B.migrate({schema: 8, figures: {}, enlaces: {"a>b": {a: "a", b: "b", fecha: "2030-01-01", veces: 2}}});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k: k.enlaces, S: B.SCHEMA}; }""")
+    assert r["S"] >= 9 and r["m"]["schema"] == r["S"] and r["m"]["enlaces"] == {}, r
+    assert r["same"] and r["k"]["a>b"]["veces"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_enlaces(browser):
+    mio = {"a": "f1", "b": "f2", "fecha": "2030-01-01", "veces": 3}
+    seed = {"schema": 9, "figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")}, "enlaces": {"f1>f2": mio}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    copia = {"app": "bachateca", "schema": 9, "figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")},
+             "enlaces": {"f1>f2": {"a": "f1", "b": "f2", "fecha": "2031-01-01", "veces": 9}, "f2>f1": {"a": "f2", "b": "f1", "fecha": "2031-02-02", "veces": 1},
+                         "malo": {"a": "f2", "b": "f1", "fecha": "ayer", "veces": 1}, "malo2": {"a": "f1", "b": "x y", "fecha": "2031-02-02", "veces": 1},
+                         "malo3": {"a": "f1", "b": "f1", "fecha": "2031-02-02", "veces": 0}}}
+    import_text(p, json.dumps(copia))
+    e = p.evaluate("() => window.__bachateca.state().enlaces")
+    assert sorted(e) == ["f1>f2", "f2>f1"] and e["f1>f2"]["veces"] == 3 and e["f2>f1"]["veces"] == 1, e
+    assert json.loads(p.evaluate("() => window.__bachateca.exportData()"))["enlaces"].keys() == e.keys()
+    p.keyboard.press("Escape"); p.wait_for_timeout(200)
+    import_text(p, json.dumps({**copia, "enlaces": {"f2>f1": copia["enlaces"]["f2>f1"]}}), replace=True)
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_timeout(300)
+    assert list(p.evaluate("() => window.__bachateca.state().enlaces")) == ["f2>f1"]
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- preguntas de memoria
+@test
+def preguntas_de_memoria_se_generan_con_tus_datos(browser):
+    figs = {"f1": fig(1, "Cerrada", "Sombra", nombre="Vuelta del Reloj", agarreOut="izq–der"),
+            "f2": fig(2, "Sombra", "Abierta", nombre="Giro Sombra"),
+            "f3": fig(3, "Salsa A", "Salsa B", nombre="Dile que no", baile="Salsa"),
+            "f4": fig(4, "Cerrada", "Abierta", nombre="Espera", estado="espera")}
+    ctx, p, errors = open_app(browser, seed={"schema": 9, "figures": figs})
+    qs = p.evaluate("() => window.__bachateca.quizItems()")
+    por = {(q["figId"], q["tipo"]): q for q in qs}
+    assert {q["tipo"] for q in qs} == {"acaba", "desde", "despues"}, qs
+    assert por["f1", "acaba"]["q"] == "¿Dónde termina «Vuelta del Reloj»?" and por["f1", "acaba"]["a"] == "Sombra (izq–der)", por
+    assert por["f1", "desde"]["q"] == "¿Desde dónde entras en «Vuelta del Reloj»?" and por["f1", "desde"]["a"] == "Cerrada", por
+    d = por["f1", "despues"]
+    assert d["q"] == "Acabas «Vuelta del Reloj» en Sombra (izq–der). ¿Qué puedes hacer después?" and d["a"] == "Giro Sombra", d
+    assert ("f2", "despues") not in por, "sin salidas encadenables no hay pregunta"
+    assert not any(q["figId"] in ("f3", "f4") for q in qs), "nada de otro baile ni de la lista de espera"
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('[data-act="start-quiz"]')
+    txt = p.locator("#v-repasar").inner_text()
+    assert "1 de 2" in txt and ("Vuelta del Reloj" in txt or "Giro Sombra" in txt) and "Dile que no" not in txt, txt
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def preguntas_de_memoria_actualizan_el_repaso(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 9, "figures": {"f1": fig(1, "Cerrada", "Sombra")}})
+    step = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.rep.step")
+    def preguntar(nota):
+        p.click('nav.tabs [data-tab="repasar"]')
+        p.click('[data-act="start-quiz"]')
+        p.click('[data-act="reveal"]')
+        assert p.locator(f'[data-grade="{nota}"]').count() == 1
+        p.click(f'[data-grade="{nota}"]')
+        assert "Repaso terminado" in p.locator("#v-repasar").inner_text()
+        p.click('[data-act="end"]')
+    p.click('nav.tabs [data-tab="repasar"]'); p.click('[data-act="start-quiz"]'); p.click('[data-act="reveal"]')
+    assert [b.inner_text() for b in p.locator("#v-repasar .grade button").all()] == ["No", "Con dudas", "Sí"]
+    p.click('[data-grade="fluida"]'); p.click('[data-act="end"]')
+    assert step() == 1, step()
+    preguntar("fluida")
+    assert step() == 1, "una segunda «Sí» el mismo día no vuelve a subir"
+    preguntar("no")
+    assert step() == 0, "«No» siempre aplica"
+    act = p.evaluate("() => window.__bachateca.state().actividad[window.__bachateca.todayStr()]")
+    assert act == 3, act
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def sin_figuras_con_ruta_no_hay_preguntas(browser):
+    figs = {"f1": fig(1, "Cerrada", ""), "f2": fig(2, "Sombra", "Abierta", estado="espera"), "f3": fig(3, "A", "B", estado="incompleta")}
+    ctx, p, errors = open_app(browser, seed={"schema": 9, "figures": figs})
+    assert p.evaluate("() => window.__bachateca.quizItems()") == []
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert p.locator('[data-act="start-quiz"]').count() == 0
+    assert "Preguntas de memoria" in p.locator("#v-repasar").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- errores recurrentes (fase 4)
+@test
+def migracion_10_errores(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 9, figures: {a: {id: "a", nombre: "A", errores: [{id: "e1", nota: "n", fecha: "2030-01-05"}, {id: "e2", nota: "m"}]}, b: {id: "b", nombre: "B"}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 9});
+      const k = B.migrate({schema: 9, figures: {a: {id: "a", nombre: "A", errores: [{id: "e1", nota: "n", fecha: "2030-01-05", veces: 4, ultima: "2030-02-01"}]}}});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k, t: B.todayStr(), S: B.SCHEMA}; }""")
+    assert r["S"] >= 10 and r["m"]["schema"] == r["S"], r
+    e = r["m"]["figures"]["a"]["errores"]
+    assert e[0]["veces"] == 1 and e[0]["ultima"] == "2030-01-05", e
+    assert e[1]["veces"] == 1 and e[1]["ultima"] == r["t"], "sin fecha, hoy"
+    assert r["same"], "repetir la migración no cambia nada"
+    assert r["k"]["figures"]["a"]["errores"][0]["veces"] == 4 and r["k"]["figures"]["a"]["errores"][0]["ultima"] == "2030-02-01", "no pisa lo que ya hay"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_valida_los_campos_de_errores(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => window.__bachateca.sanitizeImport({figures: {f1: {id: "f1", nombre: "A", errores: [
+      {id: "e1", nota: "x", veces: 3, ultima: "2030-01-01", resuelto: "2030-01-02"},
+      {id: "e2", nota: "y", veces: -2, ultima: "ayer", resuelto: 5},
+      {id: "e3", nota: "z", veces: "2"}]}}}).figures.f1.errores""")
+    assert r[0]["veces"] == 3 and r[0]["ultima"] == "2030-01-01" and r[0]["resuelto"] == "2030-01-02", r
+    assert r[1]["veces"] == 1 and "ultima" not in r[1] and "resuelto" not in r[1], r
+    assert r[2]["veces"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
+def err_seed(**kw):
+    errs = [{"id": "e1", "nota": "me adelanto", "b": 4, "desde": "i1", "marca": "m1", "fecha": "2030-01-01", "veces": 1, "ultima": "2030-01-01"},
+            {"id": "e2", "nota": "brazo bajo", "b": 2, "desde": "i1", "marca": "m2", "fecha": "2030-01-02", "veces": 3, "ultima": "2030-01-03"}]
+    return {"figures": {"f1": fig(1, "Cerrada", "Sombra", errores=errs, **kw)}}
+
+
+@test
+def marcar_otra_vez_el_mismo_error(browser):
+    a = att(1, "a1", pulso={"vid": "a1", "modo": "todos", "marcas": [{"b": 1, "s": 0.1}, {"b": 2, "s": 0.4}, {"b": 3, "s": 0.7}, {"b": 4, "s": 1.0}]}, marcadores=[])
+    seed = cmp_seed(); seed["schema"] = 9
+    seed["figures"]["f1"]["errores"] = [{"id": "e1", "nota": "me adelanto", "b": 4, "desde": "i1", "marca": "m1", "fecha": "2030-01-01"}]
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]')
+    assert "¿Es uno de estos?" in p.locator("#cmp-form").inner_text()
+    p.click('#cmp-form [data-esame="e1"]')
+    assert p.locator('#cmp-form [data-esame="e1"]').get_attribute("aria-pressed") == "true"
+    p.click("#cmp-fsave")
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    t = p.evaluate("() => window.__bachateca.todayStr()")
+    assert len(f["errores"]) == 1, "no se duplica"
+    e = f["errores"][0]
+    assert e["veces"] == 2 and e["ultima"] == t, e
+    m = f["intentos"][0]["marcadores"][0]
+    assert e["marca"] == "m1" and e["marcas"] == [m["id"]] and e["desde"] == "i1", (e, m)  # la primera vez no se mueve; la repetición se anota
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def error_resuelto_sale_del_repaso(browser):
+    ctx, p, errors = open_app(browser, seed=err_seed())
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    card = p.locator("section:has(#fv-e)")
+    txt = card.inner_text()
+    assert "×3" in txt and "×1" in txt and txt.index("brazo bajo") < txt.index("me adelanto"), "el más repetido primero"
+    assert "Ya no me pasa" in txt and "Resueltos" not in txt, txt
+    p.click('[data-act="err-res"][data-err="e2"]')
+    t = p.evaluate("() => window.__bachateca.todayStr()")
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.errores[1].resuelto") == t
+    # Deshacer lo devuelve a activos.
+    p.click(".toast .undo")
+    assert "resuelto" not in p.evaluate("() => window.__bachateca.state().figures.f1.errores[1]")
+    p.click('[data-act="err-res"][data-err="e2"]')
+    card = p.locator("section:has(#fv-e)")
+    assert "Resueltos (1)" in card.inner_text(), card.inner_text()
+    p.click('[data-act="rev-one"]')
+    ojo = p.locator("#v-repasar .ojo").inner_text()
+    assert "me adelanto" in ojo and "brazo bajo" not in ojo, ojo
+    p.click('[data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click("section:has(#fv-e) details summary")
+    p.click('[data-act="err-reopen"][data-err="e2"]')
+    e = p.evaluate("() => window.__bachateca.state().figures.f1.errores[1]")
+    assert "resuelto" not in e and e["veces"] == 4 and e["ultima"] == t, e
+    p.click('[data-act="rev-one"]')
+    assert "brazo bajo" in p.locator("#v-repasar .ojo").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def errores_activos_limitan_el_intervalo(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    def repasar(p, fid):
+        p.click('nav.tabs [data-tab="repertorio"]'); p.click(f'#v-repertorio [data-view="{fid}"]')
+        p.click('[data-act="rev-one"]'); p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    # Con un error activo: varias «Sí» seguidas y el repaso no pasa de 7 días.
+    seed = err_seed(rep={"step": 0, "due": d(0), "aciertos": 0, "fallos": 0})
+    seed["figures"]["f2"] = fig(2, "Sombra", "Cerrada", rep={"step": 0, "due": d(0), "aciertos": 0, "fallos": 0})
+    ctx, p, errors = open_app(browser, seed=seed)
+    for _ in range(5):
+        repasar(p, "f1"); repasar(p, "f2")
+    f1, f2 = p.evaluate("() => { const s = window.__bachateca.state().figures; return [s.f1.rep, s.f2.rep]; }")
+    assert f1["step"] == 2 and f1["due"] <= d(7), f1
+    assert f2["step"] == 5 and f2["due"] == d(60), f2
+    # Resueltos todos, vuelve a espaciarse.
+    p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.errores.forEach(e => e.resuelto = window.__bachateca.todayStr()); }")
+    repasar(p, "f1")
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.step") == 3
+    # La misma regla para las preguntas de memoria y para el social.
+    r = p.evaluate("""() => { const B = window.__bachateca, f = {id: "g", nombre: "G", errores: [{id: "x", nota: "n", veces: 1}], rep: {step: 4, due: B.todayStr(30), aciertos: 4, fallos: 0}};
+      B.capByErrors(f); const a = {...f.rep}; f.errores[0].resuelto = B.todayStr(); f.rep = {step: 4, due: B.todayStr(30)}; B.capByErrors(f); return [a, f.rep]; }""")
+    assert r[0]["step"] == 2 and r[0]["due"] == d(7) and r[1]["step"] == 4 and r[1]["due"] == d(30), r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_con_errores_activos_limita_el_intervalo(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    seed = err_seed(rep={"step": 3, "due": d(0), "last": d(-1), "aciertos": 3, "fallos": 0})
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="social"]'); p.click('[data-act="log-open"]')
+    p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    S = p.evaluate("() => window.__bachateca.state()")
+    rep = S["figures"]["f1"]["rep"]; l = list(S["logs"].values())[0]
+    assert rep["step"] == 2 and rep["due"] == d(7), rep
+    assert l["repDespues"]["f1"] == rep, "el registro guarda el repaso ya limitado"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def repetir_error_no_desengancha_la_marca_anterior(browser):
+    seed = cmp_seed(); seed["schema"] = 9
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.fill("#cmp-nota", "me adelanto"); p.check("#cmp-toerr"); p.click("#cmp-fsave")
+    p.click('#cmp-line [data-cb="2"]'); p.click('[data-cmk="error"]')
+    p.click('#cmp-form [data-esame]')
+    assert p.locator("#cmp-toerr").count() == 0, "con un error elegido no se ofrece añadir otro"
+    p.click("#cmp-fsave")
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert len(f["errores"]) == 1 and f["errores"][0]["veces"] == 2 and len(f["errores"][0]["marcas"]) == 1, f["errores"]
+    items = p.locator("#cmp-marks li").all_inner_texts()
+    assert len(items) == 2 and all("En tus errores" in t and "A mis errores" not in t for t in items), items
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def anadir_o_reabrir_error_limita_el_repaso_al_instante(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    seed = err_seed(rep={"step": 4, "due": d(30), "aciertos": 4, "fallos": 0})
+    seed["figures"]["f1"]["errores"][0]["resuelto"] = d(-1); seed["figures"]["f1"]["errores"].pop()
+    ctx, p, errors = open_app(browser, seed=seed)
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.due") == d(30)
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click("section:has(#fv-e) details summary"); p.click('[data-act="err-reopen"]')
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep")
+    assert r["step"] == 2 and r["due"] <= d(7), r
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- cadenas con objetivo (fase 5)
+# Mapa: Cerrada -f1-> Sombra -f2-> Abierta -f3-> Cerrada; atajo Cerrada -f4-> Abierta; f5: Sombra -> Cerrada.
+def objetivo_seed():
+    return {"figures": {"f1": fig(1, "Cerrada", "Sombra", estado="disponible"), "f2": fig(2, "Sombra", "Abierta 2 manos", estado="disponible"),
+                        "f3": fig(3, "Abierta 2 manos", "Cerrada", estado="disponible"), "f4": fig(4, "Cerrada", "Abierta 2 manos", estado="disponible"),
+                        "f5": fig(5, "Sombra", "Cerrada", estado="disponible")}}
+
+
+@test
+def cadena_hasta_una_posicion(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), out = [];
+      for (let k = 0; k < 40; k++) out.push(B.buildChain(pool, {start: "Cerrada", end: "Abierta 2 manos", n: 3}, () => k / 40).steps);
+      return out.map(st => st.map(s => s.f && {id: s.f.id, e: s.f.entrada, s: s.f.salida})); }""")
+    for st in r:
+        assert st and st[0]["e"] == "Cerrada" and st[-1]["s"] == "Abierta 2 manos" and len(st) <= 3, st
+        assert all(a["s"] == b["e"] for a, b in zip(st, st[1:])), st
+        assert len({x["id"] for x in st}) == len(st), st
+    assert {len(st) for st in r} == {1, 2, 3}, {len(st) for st in r}
+    # Con n = 1 solo cabe el atajo.
+    r1 = p.evaluate("""() => { const B = window.__bachateca; return B.buildChain(Object.values(B.state().figures), {start: "Cerrada", end: "Abierta 2 manos", n: 1}).steps.map(s => s.f.id); }""")
+    assert r1 == ["f4"], r1
+    # En la interfaz: Terminar en + Generar.
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    p.select_option('#v-enlazar [data-chainsel="end"]', "Abierta 2 manos")
+    assert p.locator('#v-enlazar .chain').count() == 0, "sin cadena a la vista no se genera sola"
+    p.click('#v-enlazar [data-act="chain"]')
+    t = p.locator("#v-enlazar .chain .step").all_inner_texts()
+    assert t and "→ Abierta 2 manos" in t[-1], t
+    ls = p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.cadena'))")
+    assert ls["end"] == "Abierta 2 manos" and ls["n"] == 4, ls
+    p.select_option('#v-enlazar [data-chainsel="n"]', "2")
+    assert p.locator("#v-enlazar .chain .step").count() <= 2, "con cadena a la vista se regenera"
+    assert p.locator('#v-enlazar details.chainopts').get_attribute("open") is not None, "el panel sigue abierto"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_que_incluye_una_figura(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), out = [];
+      for (let k = 0; k < 40; k++) out.push(B.buildChain(pool, {start: "Cerrada", must: "f2", n: 4}, () => k / 40).steps.map(s => s.f.id));
+      return out; }""")
+    assert all("f2" in st and st[0] in ("f1", "f4") for st in r), r
+    assert all(len(st) <= 4 for st in r)
+    # Con end y must a la vez.
+    r2 = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures);
+      return [0, .3, .6, .99].map(k => B.buildChain(pool, {start: "Cerrada", must: "f5", end: "Cerrada", n: 4}, () => k).steps.map(s => [s.f.id, s.f.salida])); }""")
+    for st in r2:
+        assert "f5" in [x[0] for x in st] and st[-1][1] == "Cerrada" and len(st) <= 4, st
+    # UI: Incluir
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    p.select_option('#v-enlazar [data-chainsel="must"]', "f2")
+    p.click('#v-enlazar [data-act="chain"]')
+    assert "Figura 2" in p.inner_text("#v-enlazar .chain")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_sin_camino_lo_dice(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures);
+      return [B.buildChain(pool, {start: "Cerrada", end: "Nada", n: 4}), B.buildChain(pool, {start: "Cerrada", must: "f3", end: "Sombra", n: 2}),
+              B.buildChain(pool, {start: "Cerrada", must: "f3", exclude: ["f3"]})]; }""")
+    assert all(x == {"steps": [], "noPath": True} for x in r), r
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    p.select_option('#v-enlazar [data-chainsel="n"]', "2")
+    p.select_option('#v-enlazar [data-chainsel="must"]', "f3")
+    p.select_option('#v-enlazar [data-chainsel="end"]', "Sombra")
+    p.click('#v-enlazar [data-act="chain"]')
+    assert "No hay ninguna cadena así con tus figuras. Prueba con más pasos o quita una condición." in p.inner_text("#v-enlazar .practice")
+    assert p.locator("#v-enlazar .chain .step").count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_excluye_figuras(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), seen = new Set();
+      for (let k = 0; k < 40; k++) B.buildChain(pool, {start: "Cerrada", end: "Abierta 2 manos", n: 3, exclude: ["f4"]}, () => k / 40).steps.forEach(s => seen.add(s.f.id));
+      return [[...seen].sort(), B.buildChain(pool, {start: "Cerrada", end: "Abierta 2 manos", n: 3, exclude: ["f4", "f2"]}),
+              B.buildChain(pool, {start: "Cerrada", n: 1, exclude: ["f4"]}, () => 0.99).steps.map(s => s.f.id)]; }""")
+    assert r[0] == ["f1", "f2"] and r[1]["noPath"] is True and r[2] == ["f1"], r
+    # UI: chip «Sin»
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    c = p.locator('#v-enlazar [data-chainx="f1"]')
+    assert c.get_attribute("aria-pressed") == "false"
+    c.click()
+    assert p.locator('#v-enlazar [data-chainx="f1"]').get_attribute("aria-pressed") == "true"
+    assert p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.cadena')).exclude") == ["f1"]
+    p.click('#v-enlazar [data-act="chain"]')
+    t = p.inner_text("#v-enlazar .practice")
+    assert "Figura 1" not in p.inner_text("#v-enlazar .chain") if p.locator("#v-enlazar .chain").count() else True
+    assert "Figura 4" in t
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_lee_opciones_guardadas_con_validacion(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed(), ls={"bachateca.cadena": {"safe": True, "end": 7, "must": ["x"], "exclude": ["f1", 3], "n": 99}})
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    assert p.input_value('#v-enlazar [data-chainsel="n"]') == "4" and p.input_value('#v-enlazar [data-chainsel="end"]') == ""
+    assert p.locator('#v-enlazar [data-chainx][aria-pressed="true"]').count() == 1
+    ctx.close()
+    ctx, p, errors = open_app(browser, seed=objetivo_seed(), ls={"bachateca.cadena": {"end": "Cerrada", "must": "f2", "exclude": "f1", "n": 3.5}})
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    assert p.input_value('#v-enlazar [data-chainsel="n"]') == "4"
+    assert p.input_value('#v-enlazar [data-chainsel="end"]') == "Cerrada" and p.input_value('#v-enlazar [data-chainsel="must"]') == "f2"
+    assert p.locator('#v-enlazar [data-chainx][aria-pressed="true"]').count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+# ---- fase 5
+@test
+def avance_fino_en_la_ficha(browser):
+    """«0,1 s ›» pausa y mueve el vídeo una décima, sin salirse del recorte."""
+    seed = {"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidTrim={"start": 0.5, "end": 0.8})}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("(() => { const v = document.querySelector('.player video'); return v && v.readyState >= 1 && Math.abs(v.currentTime - 0.5) < 0.05; })()")
+    assert p.get_attribute('.player [data-step="0.1"]', "aria-label") == "Adelante 0,1 segundos"
+    assert p.get_attribute('.player [data-step="-0.1"]', "aria-label") == "Atrás 0,1 segundos"
+    cur = "() => document.querySelector('.player video').currentTime"
+    def seeked():
+        p.wait_for_function("!document.querySelector('.player video').seeking")
+    p.click('.player [data-step="0.1"]'); seeked(); p.click('.player [data-step="0.1"]'); seeked()
+    t = p.evaluate(cur)
+    assert abs(t - 0.7) < 0.03 and p.evaluate("() => document.querySelector('.player video').paused"), t
+    p.click('.player [data-step="0.1"]'); seeked(); p.click('.player [data-step="0.1"]'); seeked()
+    p.wait_for_timeout(400)
+    t = p.evaluate(cur)
+    assert 0.8 - 0.15 < t <= 0.8, ("no pasa del final del recorte ni salta al principio", t)
+    for _ in range(5):
+        p.click('.player [data-step="-0.1"]'); seeked()
+    assert p.evaluate(cur) >= 0.5 - 0.01, "no baja del inicio del recorte"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def avance_fino_en_comparar(browser):
+    """Los dos botones mueven la clase una décima y colocan el tuyo en el mismo tiempo de la música."""
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="cmp-open"]')
+    p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    wait_seeked(p)
+    assert p.get_attribute('[data-cmp] [data-cstep="0.1"]', "aria-label") == "Adelante 0,1 segundos"
+    assert p.get_attribute('[data-cmp] [data-cstep="-0.1"]', "aria-label") == "Atrás 0,1 segundos"
+    t0 = times(p)[0]
+    p.click('[data-cmp] [data-cstep="0.1"]'); wait_seeked(p)
+    p.click('[data-cmp] [data-cstep="0.1"]'); wait_seeked(p)
+    r = p.evaluate("""() => { const B = window.__bachateca, S = B.state().figures.f1, t = document.querySelector('#cmp-t').currentTime, m = document.querySelector('#cmp-m').currentTime;
+      const b = B.secToBeat(S.pulso, t); return {t, b, err: m - B.beatToSec(S.intentos[0].pulso, b), st: B.cmpState()}; }""")
+    assert abs(r["t"] - t0 - 0.2) < 0.03 and abs(r["err"]) < 0.03 and abs(r["st"]["b"] - r["b"]) < 0.01 and not r["st"]["playing"], r
+    p.click('[data-cmp] [data-cstep="-0.1"]'); wait_seeked(p)
+    t1 = times(p)[0]
+    assert abs(t1 - t0 - 0.1) < 0.03, (t0, t1)
+    for _ in range(4):
+        p.click('[data-cmp] [data-cstep="-0.1"]'); wait_seeked(p)
+    assert p.evaluate("() => window.__bachateca.cmpState().b") >= 1, "no sale de la línea por detrás"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def superponer_en_comparar(browser):
+    """Superponer apila los dos vídeos en la misma caja con el tuyo a la opacidad elegida; la sincronización sigue."""
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="cmp-open"]')
+    p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    wait_seeked(p)
+    box = "() => ['#cmp-t', '#cmp-m'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })"
+    a, b = p.evaluate(box)
+    assert b[1] > a[1] and p.get_attribute("#cmp-over", "aria-pressed") == "false", (a, b)  # lado a lado (apilados en vertical)
+    assert p.get_attribute("#cmp-op", "aria-label") == "Transparencia de tu vídeo"
+    assert (p.get_attribute("#cmp-op", "min"), p.get_attribute("#cmp-op", "max"), p.input_value("#cmp-op")) == ("20", "80", "50")
+    p.click("#cmp-over")
+    assert p.get_attribute("#cmp-over", "aria-pressed") == "true"
+    a, b = p.evaluate(box)
+    assert a == b, (a, b)
+    opac = "() => +getComputedStyle(document.querySelector('#cmp-m').closest('figure')).opacity"
+    assert abs(p.evaluate(opac) - 0.5) < 0.01
+    p.fill("#cmp-op", "30"); assert abs(p.evaluate(opac) - 0.3) < 0.01
+    p.click("#cmp-mirror-m")
+    assert p.evaluate("() => document.querySelector('#cmp-m').classList.contains('mirror') && !document.querySelector('#cmp-t').classList.contains('mirror')")
+    assert p.get_attribute("#cmp-mirror-m", "aria-pressed") == "true"
+    b0 = p.evaluate("() => window.__bachateca.cmpState().b")
+    p.click("#cmp-play"); p.wait_for_function("b => window.__bachateca.cmpState().b > b + 0.3", arg=b0)
+    p.click("#cmp-play")
+    p.click("#cmp-over")
+    a, b = p.evaluate(box)
+    assert b[1] > a[1] and abs(p.evaluate(opac) - 1) < 0.01, (a, b)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def migracion_11_notas_video(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 10, figures: {a: {id: "a", nombre: "A"}, b: {id: "b", nombre: "B", notasVid: [{id: "n1", s: 1.5, texto: "x"}]}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 10});
+      const k = B.sanitizeImport({figures: {f1: {id: "f1", nombre: "A", notasVid: [{id: "n1", s: 2, texto: "ok"}, {id: "n2", s: -1, texto: "x"}, {id: "n3", s: 1, texto: ""}, {id: "n4", s: 1, texto: "y".repeat(141)}, {id: "n5", s: "2", texto: "z"}, {id: "bad id", s: 1, texto: "z"}],
+        partes: [{id: "p1", notasVid: [{id: "n1", s: 1, texto: "a"}, {id: "n2", s: NaN, texto: "b"}]}]}}}).figures.f1;
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k, S: B.SCHEMA}; }""")
+    assert r["S"] >= 11 and r["m"]["schema"] == r["S"], r
+    assert r["m"]["figures"]["a"]["notasVid"] == [], r["m"]
+    assert r["m"]["figures"]["b"]["notasVid"][0]["texto"] == "x", "no pisa lo que ya hay"
+    assert r["same"], "repetir la migración no cambia nada"
+    assert [n["id"] for n in r["k"]["notasVid"]] == ["n1"], r["k"]["notasVid"]
+    assert [n["id"] for n in r["k"]["partes"][0]["notasVid"]] == ["n1"], r["k"]["partes"]
+    assert not errors, errors
+    ctx.close()
+
+
+def nv_seed(**kw):
+    return {"schema": 11, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", **kw)}, "logs": {}}
+
+
+def nv_open(browser, seed):
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("(() => { const v = document.querySelector('.player video'); return v && v.readyState >= 2; })()")
+    return ctx, p, errors
+
+
+@test
+def nota_en_el_video(browser):
+    """«Nota aquí» pausa y pide el texto en línea; la nota sale en la lista, se va a su segundo y se ve mientras suena."""
+    ctx, p, errors = nv_open(browser, nv_seed())
+    p.evaluate("() => { const v = document.querySelector('.player video'); v.pause(); v.currentTime = 0.5; }")
+    p.wait_for_function("!document.querySelector('.player video').seeking")
+    p.click('[data-act="nv-add"]')
+    assert p.evaluate("() => document.querySelector('.player video').paused")
+    p.fill("#nv-txt", "  Suelta la mano aquí  ")
+    p.click('[data-act="nv-save"]')
+    p.wait_for_selector('[data-nv-list] [data-act="nv-go"]')
+    assert "Suelta la mano aquí" in p.inner_text("[data-nv-list]") and "0:00,5" in p.inner_text("[data-nv-list]"), p.inner_text("[data-nv-list]")
+    n = p.evaluate("() => window.__bachateca.state().figures.f1.notasVid")
+    assert len(n) == 1 and n[0]["texto"] == "Suelta la mano aquí" and abs(n[0]["s"] - 0.5) < 0.051, n
+    # cancelar no guarda; vacío no guarda
+    p.click('[data-act="nv-add"]'); p.click('[data-act="nv-cancel"]')
+    p.click('[data-act="nv-add"]'); p.click('[data-act="nv-save"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.notasVid.length") == 1
+    p.click('[data-act="nv-cancel"]')
+    # tocarla lleva el vídeo a 0,5
+    p.evaluate("() => { const v = document.querySelector('.player video'); v.currentTime = 0; }")
+    p.wait_for_function("!document.querySelector('.player video').seeking")
+    p.click('[data-act="nv-go"]')
+    p.wait_for_function("(() => { const v = document.querySelector('.player video'); return !v.seeking && Math.abs(v.currentTime - 0.5) < 0.06; })()")
+    # se ve durante la reproducción
+    p.evaluate("() => { const v = document.querySelector('.player video'); v.currentTime = 0; v.muted = true; v.play(); }")
+    p.wait_for_function("document.querySelector('.vcap').textContent.includes('Suelta la mano')")
+    assert p.get_attribute(".vcap", "aria-live") == "polite"
+    # quitar con Deshacer
+    p.click('[data-act="nv-del"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.notasVid.length") == 0
+    p.click(".toast .undo")
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.notasVid.length") == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def nota_pasa_a_la_parte_anterior(browser):
+    """Al añadir una parte nueva, las notas del vídeo de ahora se van con él a la parte anterior."""
+    seed = {"schema": 11, "figures": {"f1": inc_fig(notasVid=[{"id": "n1", "s": 0.5, "texto": "Cuidado con el giro"}])}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="pt-new"]')
+    p.set_input_files("#ff-file", FIXTURE)
+    p.wait_for_selector("#pt-form #ff-prev")
+    p.wait_for_function("document.querySelector('#ff-prev').readyState >= 1")
+    p.click('#pt-form button[type="submit"]')
+    p.wait_for_selector('[data-viewfig="f1"]', timeout=15000)
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert f["notasVid"] == [], "el vídeo nuevo empieza sin notas"
+    assert [(x["vid"], x["notasVid"][0]["texto"]) for x in f["partes"]] == [("v1", "Cuidado con el giro")], f["partes"]
+    p.click(f'[data-act="pt-open"][data-pt="{f["partes"][0]["id"]}"]')
+    p.wait_for_selector("[data-viewpt] video")
+    assert "Cuidado con el giro" in p.locator("[data-viewpt]").inner_text() and p.locator('[data-viewpt] [data-act="nv-del"]').count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- práctica guiada (fase 2)
+def guia_seed():
+    errs = [{"id": "e1", "nota": "me adelanto", "b": 4, "desde": "i1", "marca": "m1", "fecha": "2030-01-01", "veces": 2, "ultima": "2030-01-02"}]
+    lejos = {"step": 3, "due": "2999-01-01", "last": "2026-01-01", "aciertos": 3, "fallos": 0}
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Sombra", errores=errs, senal="mano en la espalda"),
+                                 fig(2, "Sombra", "Abierta"),
+                                 fig(3, "Abierta", "Cerrada", rep=lejos),
+                                 fig(4, "Salsa A", "Salsa B", baile="Salsa"),
+                                 fig(5, "Cerrada", "Abierta", estado="espera")]}
+    return {"figures": figs, "enlaces": {"f3>f1": {"a": "f3", "b": "f1", "fecha": "2026-01-01", "veces": 1}}}
+
+
+@test
+def practica_guiada_se_construye_con_tus_datos(browser):
+    ctx, p, errors = open_app(browser, seed=guia_seed())
+    plan = p.evaluate("() => window.__bachateca.guidedPlan(10)")
+    assert [b["tipo"] for b in plan] == ["figura", "enlace", "cadena"], plan
+    assert plan[0]["ref"] == "f1", "primero la figura con errores activos"
+    assert plan[1]["ref"] == {"a": "f3", "b": "f1"}, plan[1]
+    assert len(plan[2]["ref"]["ids"]) >= 2, plan[2]
+    assert all(b["bpm"] == 110 for b in plan) and plan[0]["reps"] == 4, plan
+    largo = p.evaluate("() => window.__bachateca.guidedPlan(20)")
+    assert len(largo) == 6 and largo[-1]["tipo"] == "cadena", largo
+    figuras = [b["ref"] for b in largo if b["tipo"] == "figura"]
+    assert figuras == ["f1", "f2"], "solo pendientes del baile elegido, fuera de la lista de espera"
+    enl = [b["ref"] for b in largo if b["tipo"] == "enlace"]
+    assert {"a": "f3", "b": "f1"} in enl and any("pos" in r for r in enl), enl
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert "Práctica guiada" in p.inner_text("#v-repasar")
+    assert p.locator('#v-repasar [data-act="guia-mins"]').count() == 2
+    p.click('#v-repasar [data-act="guia-open"]')
+    t = p.inner_text("[data-guia]")
+    assert "Bloque 1 de 3" in t and "Figura 1, 4 veces" in t and "mano en la espalda" in t and "me adelanto" in t, t
+    assert p.evaluate("() => window.__bachateca.guiaState()") == {"i": 0, "total": 3, "fase": "listo", "rep": 0}
+    p.click('[data-guia] [data-guiaact="skip"]')
+    t = p.inner_text("[data-guia]")
+    assert "Bloque 2 de 3" in t and "Figura 3 → Figura 1, 4 veces" in t, t
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def practica_guiada_completa(browser):
+    ctx, p, errors = open_app(browser, seed=guia_seed())
+    st = lambda: p.evaluate("() => window.__bachateca.guiaState()")
+    p.evaluate("() => window.__bachateca.guiaForce({reps: 1, bpm: 240})")
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('#v-repasar [data-act="guia-open"]')
+    notas = ["fluida", "fluida", "dudas"]
+    for i, g in enumerate(notas):
+        assert st()["fase"] == "listo" and st()["i"] == i, st()
+        p.click("#guia-go")
+        s = st()
+        assert s["fase"] == "cuenta" and s["rep"] == 1, s
+        assert "Vez 1 de 1" in p.inner_text("[data-guia]") or "Frase 1 de 1" in p.inner_text("[data-guia]")
+        p.wait_for_function("window.__bachateca.guiaState().fase === 'nota'", timeout=8000)
+        assert "¿Cómo ha ido?" in p.inner_text("[data-guia]")
+        assert [b.inner_text() for b in p.locator("[data-guia] .grade button").all()] == ["No", "Con dudas", "Bien"]
+        p.click(f'[data-guia] [data-guiag="{g}"]')
+    assert st()["fase"] == "fin"
+    t = p.inner_text("[data-guia]")
+    assert "Práctica terminada" in t and "Figura 3 → Figura 1" in t, t
+    S = p.evaluate("() => window.__bachateca.state()")
+    assert S["figures"]["f1"]["rep"]["step"] == 1, "el enlace hacia f1 no vuelve a subirla el mismo día"
+    assert S["figures"]["f3"]["rep"]["step"] == 3, "la cadena y el origen del enlace no cambian el repaso"
+    assert S["figures"]["f2"].get("rep") is None
+    assert S["actividad"][p.evaluate("() => window.__bachateca.todayStr()")] == 3
+    p.click('[data-guia] [data-act="close"]')
+    assert st() is None
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def practica_guiada_cerrar_para_el_conteo(browser):
+    init = """(() => { window.__stops = 0; const o = AudioScheduledSourceNode.prototype.stop;
+      AudioScheduledSourceNode.prototype.stop = function(...a){ window.__stops++; return o.apply(this, a); }; })();"""
+    ctx, p, errors = open_app(browser, seed=guia_seed(), init=init)
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('#v-repasar [data-act="guia-open"]')
+    p.click("#guia-go")
+    p.wait_for_timeout(600)
+    assert p.evaluate("() => window.__bachateca.guiaState().fase") == "cuenta"
+    antes = p.evaluate("() => window.__stops")
+    p.click('[data-guia] [data-act="close"]')
+    assert p.locator("[data-guia]").count() == 0
+    assert p.evaluate("() => window.__bachateca.guiaState()") is None
+    assert p.evaluate("() => window.__stops") > antes
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- recordar frente a ejecutar (fase 4)
+def _hoy():
+    import datetime
+    return datetime.date.today().isoformat()
+
+
+@test
+def ejecucion_sube_con_el_social(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    ej = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.ejec || null")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    assert ej() == {"nivel": 1, "last": _hoy()}, ej()
+    p.click('[data-act="log-again"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    assert ej()["nivel"] == 1, "una subida al día"
+    # Otro día: sube hasta 3 y no pasa de ahí.
+    for esperado in (2, 3, 3):
+        p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.ejec.last = '2020-01-01'; }")
+        p.click('[data-act="log-again"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+        assert ej()["nivel"] == esperado, (esperado, ej())
+    # Borrar el último registro devuelve el nivel de antes; deshacer lo vuelve a poner.
+    p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.ejec = {nivel: 2, last: '2020-01-01'}; }")
+    p.click('[data-act="log-again"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    assert ej()["nivel"] == 3
+    p.click('[data-act="close"]')
+    p.click('[data-act="log-open"]')
+    p.locator('[data-dellog]').first.click()
+    assert ej() == {"nivel": 2, "last": "2020-01-01"}, ej()
+    p.click(".toast .undo")
+    assert ej()["nivel"] == 3, ej()
+    # Con la figura cambiada después, borrar el registro no la toca.
+    p.evaluate("() => { window.__bachateca.state().figures.f1.ejec.nivel = 1; }")
+    p.locator('[data-dellog]').first.click()
+    assert ej()["nivel"] == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ejecucion_en_la_practica_guiada_y_en_intentos(browser):
+    ctx, p, errors = open_app(browser, seed=guia_seed())
+    ej = lambda i: p.evaluate("(i) => window.__bachateca.state().figures[i].ejec || null", i)
+    p.evaluate("() => window.__bachateca.guiaForce({reps: 1, bpm: 240})")
+    p.click('nav.tabs [data-tab="repasar"]'); p.click('#v-repasar [data-act="guia-open"]')
+    def bloque(g, pareja):
+        p.click("#guia-go")
+        p.wait_for_function("window.__bachateca.guiaState().fase === 'nota'", timeout=8000)
+        if pareja is not None:
+            c = p.locator("#guia-par")
+            assert c.count() == 1 and not c.is_checked() and "Con pareja" in p.inner_text("[data-guia] .answer")
+            if pareja: c.check()
+        elif p.locator("#guia-par").count(): raise AssertionError("la cadena no lleva casilla")
+        p.click(f'[data-guia] [data-guiag="{g}"]')
+    bloque("fluida", True)            # figura f1, con pareja
+    assert ej("f1") == {"nivel": 1, "last": _hoy()}, ej("f1")
+    bloque("fluida", True)            # enlace f3 -> f1: la figura B es f1; ya subió hoy
+    assert ej("f1")["nivel"] == 1 and ej("f3") is None
+    bloque("fluida", None)            # cadena
+    p.click('[data-guia] [data-act="close"]')
+    # «No» con pareja baja uno (mínimo 0); sin pareja no cambia nada. Se usa la figura que abre el plan de cada sesión.
+    def sesion(g, pareja, fid, nivel):
+        p.evaluate("([i, n]) => { window.__bachateca.state().figures[i].ejec = {nivel: n, last: '2020-01-01'}; window.__bachateca.guiaForce({reps: 1, bpm: 240}); }", [fid, nivel])
+        p.click('nav.tabs [data-tab="repasar"]'); p.click('#v-repasar [data-act="guia-open"]')
+        bloque(g, pareja)
+        p.click('[data-guia] [data-guiaact="skip"]') if p.evaluate("() => window.__bachateca.guiaState()?.fase") == "listo" else None
+        p.click('[data-guia] [data-act="close"]')
+    fid = lambda: p.evaluate("() => window.__bachateca.guidedPlan(10)[0].ref")
+    i = fid(); sesion("no", False, i, 1); assert ej(i)["nivel"] == 1
+    i = fid(); sesion("no", True, i, 1); assert ej(i)["nivel"] == 0, ej(i)
+    i = fid(); sesion("no", True, i, 0); assert ej(i)["nivel"] == 0, "mínimo 0"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ejecucion_sube_con_un_intento_sin_errores(browser):
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    ej = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.ejec || null")
+    p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.click("#cmp-fsave")
+    assert ej() is None
+    p.click('#cmp-line [data-cb="2"]'); p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    assert ej() is None, "con un error en el intento no sube"
+    p.evaluate("() => { const a = window.__bachateca.state().figures.f1.intentos[0]; a.marcadores = a.marcadores.filter(m => m.tipo === 'bien'); }")
+    p.click('#cmp-line [data-cb="3"]'); p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    assert ej() == {"nivel": 1, "last": _hoy()}, ej()
+    p.click('#cmp-line [data-cb="1"]'); p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    assert ej()["nivel"] == 1, "una vez al día"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ficha_muestra_las_dos_barras(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible", rep={"step": 4, "due": "2999-01-01", "last": "2026-01-01"}, ejec={"nivel": 1, "last": "2026-01-01"}),
+                        "f2": fig(2, "Abierta 2 manos", "Cerrada", estado="disponible", rep={"step": 1, "due": "2999-01-01", "last": "2026-01-01"}, ejec={"nivel": 3, "last": "2026-01-01"})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    t = p.inner_text(".fv-mem")
+    assert "La recuerdo" in t and "Me sale con pareja" in t, t
+    assert "Te sale de memoria; ahora pruébala con pareja en el social." in t, t
+    bars = p.evaluate("() => [...document.querySelectorAll('.fv-mem [role=meter]')].map(m => [m.getAttribute('aria-valuenow'), m.getAttribute('aria-valuemax'), m.getAttribute('aria-label')])")
+    assert bars == [["4", "5", "La recuerdo"], ["1", "3", "Me sale con pareja"]], bars
+    p.click('[data-act="close"]')
+    p.click('#v-repertorio [data-view="f2"]')
+    assert "pruébala con pareja" not in p.inner_text(".fv-mem")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_ordena_por_ejecucion(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible", usos=9),
+                        "f2": fig(2, "Cerrada", "Abierta 2 manos", estado="disponible", ejec={"nivel": 2, "last": "2026-01-01"}),
+                        "f3": fig(3, "Cerrada", "Abierta 2 manos", estado="consolidada", usos=0),
+                        "f4": fig(4, "Cerrada", "Abierta 2 manos", estado="consolidada", ejec={"nivel": 1, "last": "2026-01-01"})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    r = p.evaluate("() => { const B = window.__bachateca, S = B.state(); return B.socSort ? Object.values(S.figures).sort(B.socSort).map(f => f.id) : null }")
+    assert r == ["f4", "f3", "f2", "f1"], r
+    b = p.evaluate("() => Object.values(window.__bachateca.state().figures).sort(window.__bachateca.bkSort('Abierta 2 manos')).map(f => f.id)")
+    assert b == ["f4", "f3", "f2", "f1"], b
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_valida_la_ejecucion(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, f = (i, e) => ({id: i, nombre: i, tipo: "figura", estado: "practica", ejec: e});
+      const o = B.sanitizeImport({figures: {a: f("a", {nivel: 2, last: "2026-01-02"}), b: f("b", {nivel: 9, last: "2026-01-02"}), c: f("c", {nivel: 1}), d: f("d", "x")},
+        logs: {l: {id: "l", fecha: "2026-01-02", figs: ["a"], ejecAntes: {a: null}, ejecDespues: {a: {nivel: 1, last: "2026-01-02"}}}, m: {id: "m", fecha: "2026-01-02", ejecAntes: {a: {nivel: 7}}, ejecDespues: {}}}});
+      return [o.figures.a.ejec, "ejec" in o.figures.b, "ejec" in o.figures.c, "ejec" in o.figures.d, o.logs.l.ejecDespues, "ejecAntes" in o.logs.m]; }""")
+    assert r == [{"nivel": 2, "last": "2026-01-02"}, False, False, False, {"a": {"nivel": 1, "last": "2026-01-02"}}, True], r
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- limpieza de vídeos sin figura (fase 2)
+_HACE = """(dias) => new Date(Date.now() - dias * 864e5).toISOString()"""
+_PUT_KV = """([v, k]) => new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
+  r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k);
+    t.oncomplete = () => { r.result.close(); res(); }; t.onerror = () => rej(t.error); }; })"""
+_PUT_VIDS = """(ids) => new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
+  r.onsuccess = () => { const t = r.result.transaction("videos", "readwrite");
+    ids.forEach(id => t.objectStore("videos").put(new Blob([new Uint8Array(2048)], {type: "video/mp4"}), id));
+    t.oncomplete = () => { r.result.close(); res(); }; t.onerror = () => rej(t.error); }; })"""
+_VID_KEYS = """() => new Promise(res => { const q = indexedDB.open("bachateca", 1);
+  q.onsuccess = () => { const g = q.result.transaction("videos").objectStore("videos").getAllKeys();
+    g.onsuccess = () => { q.result.close(); res(g.result); }; }; })"""
+
+
+def _snap_con(vids):
+    """Instantánea con una figura que usa esos vídeos (como vídeo, parte e intento)."""
+    f = {"id": "s1", "nombre": "vieja", "entrada": "a", "salida": "b", "estado": "practica", "vid": vids[0],
+         "partes": [{"id": "p1", "vid": vids[1]}], "intentos": [{"id": "i1", "vid": vids[2]}]}
+    return {"at": 5000, "reason": "diaria", "nFig": 1, "nLog": 0, "schema": 6, "state": {"schema": 6, "figures": {"s1": f}, "logs": {}}}
+
+
+@test
+def limpieza_espera_7_dias(browser):
+    # v1 está en una figura aunque una versión anterior la apuntara como huérfana hace mucho: se quita de la lista y no se borra.
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b", vid="v1", intentos=[att(1, "v2")])}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1", "v2", "h1", "cover:h1", "cover:h2"],
+                              ls={"bachateca.huerfanos": {"v1": "2026-01-01T00:00:00.000Z"}})
+    p.wait_for_function("() => { const m = JSON.parse(localStorage.getItem('bachateca.huerfanos') || '{}'); return m.h1 && m['cover:h2'] && !m.v1; }")
+    # El primer día no se borra nada.
+    assert sorted(p.evaluate(_VID_KEYS)) == ["cover:h1", "cover:h2", "h1", "v1", "v2"]
+    o = p.evaluate("() => window.__bachateca.orphanVideos()")
+    assert sorted(x["id"] for x in o) == ["cover:h1", "cover:h2", "h1"] and all(x["bytes"] == 2048 for x in o), o
+    assert sorted(p.evaluate("async () => [...await window.__bachateca.videoRefs()]")) == ["v1", "v2"]
+    # Apuntado hace 8 días (el vídeo; su portada, hace 1): se borra con su portada al arrancar.
+    p.evaluate("""(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({h1: d[0], 'cover:h1': d[1], 'cover:h2': d[1]}))""",
+               [p.evaluate(_HACE, 8), p.evaluate(_HACE, 1)])
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
+    p.evaluate("() => window.__bachateca.cleanOrphans()")   # espera a que acabe la de arranque
+    assert sorted(p.evaluate(_VID_KEYS)) == ["cover:h2", "v1", "v2"]
+    assert list(p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.huerfanos'))")) == ["cover:h2"]
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_respeta_las_instantaneas(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.evaluate(_PUT_KV, [_snap_con(["sv", "sp", "si"]), "snap:5000:diaria"])
+    p.evaluate(_PUT_VIDS, ["sv", "sp", "si", "cover:sv", "h1"])
+    viejo = p.evaluate(_HACE, 30)
+    p.evaluate("(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({sv: d, sp: d, si: d, 'cover:sv': d, h1: d}))", viejo)
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
+    r = p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")
+    assert r == {"n": 0, "bytes": 0}, r
+    assert sorted(p.evaluate(_VID_KEYS)) == ["cover:sv", "si", "sp", "sv"]
+    assert p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.huerfanos'))") == {}
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_nunca_en_modo_seguro(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["h1"], init=_parche_lectura(False),
+                              ls={"bachateca.huerfanos": {"h1": "2026-01-01T00:00:00.000Z"}})
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})") is None
+    assert p.evaluate("() => window.__bachateca.orphanVideos()") == []
+    p.click("#btn-settings")
+    p.click('[data-setv="espacio"]')
+    p.wait_for_timeout(400)
+    assert p.locator('[data-act="orph-free"]').is_hidden() and p.locator("#orph-st").is_hidden()
+    assert p.evaluate(_VID_KEYS) == ["h1"]
+    assert p.evaluate("() => localStorage.getItem('bachateca.huerfanos')") == '{"h1":"2026-01-01T00:00:00.000Z"}'
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_se_para_si_falla_una_instantanea(browser):
+    # Si una instantánea no se puede leer, podría ser la única que guarda el vídeo: no se borra nada.
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    init = """const g = IDBObjectStore.prototype.get;
+      IDBObjectStore.prototype.get = function (k) { if (typeof k === "string" && k.startsWith("snap:")) throw new DOMException("simulado", "UnknownError");
+        return g.apply(this, arguments); };"""
+    ctx, p, errors = open_app(browser, seed=seed, videos=["h1"], init=init,
+                              ls={"bachateca.huerfanos": {"h1": "2026-01-01T00:00:00.000Z"}})
+    p.evaluate(_PUT_KV, [_snap_con(["sv", "sp", "si"]), "snap:5000:diaria"])
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})") is None
+    assert p.evaluate("() => window.__bachateca.orphanVideos().then(() => 'ok', () => 'falla')") == "falla"
+    assert p.evaluate(_VID_KEYS) == ["h1"]
+    p.click("#btn-settings")
+    p.click('[data-setv="espacio"]')
+    p.wait_for_timeout(400)
+    assert p.locator('[data-act="orph-free"]').is_hidden()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def liberar_ahora(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b", vid="v1")}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1", "h1", "h2", "cover:h1", "sv", "sp", "si"])
+    p.evaluate(_PUT_KV, [_snap_con(["sv", "sp", "si"]), "snap:5000:diaria"])
+    p.click("#btn-settings")
+    p.click('[data-setv="espacio"]')
+    p.wait_for_selector('[data-act="orph-free"]:not([hidden])')
+    assert p.inner_text("#orph-st") == "2 vídeos sin figura · 0,0 MB"
+    p.click('[data-act="orph-free"]')
+    assert p.inner_text("#cf-t") == "¿Borrar 2 vídeos sin figura?"
+    assert p.inner_text("#cf-m") == "No están en ninguna figura ni en ninguna instantánea. No se puede deshacer."
+    assert p.inner_text('#confirm-root [data-cf="ok"]') == "Borrar"
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
+    p.wait_for_selector('[data-act="orph-free"][hidden]', state="attached")
+    assert sorted(p.evaluate(_VID_KEYS)) == ["si", "sp", "sv", "v1"]
+    assert p.locator("#orph-st").is_hidden()
+    assert "vídeos borrados" in p.inner_text(".toast")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_respeta_deshacer(browser):
+    f1 = fig(1, "Cerrada", "Sombra", vid="v1", intentos=[])
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "guardado": 1000, "figures": {"f1": f1}}, videos=["v1", "a1"])
+    # El intento se añade después de la copia diaria: así su vídeo no está en ninguna instantánea.
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
+    p.evaluate("(a) => { const S = window.__bachateca.state(); S.figures.f1.intentos = [a]; window.__bachateca.setFigs(S.figures); }", att(1, "a1"))
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="att-del"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector(".toast .undo")
+    # Con «Deshacer» a la vista, el vídeo del intento cuenta como usado, también para «Liberar ahora».
+    assert p.evaluate("() => window.__bachateca.orphanVideos()") == []
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})") == {"n": 0, "bytes": 0}
+    assert sorted(p.evaluate(_VID_KEYS)) == ["a1", "v1"]
+    p.click(".toast .undo")
+    assert [a["vid"] for a in p.evaluate("() => window.__bachateca.state().figures.f1.intentos")] == ["a1"]
+    assert sorted(p.evaluate(_VID_KEYS)) == ["a1", "v1"]
+    assert p.evaluate("() => window.__bachateca.orphanVideos()") == []
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_automatica_no_actua_sin_figuras(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "guardado": 1000, "figures": {}}, videos=["h1", "h2"],
+                              ls={"bachateca.huerfanos": {"h1": "2026-01-01T00:00:00.000Z", "h2": "2026-01-01T00:00:00.000Z"}})
+    assert p.evaluate("() => window.__bachateca.cleanOrphans()") is None   # el mismo camino que al arrancar
+    p.wait_for_timeout(300)
+    assert sorted(p.evaluate(_VID_KEYS)) == ["h1", "h2"]
+    assert p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.huerfanos'))") == {"h1": "2026-01-01T00:00:00.000Z", "h2": "2026-01-01T00:00:00.000Z"}
+    # «Liberar ahora» sí funciona.
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")["n"] == 2
+    assert p.evaluate(_VID_KEYS) == []
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- copia completa con vídeos (fase 2)
+@test
+def nombre_de_video_con_id(browser):
+    """Cada vídeo exportado lleva su id en el nombre (D10), y el nombre se lee de vuelta."""
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidSaved="v1")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"])
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      return [B.vidFileName('Figura 1', 'v1', 'video/mp4'), B.vidFileName('a/b:c', 'x_9-Z', 'video/quicktime'),
+              B.vidIdFromName('Figura 1 · v1.mp4'), B.vidIdFromName('Ana · intento 3/11 · a-1_b.MOV'),
+              B.vidIdFromName('Figura 1 · v1 (1).mp4'), B.vidIdFromName('IMG_0001.MOV'), B.vidIdFromName('x · a b.mp4')]; }""")
+    assert r == ["Figura 1 · v1.mp4", "abc · x_9-Z.mov", "v1", "a-1_b", "v1", None, None], r
+    # Copia completa: primero el JSON (como siempre) y después todos los vídeos, aunque ya tuvieran copia.
+    p.click("#btn-settings")
+    with p.expect_download() as dl:
+        p.click('[data-act="export-full"]')
+    assert dl.value.suggested_filename.endswith(".json")
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector("text=Ahora tus vídeos: 1")
+    p.wait_for_timeout(300)
+    with p.expect_download() as dl:
+        p.click('[data-act="save-vids"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    assert dl.value.suggested_filename == "Figura 1 · v1.mp4", dl.value.suggested_filename
+    assert p.evaluate("() => window.__bachateca.vidIdFromName(%s)" % json.dumps(dl.value.suggested_filename)) == "v1"
+    p.wait_for_selector("text=Ahora tus vídeos: 0")
+    assert p.evaluate("() => +localStorage.getItem('bachateca.backup.at')") > 0, "cuenta como copia hecha"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def recuperar_videos_por_nombre(browser):
+    import shutil, tempfile
+    d = tempfile.mkdtemp()
+    names = ["Figura 1 · v1.mp4", "Figura 2 · intento 1 · a1.mp4", "Otra cosa · zz9.mp4"]
+    paths = [os.path.join(d, n) for n in names]
+    for q in paths:
+        shutil.copy(FIXTURE, q)
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", intentos=[att(1, "a1")])}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    assert stored_video_sizes(p) == {}
+    p.click("#btn-settings")
+    p.click('[data-setv="importar"]')
+    p.set_input_files("#vid-rec", paths)
+    p.wait_for_function("document.querySelector('.toast') && /recuperados/.test(document.querySelector('.toast').innerText)")
+    t = p.locator(".toast").inner_text()
+    assert "2 vídeos recuperados · 1 no corresponde a ninguna figura" in t, t
+    sizes = stored_video_sizes(p)
+    assert sizes == {"v1": os.path.getsize(FIXTURE), "a1": os.path.getsize(FIXTURE)}, sizes
+    # Otra vez los mismos: ya estaban, no se reescriben.
+    p.set_input_files("#vid-rec", paths[:2])
+    p.wait_for_function("/ya estaban/.test(document.querySelector('.toast').innerText)")
+    t = p.locator(".toast").inner_text()
+    assert "0 vídeos recuperados" in t and "2 ya estaban" in t, t
+    # La ficha reproduce el vídeo recuperado y se le hace portada.
+    p.keyboard.press("Escape")
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1")
+    p.wait_for_function("window.__bachateca.covers().includes('v1')", timeout=15000)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def recuperar_videos_modo_seguro(browser):
+    d = __import__("tempfile").mkdtemp()
+    q = os.path.join(d, "Figura 1 · v1.mp4")
+    __import__("shutil").copy(FIXTURE, q)
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, init=_parche_lectura(False))
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    p.click("#btn-settings")
+    p.click('[data-setv="importar"]')
+    p.set_input_files("#vid-rec", [q])
+    p.wait_for_selector(".toast:has-text('Modo seguro: no se pueden guardar vídeos.')")
+    assert stored_video_sizes(p) == {}
+    ctx.close()
+
+
+# ---------------------------------------------------------------- cierre de la fase 2 (1.54)
+def _estado_v7():
+    hoy = "2026-10-01"
+    rep = {"step": 2, "due": "2026-10-08", "last": hoy}
+    return {"schema": 7, "guardado": 1000,
+        "figures": {
+            "f1": fig(1, "Cerrada", "Sombra", vid="v1", rep=rep, pulso={"vid": "v1", "marcas": [{"b": 1, "s": 0.5}], "modo": "manual"},
+                      partes=[{"id": "p1", "fecha": hoy, "nota": "", "vid": "v2"}],
+                      intentos=[{"id": "i1", "fecha": hoy, "vid": "v3", "pulso": {"vid": "v3", "marcas": [], "modo": "manual"},
+                                 "marcadores": [{"id": "m1", "b": 2, "tipo": "error", "nota": "tarde"}]}],
+                      errores=[{"id": "e1", "nota": "Pisas", "b": 2, "desde": "i1", "fecha": "2026-09-20"}, {"id": "e2", "nota": "Sin fecha"}]),
+            "f2": fig(2, "Sombra", "Cerrada", rep=rep),
+        },
+        "logs": {"l1": {"id": "l1", "fecha": hoy, "figs": ["f1"], "repAntes": {"f1": {"step": 1, "due": hoy}}, "repDespues": {"f1": rep}}},
+        "preguntas": {"q1": {"id": "q1", "pos": "Sombra", "baile": "Bachata", "creada": hoy}},
+        "linkRep": {"Cerrada": {"step": 1, "due": hoy, "last": hoy}, "Sombra": {"step": 0, "due": hoy}},
+        "actividad": {hoy: 1}}
+
+
+def _comprobar_v7_migrado(st):
+    assert st["schema"] >= 11, st["schema"]
+    assert set(st["figures"]) == {"f1", "f2"} and set(st["logs"]) == {"l1"} and set(st["preguntas"]) == {"q1"}
+    assert set(st["linkRep"]) == {"Bachata\u241fCerrada", "Bachata\u241fSombra"}, st["linkRep"]
+    assert st["enlaces"] == {}
+    f1 = st["figures"]["f1"]
+    assert [e["id"] for e in f1["errores"]] == ["e1", "e2"]
+    assert all(e["veces"] == 1 and e["ultima"] for e in f1["errores"]) and f1["errores"][0]["ultima"] == "2026-09-20"
+    assert f1["notasVid"] == [] and st["figures"]["f2"]["notasVid"] == []
+    assert f1["vid"] == "v1" and f1["partes"][0]["vid"] == "v2" and f1["intentos"][0]["vid"] == "v3"
+    assert f1["intentos"][0]["marcadores"][0]["id"] == "m1" and f1["pulso"]["vid"] == "v1"
+    assert f1["rep"]["step"] == 2 and st["logs"]["l1"]["repAntes"]["f1"]["step"] == 1
+    assert st["actividad"] == {"2026-10-01": 1}
+
+
+@test
+def de_151_a_154(browser):
+    v7 = _estado_v7()
+    ctx, p, errors = open_app(browser, seed=v7, videos=["v1", "v2", "v3"])
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length >= 1")
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    _comprobar_v7_migrado(stored_state(p))
+    assert set(stored_video_sizes(p)) == {"v1", "v2", "v3"}
+    # Una instantánea de la 1.51 (esquema 7) se restaura y migra igual.
+    p.evaluate("""s => new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
+      r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite");
+        t.objectStore("kv").put({at: 5000, reason: "diaria", nFig: 2, nLog: 1, schema: 7, state: s}, "snap:5000:diaria");
+        t.oncomplete = () => res(); t.onerror = () => rej(t.error); };
+      r.onerror = () => rej(r.error); })""", v7)
+    p.evaluate("() => { window.__t = window.__bachateca.restoreSnapshot('snap:5000:diaria'); }")
+    p.click('#confirm-root [data-cf="ok"]')
+    assert p.evaluate("() => window.__t") is True
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    _comprobar_v7_migrado(stored_state(p))
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- revisión final (1.52–1.54)
+@test
+def recuperar_videos_si_falla_la_lectura_no_escribe(browser):
+    """Si no se puede mirar si un vídeo ya está, no se escribe encima: cuenta como no comprobado."""
+    d = __import__("tempfile").mkdtemp()
+    q = os.path.join(d, "Figura 1 · v1.mp4")
+    __import__("shutil").copy(FIXTURE, q)
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}
+    falla = """globalThis.__fallaGet = 0; const g = IDBObjectStore.prototype.get;
+      IDBObjectStore.prototype.get = function (k) {
+        if (k === "v1" && globalThis.__fallaGet > 0) { globalThis.__fallaGet--; throw new DOMException("simulado", "UnknownError"); }
+        return g.apply(this, arguments); };"""
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"], init=falla)
+    antes = stored_video_sizes(p)
+    p.click("#btn-settings")
+    p.click('[data-setv="importar"]')
+    p.evaluate("() => { globalThis.__fallaGet = 1; }")
+    p.set_input_files("#vid-rec", [q])
+    p.wait_for_function("document.querySelector('.toast') && /recuperad/.test(document.querySelector('.toast').innerText)")
+    t = p.locator(".toast").inner_text()
+    assert "0 vídeos recuperados" in t and "1 no se pudo comprobar" in t, t
+    assert stored_video_sizes(p) == antes == {"v1": 2048}, stored_video_sizes(p)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def recuperar_videos_espera_a_que_cargue(browser):
+    ctx = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
+    # IndexedDB que nunca contesta: la app se queda «cargando».
+    ctx.add_init_script("indexedDB.open = () => ({});")
+    p = ctx.new_page()
+    errors = []
+    p.on("pageerror", lambda e: errors.append(str(e)))
+    p.goto(URL)
+    p.wait_for_function("window.__bachateca")
+    assert p.evaluate("() => window.__bachateca.ready()") is False
+    p.evaluate("() => window.__bachateca.recoverVideos([new File([new Uint8Array(16)], 'Figura 1 · v1.mp4', {type: 'video/mp4'})])")
+    p.wait_for_selector(".toast:has-text('Espera a que se cargue tu repertorio.')")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def lo_he_bailado_conserva_el_foco(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos"), "f2": fig(2, "Abierta 2 manos", "Cerrada")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    b = p.locator('[data-act="ln-mark"]')
+    assert "de Figura 1 a Figura 2" in b.get_attribute("aria-label"), b.get_attribute("aria-label")
+    b.focus(); p.keyboard.press("Enter")
+    foco = "() => { const a = document.activeElement; return a && a.dataset.act === 'ln-mark' && a.dataset.a === 'f1' && a.dataset.b === 'f2' ? a.getAttribute('aria-pressed') : null; }"
+    p.wait_for_function(foco)
+    assert p.evaluate(foco) == "true"
+    p.keyboard.press("Enter")
+    assert p.evaluate(foco) == "false"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cambiar_video_avisa_de_las_notas(browser):
+    notas = [{"id": "n1", "s": 0.5, "texto": "uno"}, {"id": "n2", "s": 1, "texto": "dos"}]
+    ctx, p, errors = nv_open(browser, nv_seed(notasVid=notas))
+    p.click('[data-edit="f1"]')
+    p.wait_for_selector('#vidbox [data-vid="remove"]')
+    aviso = "Sus 2 notas del vídeo se borrarán al guardar."
+    assert aviso not in p.inner_text("#vidbox")
+    p.click('#vidbox [data-vid="remove"]')
+    assert aviso in p.inner_text("#vidbox"), p.inner_text("#vidbox")
+    p.set_input_files("#ff-file", FIXTURE)
+    p.wait_for_selector("#ff-prev")
+    assert aviso in p.inner_text("#vidbox"), p.inner_text("#vidbox")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def copia_completa_cuenta_solo_los_que_estan(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", vid="v2")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"])
+    p.click("#btn-settings")
+    with p.expect_download():
+        p.click('[data-act="export-full"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector("text=Ahora tus vídeos: 1")
+    assert "1 no está en este dispositivo" in p.inner_text(".sheet"), p.inner_text(".sheet")
+    p.wait_for_timeout(300)
+    with p.expect_download() as dl:
+        p.click('[data-act="save-vids"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    assert dl.value.suggested_filename == "Figura 1 · v1.mp4"
+    p.wait_for_selector("text=Ahora tus vídeos: 0")
+    assert "1 no está en este dispositivo" in p.inner_text(".sheet")
+    assert p.locator('[data-act="save-vids"]').count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def errores_activos_limitan_el_repaso_siempre(browser):
+    lejos = {"step": 4, "due": "2999-01-01", "last": "2026-01-01"}
+    err = [{"id": "e1", "nota": "me adelanto", "fecha": "2026-01-01", "veces": 1}]
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", rep=dict(lejos), errores=err),
+                        "f2": fig(2, "Sombra", "Cerrada", rep=dict(lejos), errores=err)},
+            "logs": {"l1": {"id": "l1", "fecha": "2026-01-02", "figs": ["f2"], "repAntes": {"f2": dict(lejos)},
+                            "repDespues": {"f2": dict(lejos, step=5, due="2999-02-01")}}}}
+    seed["figures"]["f2"]["rep"] = dict(lejos, step=5, due="2999-02-01")
+    ctx, p, errors = open_app(browser, seed=seed)
+    tope = p.evaluate("() => window.__bachateca.todayStr(7)")
+    # Deshacer «quitar error»: vuelve un error activo y el repaso no pasa de 7 días.
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="err-del"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.due") == "2999-01-01"
+    p.click(".toast .undo")
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    p.keyboard.press("Escape")
+    # Borrar el registro devuelve repAntes, también limitado; su Deshacer deja el repaso del registro.
+    p.evaluate("() => window.__bachateca.deleteLog('l1')")
+    r = p.evaluate("() => window.__bachateca.state().figures.f2.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    p.click(".toast .undo")
+    r = p.evaluate("() => window.__bachateca.state().figures.f2.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    p.keyboard.press("Escape")
+    p.wait_for_selector("#sheet-root .sheet", state="detached")
+    # Importada con un error activo.
+    f3 = fig(3, "Cerrada", "Abierta", rep=dict(lejos), errores=err)
+    import_text(p, json.dumps({"schema": 11, "figures": {"f3": f3}, "logs": {}}))
+    r = p.evaluate("() => window.__bachateca.state().figures.f3.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def practica_guiada_ignora_las_opciones_de_enlazar(browser):
+    ls = {"bachateca.cadena": {"end": "Ninguna", "must": "f9", "exclude": ["f2"], "n": 2}}
+    ctx, p, errors = open_app(browser, seed=guia_seed(), ls=ls)
+    for _ in range(5):
+        plan = p.evaluate("() => window.__bachateca.guidedPlan(10)")
+        cad = [b for b in plan if b["tipo"] == "cadena"]
+        assert cad, plan
+        ids = cad[0]["ref"]["ids"]
+        assert len(ids) >= 3 and "f2" in ids, ids
     assert not errors, errors
     ctx.close()
 

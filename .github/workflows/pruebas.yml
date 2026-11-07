@@ -1,15 +1,25 @@
 name: Pruebas
 
+# Solo en main y en los PR: así cada subida a una rama con PR no lanza dos veces lo mismo.
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Si llega una subida nueva, se cancela la ejecución anterior de la misma rama o PR.
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pruebas:
     runs-on: ubuntu-latest
+    # La batería tarda unos 4 minutos: nunca debe ocupar un ejecutor horas.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,11 +32,12 @@ jobs:
       - name: Ejecutar la batería
         run: python3 tests/test_bachateca.py
 
-  # Provisional: hasta clasificar los fallos de la primera ejecución en WebKit no bloquea.
-  # Cada fallo se resuelve así: limitación del motor de pruebas -> @test(solo_chromium="motivo");
-  # fallo de la app -> se corrige o se avisa, nunca se marca. Después se quita continue-on-error.
+  # WebKit se queda colgado en este entorno hasta el límite de 6 horas de GitHub y bloqueaba la cola
+  # (también la publicación de la web). Solo se lanza a mano (Actions → Pruebas → Run workflow) y con límite.
   webkit:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

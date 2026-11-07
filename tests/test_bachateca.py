@@ -3999,8 +3999,8 @@ class WebkitConDisco:
 
     def new_context(self, **kw):
         ctx = self.pw.webkit.launch_persistent_context(tempfile.mkdtemp(dir=self.raiz), **kw)
-        for pagina in list(ctx.pages):   # la que abre sola el perfil: las pruebas crean la suya
-            pagina.close()
+        # La página en blanco que abre sola el perfil se deja abierta: en WebKit, cerrar la última
+        # página de un perfil cierra el navegador. Las pruebas abren la suya con new_page().
         self.contexts.append(ctx)
         ctx.on("close", lambda _: ctx in self.contexts and self.contexts.remove(ctx))
         return ctx

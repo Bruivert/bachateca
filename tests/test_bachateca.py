@@ -3768,6 +3768,63 @@ def recuperar_videos_modo_seguro(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- cierre de la fase 2 (1.54)
+def _estado_v7():
+    hoy = "2026-10-01"
+    rep = {"step": 2, "due": "2026-10-08", "last": hoy}
+    return {"schema": 7, "guardado": 1000,
+        "figures": {
+            "f1": fig(1, "Cerrada", "Sombra", vid="v1", rep=rep, pulso={"vid": "v1", "marcas": [{"b": 1, "s": 0.5}], "modo": "manual"},
+                      partes=[{"id": "p1", "fecha": hoy, "nota": "", "vid": "v2"}],
+                      intentos=[{"id": "i1", "fecha": hoy, "vid": "v3", "pulso": {"vid": "v3", "marcas": [], "modo": "manual"},
+                                 "marcadores": [{"id": "m1", "b": 2, "tipo": "error", "nota": "tarde"}]}],
+                      errores=[{"id": "e1", "nota": "Pisas", "b": 2, "desde": "i1", "fecha": "2026-09-20"}, {"id": "e2", "nota": "Sin fecha"}]),
+            "f2": fig(2, "Sombra", "Cerrada", rep=rep),
+        },
+        "logs": {"l1": {"id": "l1", "fecha": hoy, "figs": ["f1"], "repAntes": {"f1": {"step": 1, "due": hoy}}, "repDespues": {"f1": rep}}},
+        "preguntas": {"q1": {"id": "q1", "pos": "Sombra", "baile": "Bachata", "creada": hoy}},
+        "linkRep": {"Cerrada": {"step": 1, "due": hoy, "last": hoy}, "Sombra": {"step": 0, "due": hoy}},
+        "actividad": {hoy: 1}}
+
+
+def _comprobar_v7_migrado(st):
+    assert st["schema"] >= 11, st["schema"]
+    assert set(st["figures"]) == {"f1", "f2"} and set(st["logs"]) == {"l1"} and set(st["preguntas"]) == {"q1"}
+    assert set(st["linkRep"]) == {"Bachata\u241fCerrada", "Bachata\u241fSombra"}, st["linkRep"]
+    assert st["enlaces"] == {}
+    f1 = st["figures"]["f1"]
+    assert [e["id"] for e in f1["errores"]] == ["e1", "e2"]
+    assert all(e["veces"] == 1 and e["ultima"] for e in f1["errores"]) and f1["errores"][0]["ultima"] == "2026-09-20"
+    assert f1["notasVid"] == [] and st["figures"]["f2"]["notasVid"] == []
+    assert f1["vid"] == "v1" and f1["partes"][0]["vid"] == "v2" and f1["intentos"][0]["vid"] == "v3"
+    assert f1["intentos"][0]["marcadores"][0]["id"] == "m1" and f1["pulso"]["vid"] == "v1"
+    assert f1["rep"]["step"] == 2 and st["logs"]["l1"]["repAntes"]["f1"]["step"] == 1
+    assert st["actividad"] == {"2026-10-01": 1}
+
+
+@test
+def de_151_a_154(browser):
+    v7 = _estado_v7()
+    ctx, p, errors = open_app(browser, seed=v7, videos=["v1", "v2", "v3"])
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length >= 1")
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    _comprobar_v7_migrado(stored_state(p))
+    assert set(stored_video_sizes(p)) == {"v1", "v2", "v3"}
+    # Una instantánea de la 1.51 (esquema 7) se restaura y migra igual.
+    p.evaluate("""s => new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
+      r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite");
+        t.objectStore("kv").put({at: 5000, reason: "diaria", nFig: 2, nLog: 1, schema: 7, state: s}, "snap:5000:diaria");
+        t.oncomplete = () => res(); t.onerror = () => rej(t.error); };
+      r.onerror = () => rej(r.error); })""", v7)
+    p.evaluate("() => { window.__t = window.__bachateca.restoreSnapshot('snap:5000:diaria'); }")
+    p.click('#confirm-root [data-cf="ok"]')
+    assert p.evaluate("() => window.__t") is True
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    _comprobar_v7_migrado(stored_state(p))
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

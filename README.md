@@ -38,7 +38,7 @@ Exportar, porque viven en el mismo iPhone.
 
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v53` → `bachateca-v54`).
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v54` → `bachateca-v55`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
 
 ## Practicar para el social
@@ -80,6 +80,15 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
   pruebas reales: socials, práctica guiada con pareja o intentos en los que solo marcas «Bien». En Social salen
   primero las figuras que te salen mejor con pareja.
 
+## Tus datos (versión 1.54)
+
+- **Copia completa** (Ajustes): guarda un JSON con todas tus figuras y registros, más todos tus vídeos. Guárdala en
+  **Archivos o iCloud Drive**, no en Fotos: Fotos puede cambiar el nombre de los archivos y entonces un vídeo no
+  sabría a qué figura volver.
+- **Recuperar vídeos**: elige los archivos de vídeo de la copia; cada uno vuelve a su figura por el id que lleva en el nombre.
+- **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
+  una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
+
 ## Pruebas automáticas
 
 Antes de publicar un cambio, comprueba que no se ha roto nada (repaso, enlaces, migración de datos, importar copias, vídeos):
@@ -97,7 +106,7 @@ Abren la app en un navegador sin ventana y con datos de prueba: no tocan tus dat
 
 Los datos guardados llevan un número de versión (`schema`). Si un cambio necesita guardar las figuras de otra forma,
 se sube `SCHEMA` en `index.html` y se añade un paso en `MIGRATIONS`: al abrir la app, los datos antiguos se ponen al día
-solos, sin borrar nada. La versión 1.53 pasa los datos a la versión 11 (la 1.52 los había pasado a la 10 y la versión 1.51 los había pasado a la 7 con las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
+solos, sin borrar nada. La versión 1.54 deja los datos en la versión 11 (la 1.53 los pasó a la 11, la 1.52 a la 10 y la versión 1.51 los había pasado a la 7 con las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
 
 ## Limitaciones conocidas
 

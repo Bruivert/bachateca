@@ -3123,7 +3123,9 @@ def avance_fino_en_la_ficha(browser):
     t = p.evaluate(cur)
     assert abs(t - 0.7) < 0.03 and p.evaluate("() => document.querySelector('.player video').paused"), t
     p.click('.player [data-step="0.1"]'); seeked(); p.click('.player [data-step="0.1"]'); seeked()
-    assert p.evaluate(cur) <= 0.8 + 0.01, "no pasa del final del recorte"
+    p.wait_for_timeout(400)
+    t = p.evaluate(cur)
+    assert 0.8 - 0.15 < t <= 0.8, ("no pasa del final del recorte ni salta al principio", t)
     for _ in range(5):
         p.click('.player [data-step="-0.1"]'); seeked()
     assert p.evaluate(cur) >= 0.5 - 0.01, "no baja del inicio del recorte"
@@ -3153,6 +3155,9 @@ def avance_fino_en_comparar(browser):
     p.click('[data-cmp] [data-cstep="-0.1"]'); wait_seeked(p)
     t1 = times(p)[0]
     assert abs(t1 - t0 - 0.1) < 0.03, (t0, t1)
+    for _ in range(4):
+        p.click('[data-cmp] [data-cstep="-0.1"]'); wait_seeked(p)
+    assert p.evaluate("() => window.__bachateca.cmpState().b") >= 1, "no sale de la línea por detrás"
     assert not errors, errors
     ctx.close()
 

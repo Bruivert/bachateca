@@ -3108,7 +3108,9 @@ async function openCompare(figId, attId){
   // Avance fino: la clase se mueve una décima y el tuyo va al mismo tiempo de la música.
   document.querySelectorAll("[data-cstep]").forEach(b=> b.onclick=()=>{
     cmpPause();
-    const t=cmpClampT(T, T.currentTime + +b.dataset.cstep), bb=secToBeat(cmp.pT, t); if(bb==null) return;
+    const b0=secToBeat(cmp.pT, cmpClampT(T, T.currentTime + +b.dataset.cstep)); if(b0==null) return;
+    // El tiempo se queda dentro de la línea (las marcas usan floor(cmp.b)); el segundo de la clase sale del tiempo ya recortado.
+    const bb=Math.max(cmp.lo, Math.min(cmp.hi-1e-3, b0)), t=cmpClampT(T, beatToSec(cmp.pT, bb));
     cmp.b = bb;
     try{ T.currentTime = t; M.currentTime = cmpClampT(M, beatToSec(cmp.pM, bb)); }catch{}
     cmpPaint(); });
@@ -4584,7 +4586,7 @@ document.addEventListener("click", async e=>{
     const pl=pc.closest(".player"), v=pl && pl.querySelector("video"); if(!v) return;
     if(pc.dataset.step){
       // Avance fino: pausa y una décima, sin salirse del recorte (data-s/data-e) para no caer en el bucle ni fuera del tramo.
-      const s=+v.dataset.s||0, e=+v.dataset.e||0, hi=e>0 ? e : (isFinite(v.duration) ? v.duration : Infinity);
+      const s=+v.dataset.s||0, e=+v.dataset.e||0, hi=(e>0 ? e : (isFinite(v.duration) ? v.duration : Infinity)) - .05; // 0,05 antes del final: justo en e el bucle volvería a s
       v.pause(); try{ v.currentTime = Math.max(s, Math.min(hi, v.currentTime + +pc.dataset.step)); }catch{}
     }
     else if(pc.dataset.speed){ v.playbackRate=+pc.dataset.speed; pl.querySelectorAll("[data-speed]").forEach(b=>b.setAttribute("aria-pressed", b===pc)); }

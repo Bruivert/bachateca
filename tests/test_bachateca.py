@@ -361,7 +361,7 @@ def apariencia(browser):
     assert bg == "rgb(6, 12, 26)", bg
     p.click("#btn-settings"); p.click('[data-tema="claro"]')
     assert "theme-light" in p.evaluate("() => document.documentElement.className")
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     assert "theme-light" in p.evaluate("() => document.documentElement.className"), "se recuerda al volver a abrir"
     assert p.evaluate("() => getComputedStyle(document.body).backgroundColor") != "rgb(6, 12, 26)"
     ctx.close()
@@ -398,7 +398,7 @@ def portadas_desde_el_video(browser):
     p.evaluate("""async b64 => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       const db = await new Promise(r => { const q = indexedDB.open("bachateca", 1); q.onsuccess = () => r(q.result); });
       await new Promise(r => { const t = db.transaction("videos", "readwrite"); t.objectStore("videos").put(new Blob([bin], {type: "video/mp4"}), "v1"); t.oncomplete = r; }); db.close(); }""", data)
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.wait_for_function("window.__bachateca.covers().includes('v1')", timeout=20000)
     p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
     st = stored_state(p)
@@ -558,14 +558,17 @@ def nombre_descargado(nombre):
 
 
 def put_fixture(page, vid_ids):
-    """Guarda el vídeo de prueba real con esos ids (para reproducirlo en la app) y recarga."""
+    """Guarda el vídeo de prueba real con esos ids (para reproducirlo en la app) y recarga.
+
+    Las recargas esperan a que la app esté lista, no al evento «load»: en WebKit, un vídeo que se
+    está cargando puede retrasar «load» más de 30 s, y lo que importa a las pruebas es ready()."""
     import base64
     data = base64.b64encode(open(FIXTURE, "rb").read()).decode()
     page.evaluate("""async ([b64, ids]) => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       const db = await new Promise(r => { const q = indexedDB.open("bachateca", 1); q.onsuccess = () => r(q.result); });
       await new Promise(r => { const t = db.transaction("videos", "readwrite");
         ids.forEach(id => t.objectStore("videos").put(new Blob([bin], {type: "video/mp4"}), id)); t.oncomplete = r; }); db.close(); }""", [data, vid_ids])
-    page.reload(); page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    page.reload(wait_until="domcontentloaded"); page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
 
 
 def tap_at(page, sec):
@@ -747,7 +750,7 @@ def comparar_por_tiempos(browser):
     p.click('[data-act="att-open"][data-att="i1"]')
     p.click('[data-act="cmp-open"]')
     p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
-    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     wait_seeked(p)
     assert "200 bpm" in p.locator("#cmp-tempo").inner_text() and "120" in p.locator("#cmp-tempo").inner_text()
     assert "no un fallo" in p.locator("#cmp-tempo").inner_text(), "el pulso es un dato"
@@ -815,7 +818,7 @@ def marcas_y_errores_que_cometo(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     p.click('#cmp-line [data-cb="4"]')
     p.click('[data-cmk="error"]')
     assert "Error en el 4" in p.locator("#cmp-form").inner_text()
@@ -1137,7 +1140,7 @@ def videos_como_copia_en_memoria(browser):
     ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}})
     put_fixture(p, ["v1"])
     p.evaluate("() => localStorage.setItem('bachateca.vidmode', JSON.stringify('mem'))")
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
     v = ficha_video(p)
@@ -1167,7 +1170,7 @@ def videos_sin_coletilla(browser):
     ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidTrim={"start": 0.8, "end": 0})}, "logs": {}})
     put_fixture(p, ["v1"])
     p.evaluate("() => localStorage.setItem('bachateca.vidmode', JSON.stringify('plain'))")
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
     v = ficha_video(p)
@@ -2408,7 +2411,7 @@ def copia_en_memoria_solo_para_ese_video(browser):
     seed = {"schema": 6, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", vid="v2")}, "logs": {}}
     ctx, p, errors = open_app(browser, seed=seed, ls={"bachateca.vidmem": ["v1"]})
     put_fixture(p, ["v1", "v2"])
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.click('nav.tabs [data-tab="repertorio"]')
     for f in ("f1", "f2"):
         p.click(f'#v-repertorio [data-view="{f}"]')
@@ -2860,7 +2863,7 @@ def marcar_otra_vez_el_mismo_error(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]')
     assert "¿Es uno de estos?" in p.locator("#cmp-form").inner_text()
     p.click('#cmp-form [data-esame="e1"]')
@@ -2959,7 +2962,7 @@ def repetir_error_no_desengancha_la_marca_anterior(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.fill("#cmp-nota", "me adelanto"); p.check("#cmp-toerr"); p.click("#cmp-fsave")
     p.click('#cmp-line [data-cb="2"]'); p.click('[data-cmk="error"]')
     p.click('#cmp-form [data-esame]')
@@ -3149,7 +3152,7 @@ def avance_fino_en_comparar(browser):
     p.click('[data-act="att-open"][data-att="i1"]')
     p.click('[data-act="cmp-open"]')
     p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
-    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     wait_seeked(p)
     assert p.get_attribute('[data-cmp] [data-cstep="0.1"]', "aria-label") == "Adelante 0,1 segundos"
     assert p.get_attribute('[data-cmp] [data-cstep="-0.1"]', "aria-label") == "Atrás 0,1 segundos"
@@ -3178,7 +3181,7 @@ def superponer_en_comparar(browser):
     p.click('[data-act="att-open"][data-att="i1"]')
     p.click('[data-act="cmp-open"]')
     p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
-    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     wait_seeked(p)
     box = "() => ['#cmp-t', '#cmp-m'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })"
     a, b = p.evaluate(box)
@@ -3469,7 +3472,7 @@ def ejecucion_sube_con_un_intento_sin_errores(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     ej = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.ejec || null")
     p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.click("#cmp-fsave")
     assert ej() is None
@@ -3565,7 +3568,7 @@ def limpieza_espera_7_dias(browser):
     # Apuntado hace 8 días (el vídeo; su portada, hace 1): se borra con su portada al arrancar.
     p.evaluate("""(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({h1: d[0], 'cover:h1': d[1], 'cover:h2': d[1]}))""",
                [p.evaluate(_HACE, 8), p.evaluate(_HACE, 1)])
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
     p.evaluate("() => window.__bachateca.cleanOrphans()")   # espera a que acabe la de arranque
     assert sorted(p.evaluate(_VID_KEYS)) == ["cover:h2", "v1", "v2"]
@@ -3582,7 +3585,7 @@ def limpieza_respeta_las_instantaneas(browser):
     p.evaluate(_PUT_VIDS, ["sv", "sp", "si", "cover:sv", "h1"])
     viejo = p.evaluate(_HACE, 30)
     p.evaluate("(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({sv: d, sp: d, si: d, 'cover:sv': d, h1: d}))", viejo)
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
     r = p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")
     assert r == {"n": 0, "bytes": 0}, r

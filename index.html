@@ -702,6 +702,7 @@ details.info summary::after{inset:-10px -4px}
 .ring.sm{width:70px;height:70px}
 .ring.sm b{font-size:0.9412rem}
 .fv-mem-t{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.fv-bar{display:grid;grid-template-columns:minmax(0,9.5em) 1fr;gap:8px;align-items:center}
 .fg{color:var(--fg)}
 
 /* Formulario: campos con borde fino y altura cómoda. */
@@ -1079,6 +1080,17 @@ function capByErrors(f){
   f.rep.step = Math.min(f.rep.step, 2);
   const tope = todayStr(LADDER[2]); if(!f.rep.due || f.rep.due>tope) f.rep.due = tope;
   return f;
+}
+// D9: «Me sale con pareja» (f.ejec = {nivel 0..3, last}) sube solo con evidencia de ejecución real y como mucho una vez al día;
+// baja con un «No» con pareja. Ausente = 0. Devuelve true si cambió algo (para poder deshacerlo desde el registro del social).
+const ejecN = f => { const n = Math.floor(+(f && f.ejec && f.ejec.nivel)); return n>=1 ? Math.min(n,3) : 0; };
+function bumpEjec(f, delta){
+  if(!f || !S.figures[f.id]) return false;
+  const hoy = todayStr(), n0 = ejecN(f), n = Math.max(0, Math.min(3, n0 + (delta>0 ? 1 : -1)));
+  if(delta>0 && f.ejec && f.ejec.last===hoy) return false;
+  if(n===n0 && (delta<0 || n0===3)) return false;
+  f.ejec = {nivel:n, last: delta>0 ? hoy : (f.ejec && f.ejec.last) || hoy};
+  persist({t:"fig", id:f.id}); return true;
 }
 function reviewFig(f, g){
   if(!(g==="fluida" && f.rep && f.rep.last===todayStr())) f.rep = nextRep(f.rep, g);
@@ -2258,7 +2270,7 @@ function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && ba
 // Lo que ya marcaste esta noche se ve siempre, aunque esté en práctica o quede fuera de las primeras.
 const socOk = f => ready(f) || socialIncl || logSel.has(f.id);
 const socTop = (list, n) => [...list.slice(0,n), ...list.slice(n).filter(f=>logSel.has(f.id))];
-const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
+const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || (ejecN(b)-ejecN(a)) || ((b.usos||0)-(a.usos||0));
 const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" pathLength="1"/></svg></span>`;
 function socLi(f, sub){
   return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${esc(f.id)}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}<span class="sr">, salió esta noche</span></span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
@@ -2452,6 +2464,8 @@ function saveLog(){
       f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; capByErrors(f); counted = true;
       (l.repDespues ||= {})[id] = clone(f.rep);
     }
+    // Marcarla en un social es ejecución real: «Me sale con pareja» +1 (una vez al día); se guarda cómo estaba para deshacerlo al borrar el registro.
+    if(usable(f)){ const antes = clone(f.ejec || null); if(bumpEjec(f, 1)){ (l.ejecAntes ||= {})[id] = antes; (l.ejecDespues ||= {})[id] = clone(f.ejec); } }
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
@@ -2477,12 +2491,16 @@ function deleteLog(id){
   const quitados = {};
   Object.entries(l.repAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
     if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){ quitados[fid]={rep:clone(f.rep), antes}; if(antes) f.rep=clone(antes); else delete f.rep; persist({t:"fig",id:fid}); } });
+  const ejQuitados = {};
+  Object.entries(l.ejecAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
+    if(f && same(f.ejec, (l.ejecDespues||{})[fid])){ ejQuitados[fid]={ejec:clone(f.ejec), antes}; if(antes) f.ejec=clone(antes); else delete f.ejec; persist({t:"fig",id:fid}); } });
   delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
     // Vuelve a poner los repasos que quitó el borrado, solo si la figura sigue como la dejó el borrado.
     Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; persist({t:"fig",id:fid}); } });
+    Object.entries(ejQuitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.ejec, q.antes)){ f.ejec=q.ejec; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
 }
@@ -2505,10 +2523,14 @@ function openView(id){
   const keys = String(f.senal||"").split(/\s*(?:[;\n]|\.(?:\s|$))\s*/).map(x=>x.trim()).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1));
   const ms = memState(f), r = f.rep || {}, step = Math.max(0, Math.min(Math.floor(+r.step)||0, LADDER.length-1));
   const when = d => !d ? "" : d<=todayStr() ? "hoy" : d===todayStr(1) ? "mañana" : fmtDate(d);
+  const eN = ejecN(f), rN = step/(LADDER.length-1);
+  const barra = (lbl, v, max) => `<div class="fv-bar"><span class="small">${lbl}</span><div class="progress" role="meter" aria-label="${lbl}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${v}"><i style="width:${Math.round(v/max*100)}%"></i></div></div>`;
   const mem = active(f) ? `<section class="fv-card fv-mem" aria-labelledby="fv-mem">
       <div class="ring sm">${ringSVG((step+1)/LADDER.length, 70, 8)}<b>${LADDER[step]} d</b></div>
       <div class="fv-mem-t"><div class="in-h"><h3 id="fv-mem">Memoria</h3><span class="tagx ${(MEM[ms]||MEM.nueva)[1]}">${(MEM[ms]||MEM.nueva)[0]}</span></div>
-        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p></div>
+        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p>
+        ${barra("La recuerdo", step, LADDER.length-1)}${barra("Me sale con pareja", eN, 3)}
+        ${eN/3 < rN ? `<p class="small muted">Te sale de memoria; ahora pruébala con pareja en el social.</p>` : ""}</div>
     </section>` : "";
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${esc(f.id)}">
     <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${esc(f.id)}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
@@ -2996,6 +3018,7 @@ function guiaEnd(){
   if(!inf){ guia.res[guia.i] = null; return guiaNext(); }
   $("#guia-body").innerHTML = `${guiaHead(b, inf)}
       <div class="answer" id="guia-ans" tabindex="-1"><p>¿Cómo ha ido?</p>
+        ${b.tipo==="figura" || (b.tipo==="enlace" && b.ref.b) ? `<label class="small row" for="guia-par" style="gap:10px;min-height:44px"><input type="checkbox" id="guia-par"> Con pareja</label>` : ""}
         <div class="grade"><button type="button" class="btn" data-guiag="no">No</button><button type="button" class="btn" data-guiag="dudas">Con dudas</button><button type="button" class="btn" data-guiag="fluida">Bien</button></div></div></div>`;
   $("#guia-ans").focus({preventScroll:true});
 }
@@ -3004,7 +3027,8 @@ function guiaEnd(){
 function guiaGrade(g){
   if(!guia || guia.fase!=="nota") return;
   const b = guia.plan[guia.i], hoy = todayStr(), F = b.tipo==="figura" ? S.figures[b.ref] : b.tipo==="enlace" && b.ref.b ? S.figures[b.ref.b] : null;
-  if(F) reviewFig(F, g);
+  const par = !!$("#guia-par")?.checked;   // con pareja = ejecución real: «Bien» sube «Me sale con pareja», «No» la baja
+  if(F){ reviewFig(F, g); if(par && g==="fluida") bumpEjec(F, 1); else if(par && g==="no") bumpEjec(F, -1); }
   else {
     if(b.tipo==="enlace" && b.ref.pos){ const k = lrKey(b.ref.pos, b.ref.baile);
       if(!(g==="fluida" && S.linkRep[k]?.last===hoy)){ S.linkRep[k] = nextRep(S.linkRep[k], g); persist({t:"lr"}); } }
@@ -3485,6 +3509,8 @@ function cmpForm(){
     const mismo = m.tipo==="error" && cmp.form.same && erroresActivos(f).find(e=>e.id===cmp.form.same);
     const veces = mismo ? repeatError(f, a, m, mismo) : 0;
     if(!mismo && $("#cmp-toerr")?.checked) addError(f, a, m);
+    // Un intento con marcas «Bien» y ninguna «Error» es ejecución real (una subida al día).
+    const ms = marcasOf(a); if(ms.some(x=>x.tipo==="bien") && !ms.some(x=>x.tipo==="error")) bumpEjec(f, 1);
     persist({t:"fig", id:f.id}); cmp.form=null; cmpForm(); cmpLine(); cmpMarks();
     toast(m.tipo==="error" ? (mismo ? "Error guardado: ya van ×"+veces : S.figures[f.id] && erroresOf(f).some(e=>errLinked(e, m.id)) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
   };
@@ -4648,6 +4674,9 @@ function sanitizeRep(r0){
   ["due","last"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; });
   return r;
 }
+// f.ejec solo se conserva como {nivel entero 0..3, last fecha ISO}; si no, se descarta (ausente = 0).
+function sanitizeEjec(e){ const n = e && typeof e==="object" ? cuenta(e.nivel) : null;
+  return n!=null && n<=3 && typeof e.last==="string" && /^\d{4}-\d{2}-\d{2}$/.test(e.last) ? {nivel:n, last:e.last} : null; }
 function sanitizeFig(f0){
   const f = {...f0}; let malas = 0;
   const lista = (v, fix) => { if(!Array.isArray(v)){ if(v!=null) malas++; return []; }
@@ -4671,6 +4700,7 @@ function sanitizeFig(f0){
   if(f.tipo!==undefined && !TIPO[f.tipo]) f.tipo = "figura";
   if("usos" in f){ const n = cuenta(f.usos); if(n==null) delete f.usos; else f.usos = n; }
   if("rep" in f){ if(!isObj(f.rep)) delete f.rep; else f.rep = sanitizeRep(f.rep); }
+  if("ejec" in f){ const e = sanitizeEjec(f.ejec); if(e) f.ejec = e; else delete f.ejec; }
   ["tiempo","tiempos"].forEach(k=>{ if(k in f && f[k]!=="" && cuenta(f[k])==null) delete f[k]; });
   return {f, malas};
 }
@@ -4684,6 +4714,10 @@ function sanitizeImport(d){
     const mapa = m => { if(!isObj(m)) return null; const out={};
       Object.entries(m).forEach(([k,v])=>{ if(v===null) out[k]=null; else if(isObj(v)) out[k]=sanitizeRep(v); }); return out; };
     if("repAntes" in o || "repDespues" in o){ const a=mapa(o.repAntes), b=mapa(o.repDespues); if(a&&b){ o.repAntes=a; o.repDespues=b; } else { delete o.repAntes; delete o.repDespues; } }
+    // ejecAntes/ejecDespues: deleteLog los devuelve a f.ejec; misma validación, y si falla un mapa se quitan los dos.
+    const mapaE = m => { if(!isObj(m)) return null; const out={};
+      Object.entries(m).forEach(([k,v])=>{ if(v===null) out[k]=null; else { const e=sanitizeEjec(v); if(e) out[k]=e; } }); return out; };
+    if("ejecAntes" in o || "ejecDespues" in o){ const a=mapaE(o.ejecAntes), b=mapaE(o.ejecDespues); if(a&&b){ o.ejecAntes=a; o.ejecDespues=b; } else { delete o.ejecAntes; delete o.ejecDespues; } }
     logs[l.id]=o; } else descartadas++; });
   // Preguntas para clase: id seguro y posición con texto; las fechas mal escritas se quitan.
   const preguntas={}, ps = isObj(d&&d.preguntas) ? Object.values(d.preguntas) : [];
@@ -5079,7 +5113,7 @@ $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
-if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
+if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, socSort, bkSort, bumpEjec, 
   SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };

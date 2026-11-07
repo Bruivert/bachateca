@@ -3381,6 +3381,147 @@ def practica_guiada_cerrar_para_el_conteo(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- recordar frente a ejecutar (fase 4)
+def _hoy():
+    import datetime
+    return datetime.date.today().isoformat()
+
+
+@test
+def ejecucion_sube_con_el_social(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    ej = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.ejec || null")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    assert ej() == {"nivel": 1, "last": _hoy()}, ej()
+    p.click('[data-act="log-again"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    assert ej()["nivel"] == 1, "una subida al día"
+    # Otro día: sube hasta 3 y no pasa de ahí.
+    for esperado in (2, 3, 3):
+        p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.ejec.last = '2020-01-01'; }")
+        p.click('[data-act="log-again"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+        assert ej()["nivel"] == esperado, (esperado, ej())
+    # Borrar el último registro devuelve el nivel de antes; deshacer lo vuelve a poner.
+    p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.ejec = {nivel: 2, last: '2020-01-01'}; }")
+    p.click('[data-act="log-again"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    assert ej()["nivel"] == 3
+    p.click('[data-act="close"]')
+    p.click('[data-act="log-open"]')
+    p.locator('[data-dellog]').first.click()
+    assert ej() == {"nivel": 2, "last": "2020-01-01"}, ej()
+    p.click(".toast .undo")
+    assert ej()["nivel"] == 3, ej()
+    # Con la figura cambiada después, borrar el registro no la toca.
+    p.evaluate("() => { window.__bachateca.state().figures.f1.ejec.nivel = 1; }")
+    p.locator('[data-dellog]').first.click()
+    assert ej()["nivel"] == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ejecucion_en_la_practica_guiada_y_en_intentos(browser):
+    ctx, p, errors = open_app(browser, seed=guia_seed())
+    ej = lambda i: p.evaluate("(i) => window.__bachateca.state().figures[i].ejec || null", i)
+    p.evaluate("() => window.__bachateca.guiaForce({reps: 1, bpm: 240})")
+    p.click('nav.tabs [data-tab="repasar"]'); p.click('#v-repasar [data-act="guia-open"]')
+    def bloque(g, pareja):
+        p.click("#guia-go")
+        p.wait_for_function("window.__bachateca.guiaState().fase === 'nota'", timeout=8000)
+        if pareja is not None:
+            c = p.locator("#guia-par")
+            assert c.count() == 1 and not c.is_checked() and "Con pareja" in p.inner_text("[data-guia] .answer")
+            if pareja: c.check()
+        elif p.locator("#guia-par").count(): raise AssertionError("la cadena no lleva casilla")
+        p.click(f'[data-guia] [data-guiag="{g}"]')
+    bloque("fluida", True)            # figura f1, con pareja
+    assert ej("f1") == {"nivel": 1, "last": _hoy()}, ej("f1")
+    bloque("fluida", True)            # enlace f3 -> f1: la figura B es f1; ya subió hoy
+    assert ej("f1")["nivel"] == 1 and ej("f3") is None
+    bloque("fluida", None)            # cadena
+    p.click('[data-guia] [data-act="close"]')
+    # «No» con pareja baja uno (mínimo 0); sin pareja no cambia nada. Se usa la figura que abre el plan de cada sesión.
+    def sesion(g, pareja, fid, nivel):
+        p.evaluate("([i, n]) => { window.__bachateca.state().figures[i].ejec = {nivel: n, last: '2020-01-01'}; window.__bachateca.guiaForce({reps: 1, bpm: 240}); }", [fid, nivel])
+        p.click('nav.tabs [data-tab="repasar"]'); p.click('#v-repasar [data-act="guia-open"]')
+        bloque(g, pareja)
+        p.click('[data-guia] [data-guiaact="skip"]') if p.evaluate("() => window.__bachateca.guiaState()?.fase") == "listo" else None
+        p.click('[data-guia] [data-act="close"]')
+    fid = lambda: p.evaluate("() => window.__bachateca.guidedPlan(10)[0].ref")
+    i = fid(); sesion("no", False, i, 1); assert ej(i)["nivel"] == 1
+    i = fid(); sesion("no", True, i, 1); assert ej(i)["nivel"] == 0, ej(i)
+    i = fid(); sesion("no", True, i, 0); assert ej(i)["nivel"] == 0, "mínimo 0"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ejecucion_sube_con_un_intento_sin_errores(browser):
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    ej = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.ejec || null")
+    p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.click("#cmp-fsave")
+    assert ej() is None
+    p.click('#cmp-line [data-cb="2"]'); p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    assert ej() is None, "con un error en el intento no sube"
+    p.evaluate("() => { const a = window.__bachateca.state().figures.f1.intentos[0]; a.marcadores = a.marcadores.filter(m => m.tipo === 'bien'); }")
+    p.click('#cmp-line [data-cb="3"]'); p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    assert ej() == {"nivel": 1, "last": _hoy()}, ej()
+    p.click('#cmp-line [data-cb="1"]'); p.click('[data-cmk="bien"]'); p.click("#cmp-fsave")
+    assert ej()["nivel"] == 1, "una vez al día"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def ficha_muestra_las_dos_barras(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible", rep={"step": 4, "due": "2999-01-01", "last": "2026-01-01"}, ejec={"nivel": 1, "last": "2026-01-01"}),
+                        "f2": fig(2, "Abierta 2 manos", "Cerrada", estado="disponible", rep={"step": 1, "due": "2999-01-01", "last": "2026-01-01"}, ejec={"nivel": 3, "last": "2026-01-01"})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    t = p.inner_text(".fv-mem")
+    assert "La recuerdo" in t and "Me sale con pareja" in t, t
+    assert "Te sale de memoria; ahora pruébala con pareja en el social." in t, t
+    bars = p.evaluate("() => [...document.querySelectorAll('.fv-mem [role=meter]')].map(m => [m.getAttribute('aria-valuenow'), m.getAttribute('aria-valuemax'), m.getAttribute('aria-label')])")
+    assert bars == [["4", "5", "La recuerdo"], ["1", "3", "Me sale con pareja"]], bars
+    p.click('[data-act="close"]')
+    p.click('#v-repertorio [data-view="f2"]')
+    assert "pruébala con pareja" not in p.inner_text(".fv-mem")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_ordena_por_ejecucion(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible", usos=9),
+                        "f2": fig(2, "Cerrada", "Abierta 2 manos", estado="disponible", ejec={"nivel": 2, "last": "2026-01-01"}),
+                        "f3": fig(3, "Cerrada", "Abierta 2 manos", estado="consolidada", usos=0),
+                        "f4": fig(4, "Cerrada", "Abierta 2 manos", estado="consolidada", ejec={"nivel": 1, "last": "2026-01-01"})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    r = p.evaluate("() => { const B = window.__bachateca, S = B.state(); return B.socSort ? Object.values(S.figures).sort(B.socSort).map(f => f.id) : null }")
+    assert r == ["f4", "f3", "f2", "f1"], r
+    b = p.evaluate("() => Object.values(window.__bachateca.state().figures).sort(window.__bachateca.bkSort('Abierta 2 manos')).map(f => f.id)")
+    assert b == ["f4", "f3", "f2", "f1"], b
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_valida_la_ejecucion(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, f = (i, e) => ({id: i, nombre: i, tipo: "figura", estado: "practica", ejec: e});
+      const o = B.sanitizeImport({figures: {a: f("a", {nivel: 2, last: "2026-01-02"}), b: f("b", {nivel: 9, last: "2026-01-02"}), c: f("c", {nivel: 1}), d: f("d", "x")},
+        logs: {l: {id: "l", fecha: "2026-01-02", figs: ["a"], ejecAntes: {a: null}, ejecDespues: {a: {nivel: 1, last: "2026-01-02"}}}, m: {id: "m", fecha: "2026-01-02", ejecAntes: {a: {nivel: 7}}, ejecDespues: {}}}});
+      return [o.figures.a.ejec, "ejec" in o.figures.b, "ejec" in o.figures.c, "ejec" in o.figures.d, o.logs.l.ejecDespues, "ejecAntes" in o.logs.m]; }""")
+    assert r == [{"nivel": 2, "last": "2026-01-02"}, False, False, False, {"a": {"nivel": 1, "last": "2026-01-02"}}, True], r
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

@@ -175,7 +175,7 @@ def arranque_migra_y_guarda(browser):
     assert st["schema"] == p.evaluate("() => window.__bachateca.SCHEMA"), st.get("schema")
     assert set(st["figures"]) == {"a", "b"} and st["figures"]["b"]["tipo"] == "figura"
     assert st["figures"]["a"]["rep"]["step"] == 2, "no toca el repaso"
-    assert st["logs"]["l1"]["figs"] == ["a"] and st["linkRep"]["Cerrada"]["step"] == 1
+    assert st["logs"]["l1"]["figs"] == ["a"] and st["linkRep"]["Bachata\u241fCerrada"]["step"] == 1
     assert st["campoFuturo"] == {"x": 1}, "conserva campos desconocidos"
     assert st["classes"] == [], "respeta la lista de clases vacía"
     assert p.locator("#due-badge").inner_text() != "0"
@@ -2269,7 +2269,7 @@ def migracion_7_preguntas(browser):
       const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 6});
       const sinPreg = B.migrate({schema: 6, figures: {}});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), n3: Object.keys(m3.preguntas).length, sinPreg: sinPreg.preguntas, t3: t(-3), S: B.SCHEMA}; }""")
-    assert r["S"] == 7 and r["m"]["schema"] == 7, r
+    assert r["S"] == 8 and r["m"]["schema"] == 8, r
     qs = list(r["m"]["preguntas"].values())
     assert len(qs) == 1 and qs[0]["pos"] == "Sombra" and qs[0]["creada"] == r["t3"] and qs[0]["baile"] == "Bachata" and not qs[0].get("resuelta"), qs
     assert r["same"] and r["n3"] == 1, "repetir la migración no duplica"
@@ -2452,7 +2452,7 @@ def simulacro_completo(browser):
     assert "Sombra" in t.split("Dónde dudaste")[1]
     assert p.locator('[data-sim] [data-act="goto-pos"][data-p="Sombra"]').count() == 1
     lr = p.evaluate("() => window.__bachateca.state().linkRep")
-    assert lr["Cerrada"]["step"] == 1 and lr["Sombra"]["fallos"] == 1, lr
+    assert lr["Bachata\u241fCerrada"]["step"] == 1 and lr["Bachata\u241fSombra"]["fallos"] == 1, lr
     hoy = p.evaluate("() => window.__bachateca.todayStr()")
     assert p.evaluate("() => window.__bachateca.state().actividad")[hoy] == 2
     p.click('[data-sim] [data-act="goto-pos"][data-p="Sombra"]')
@@ -2542,7 +2542,7 @@ def simulacro_una_subida_por_dia(browser):
     for _ in range(3):
         p.click("#sim-ok"); p.click('[data-simg="fluida"]')
     lr = p.evaluate("() => window.__bachateca.state().linkRep")
-    assert lr["Cerrada"]["step"] == 1 and lr["Sombra"]["step"] == 1, lr
+    assert lr["Bachata\u241fCerrada"]["step"] == 1 and lr["Bachata\u241fSombra"]["step"] == 1, lr
     hoy = p.evaluate("() => window.__bachateca.todayStr()")
     assert p.evaluate("() => window.__bachateca.state().actividad")[hoy] == 3
     assert not errors, errors
@@ -2576,6 +2576,57 @@ def cadena_opciones_sin_cadena_no_generan(browser):
     p.click('#v-enlazar [data-pos="Cerrada"]')
     p.click('#v-enlazar [data-chainopt="safe"]')
     assert p.locator("#v-enlazar .chain").count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+# ---- fase 4
+@test
+def migracion_8_repaso_por_baile(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca, t = B.todayStr;
+      const old = {schema: 7, figures: {}, linkRep: {Cerrada: {step: 2, due: t(3)}, "Salsa\u241fSombra": {step: 1, due: t(1)}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 7});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2), same3: JSON.stringify(m) === JSON.stringify(m3), S: B.SCHEMA}; }""")
+    assert r["S"] == 8 and r["m"]["schema"] == 8, r
+    lr = r["m"]["linkRep"]
+    assert sorted(lr) == ["Bachata\u241fCerrada", "Salsa\u241fSombra"] and lr["Bachata\u241fCerrada"]["step"] == 2, lr
+    assert r["same"] and r["same3"], "repetir la migración no cambia nada"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def repaso_de_enlaces_separado_por_baile(browser):
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Abierta 2 manos", "Cerrada"),
+                                  fig(3, "Cerrada", "Abierta 2 manos", baile="Salsa"), fig(4, "Abierta 2 manos", "Cerrada", baile="Salsa")]}
+    ctx, p, errors = open_app(browser, seed={"figures": figs})
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('#v-repasar [data-act="start-link"]')
+    for _ in range(3):
+        if p.locator('[data-act="reveal"]').count() == 0: break
+        p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    lr = p.evaluate("() => window.__bachateca.state().linkRep")
+    assert "Bachata\u241fCerrada" in lr and not any(k.startswith("Salsa") for k in lr), lr
+    p.click('#v-repasar [data-act="end"]')
+    p.evaluate("() => window.__bachateca.setBaile('Salsa')")
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert p.locator('#v-repasar [data-act="start-link"]').count() == 1, "en salsa siguen pendientes"
+    assert "2 posiciones tocan" in p.inner_text("#v-repasar"), p.inner_text("#v-repasar")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def renombrar_posicion_mueve_su_repaso(browser):
+    seed = {"schema": 8, "figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada", baile="Salsa")},
+            "linkRep": {"Bachata\u241fCerrada": {"step": 1, "due": "2030-01-01"}, "Salsa\u241fCerrada": {"step": 2, "due": "2030-01-02"},
+                        "Salsa\u241fSombra": {"step": 0, "due": "2030-01-03"}}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.evaluate("() => { const B = window.__bachateca; B.renameItem('pos', B.state().positions.indexOf('Cerrada'), 'Pegados'); }")
+    lr = p.evaluate("() => window.__bachateca.state().linkRep")
+    assert sorted(lr) == ["Bachata\u241fPegados", "Salsa\u241fPegados", "Salsa\u241fSombra"], lr
+    assert lr["Salsa\u241fPegados"]["step"] == 2 and lr["Bachata\u241fPegados"]["step"] == 1
     assert not errors, errors
     ctx.close()
 

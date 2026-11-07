@@ -2741,6 +2741,69 @@ def importar_enlaces(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- preguntas de memoria
+@test
+def preguntas_de_memoria_se_generan_con_tus_datos(browser):
+    figs = {"f1": fig(1, "Cerrada", "Sombra", nombre="Vuelta del Reloj", agarreOut="izq–der"),
+            "f2": fig(2, "Sombra", "Abierta", nombre="Giro Sombra"),
+            "f3": fig(3, "Salsa A", "Salsa B", nombre="Dile que no", baile="Salsa"),
+            "f4": fig(4, "Cerrada", "Abierta", nombre="Espera", estado="espera")}
+    ctx, p, errors = open_app(browser, seed={"schema": 9, "figures": figs})
+    qs = p.evaluate("() => window.__bachateca.quizItems()")
+    por = {(q["figId"], q["tipo"]): q for q in qs}
+    assert {q["tipo"] for q in qs} == {"acaba", "desde", "despues"}, qs
+    assert por["f1", "acaba"]["q"] == "¿Dónde termina «Vuelta del Reloj»?" and por["f1", "acaba"]["a"] == "Sombra (izq–der)", por
+    assert por["f1", "desde"]["q"] == "¿Desde dónde entras en «Vuelta del Reloj»?" and por["f1", "desde"]["a"] == "Cerrada", por
+    d = por["f1", "despues"]
+    assert d["q"] == "Acabas «Vuelta del Reloj» en Sombra (izq–der). ¿Qué puedes hacer después?" and d["a"] == "Giro Sombra", d
+    assert ("f2", "despues") not in por, "sin salidas encadenables no hay pregunta"
+    assert not any(q["figId"] in ("f3", "f4") for q in qs), "nada de otro baile ni de la lista de espera"
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('[data-act="start-quiz"]')
+    txt = p.locator("#v-repasar").inner_text()
+    assert "1 de 2" in txt and ("Vuelta del Reloj" in txt or "Giro Sombra" in txt) and "Dile que no" not in txt, txt
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def preguntas_de_memoria_actualizan_el_repaso(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 9, "figures": {"f1": fig(1, "Cerrada", "Sombra")}})
+    step = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.rep.step")
+    def preguntar(nota):
+        p.click('nav.tabs [data-tab="repasar"]')
+        p.click('[data-act="start-quiz"]')
+        p.click('[data-act="reveal"]')
+        assert p.locator(f'[data-grade="{nota}"]').count() == 1
+        p.click(f'[data-grade="{nota}"]')
+        assert "Repaso terminado" in p.locator("#v-repasar").inner_text()
+        p.click('[data-act="end"]')
+    p.click('nav.tabs [data-tab="repasar"]'); p.click('[data-act="start-quiz"]'); p.click('[data-act="reveal"]')
+    assert [b.inner_text() for b in p.locator("#v-repasar .grade button").all()] == ["No", "Con dudas", "Sí"]
+    p.click('[data-grade="fluida"]'); p.click('[data-act="end"]')
+    assert step() == 1, step()
+    preguntar("fluida")
+    assert step() == 1, "una segunda «Sí» el mismo día no vuelve a subir"
+    preguntar("no")
+    assert step() == 0, "«No» siempre aplica"
+    act = p.evaluate("() => window.__bachateca.state().actividad[window.__bachateca.todayStr()]")
+    assert act == 3, act
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def sin_figuras_con_ruta_no_hay_preguntas(browser):
+    figs = {"f1": fig(1, "Cerrada", ""), "f2": fig(2, "Sombra", "Abierta", estado="espera"), "f3": fig(3, "A", "B", estado="incompleta")}
+    ctx, p, errors = open_app(browser, seed={"schema": 9, "figures": figs})
+    assert p.evaluate("() => window.__bachateca.quizItems()") == []
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert p.locator('[data-act="start-quiz"]').count() == 0
+    assert "Preguntas de memoria" in p.locator("#v-repasar").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

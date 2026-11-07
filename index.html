@@ -1043,6 +1043,27 @@ function nextRep(r0,g){
   r.last=todayStr(); return r;
 }
 
+// Preguntas de memoria: salen solo de tus figuras del baile elegido (con ruta y ya enseñadas), nunca de ejemplos de otro baile.
+// Devuelve todas las posibles, las pendientes y olvidadas primero; la sesión elige una por figura.
+function quizItems(){
+  const hold = h => h ? ` (${h})` : "";
+  const out = [];
+  figs().filter(f=>usable(f) && placed(f) && baileOf(f)===baileSel).sort((a,b)=> (isDue(b)?1:0)-(isDue(a)?1:0) || byMem(a,b)).forEach(f=>{
+    out.push({tipo:"acaba", figId:f.id, q:`¿Dónde termina «${f.nombre}»?`, a:f.salida+hold(f.agarreOut)});
+    out.push({tipo:"desde", figId:f.id, q:`¿Desde dónde entras en «${f.nombre}»?`, a:f.entrada+hold(f.agarreIn)});
+    const nx = figs().filter(x=>x.id!==f.id && usable(x) && placed(x) && baileOf(x)===baileSel && canFollow(f,x));
+    if(nx.length) out.push({tipo:"despues", figId:f.id, q:`Acabas «${f.nombre}» en ${f.salida}${hold(f.agarreOut)}. ¿Qué puedes hacer después?`, a:nx.map(x=>x.nombre).join(", ")});
+  });
+  return out;
+}
+// Nota de un repaso que no es la tarjeta de Repasar (preguntas de memoria): sube como mucho una vez al día, pero cuenta como actividad.
+function reviewFig(f, g){
+  if(!(g==="fluida" && f.rep && f.rep.last===todayStr())) f.rep = nextRep(f.rep, g);
+  if(f.estado==="incompleta") f.rep.due = todayStr(1);
+  S.figures[f.id]=f; persist({t:"fig",id:f.id});
+  const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
+}
+
 // ---------- pulso de un vídeo ----------
 // Marcas {b, s}: el tiempo de la música b cae en el segundo s del vídeo. b sigue contando tras el 8
 // (9, 10…) para las figuras de más de una frase; beatName lo devuelve a 1–8 para mostrarlo.
@@ -1855,6 +1876,11 @@ function renderRepasar(){
           : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
       </div>
       <div class="panel">
+        <h3>Preguntas de memoria</h3>
+        <p class="small muted">Dónde acaba una figura, desde dónde entras o qué puedes hacer después. Salen de tus propias figuras.</p>
+        ${quizItems().length ? `<button class="btn" data-act="start-quiz">Empezar</button>` : `<p class="small muted">Necesitas al menos una figura con dónde empieza y dónde acaba, ya enseñada entera.</p>`}
+      </div>
+      <div class="panel">
         <h3>Simulacro de social</h3>
         <p class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</p>
         <button class="btn" data-act="sim-open">Simulacro</button>
@@ -1865,7 +1891,7 @@ function renderRepasar(){
   }
   if(session.i>=session.ids.length){
     learn("rev");
-    const d=session.done, c=k=>d.filter(x=>x===k).length, link=session.kind==="link";
+    const d=session.done, c=k=>d.filter(x=>x===k).length, link=session.kind==="link", quiz=session.kind==="quiz";
     const res=[c("fluida") && pl(c("fluida"),"fluida","fluidas"), c("dudas") && `${c("dudas")} con dudas`, c("no") && `${c("no")} sin recordar`].filter(Boolean);
     // Qué viene después: lo que queda hoy o cuándo toca el siguiente.
     const left = link ? dueLinks().length : dueFigs().length, t=todayStr();
@@ -1877,18 +1903,19 @@ function renderRepasar(){
     // Cada una con cómo salió y cuándo vuelve; primero las que hay que mirar.
     const when = due => !due ? "" : due<=todayStr() ? "vuelve hoy" : due===todayStr(1) ? "vuelve mañana" : `vuelve el ${fmtDate(due)}`;
     const GR = {fluida:"Fluida", dudas:"Con dudas", no:"Sin recordar"}, ORD = {no:0, dudas:1, fluida:2};
-    const items = session.ids.slice(0, d.length).map((id,i)=>({g:d[i], name: link ? id : S.figures[id]?.nombre, due: link ? S.linkRep[lrKey(id)]?.due : S.figures[id]?.rep?.due}))
+    const items = session.ids.slice(0, d.length).map((id,i)=>({g:d[i], name: link ? id : quiz ? S.figures[id.figId]?.nombre : S.figures[id]?.nombre, due: link ? S.linkRep[lrKey(id)]?.due : S.figures[quiz ? id.figId : id]?.rep?.due}))
       .filter(x=>x.name).sort((a,b)=>ORD[a.g]-ORD[b.g]);
     const allOk = d.length>=3 && c("fluida")===d.length;
     v.innerHTML = `
       <h2>${allOk?"Todo a compás":"Repaso terminado"}</h2>
-      <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
+      <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):quiz?pl(d.length,"pregunta","preguntas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
       <ul class="rv-list">${items.map((x,n)=>`<li class="rv-${x.g}" style="--n:${n}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
       <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${esc(i)}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
       ${next?`<p class="small muted">${next}</p>`:""}
       ${training && training.i < training.steps.length-1 ? `<button class="btn pri" data-act="train-next">Seguir el entreno: ${esc(trainLabel(training.steps[training.i+1]))}</button><button class="btn" data-act="end">Terminar aquí</button>` :
+        quiz?`<button class="btn pri" data-act="end">Hecho</button>` :
         left?`<button class="btn pri" data-act="start-${link?"link":"fig"}">Repasar ${Math.min(left,MAX_SESSION)} más</button><button class="btn" data-act="end">Hecho por hoy</button>`
         : other?`<button class="btn pri" data-act="start-${link?"fig":"link"}">${link?"Repasar figuras":"Repasar enlaces"}</button><button class="btn" data-act="end">Hecho por hoy</button>`
         :`<button class="btn pri" data-act="end">Hecho</button>`}</div>`;
@@ -1898,6 +1925,19 @@ function renderRepasar(){
   const head = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><p class="muted small">${session.i+1} de ${session.ids.length}</p>`;
   const gradeHTML = `<div class="grade-bar"><p class="small muted">¿Cómo te ha salido?</p>
     <div class="grade"><button class="btn" data-grade="no">No la recordé</button><button class="btn" data-grade="dudas">Con dudas</button><button class="btn" data-grade="fluida">Fluida</button></div></div>`;
+  if(session.kind==="quiz"){
+    const it=session.ids[session.i];
+    const qGrade = gradeHTML.replace(">No la recordé<",">No<").replace(">Fluida<",">Sí<").replace("¿Cómo te ha salido?","¿La sabías?");
+    v.innerHTML = `${head}
+      <div class="flash">
+        <div class="route"><span>Pregunta de memoria</span></div>
+        <div class="big">${esc(it.q)}</div>
+        ${!session.revealed ? `<p class="muted">Respóndete antes de mirar.</p><button class="btn pri" data-act="reveal">Ver respuesta</button>` : `
+          <div class="answer"><p><b>${esc(it.a)}</b></p>${qGrade}</div>`}
+      </div>
+      <button class="btn ghost sm" data-act="end">Salir del repaso</button>`;
+    return;
+  }
   if(session.kind==="link"){
     const p=session.ids[session.i], ex=exitsFrom(p), ar=arrivals(p);
     v.innerHTML = `${head}
@@ -1952,6 +1992,12 @@ function nextFrom(f){
   return `<p class="small muted">Para enlazar desde ${esc(f.salida)}: ${opts.map(o=>`<b style="color:var(--fg)">${esc(o.nombre)}</b>`).join(", ")}.</p>`;
 }
 function grade(g){
+  if(session.kind==="quiz"){
+    const f = S.figures[session.ids[session.i].figId];
+    if(f) reviewFig(f, g);
+    session.done.push(g); session.i++; session.revealed=false;
+    render(); focusReview(); return;
+  }
   if(session.kind==="link"){
     const p=session.ids[session.i];
     S.linkRep[lrKey(p)]=nextRep(S.linkRep[lrKey(p)], g); persist({t:"lr"});
@@ -1973,6 +2019,14 @@ function focusReview(){
   const el=$("#v-repasar .flash .big") || $("#v-repasar h2"); if(!el) return;
   el.tabIndex=-1; el.focus({preventScroll:true});
   if(session && session.i < session.ids.length) announce(`${session.i+1} de ${session.ids.length}`);
+}
+function startQuiz(){
+  // Una pregunta por figura (el tipo, al azar) y hasta MAX_SESSION; ya vienen las pendientes primero.
+  const by = new Map(); quizItems().forEach(it=>{ if(!by.has(it.figId)) by.set(it.figId, []); by.get(it.figId).push(it); });
+  const ids = [...by.values()].slice(0,MAX_SESSION).map(a=>a[Math.floor(Math.random()*a.length)]);
+  if(!ids.length) return;
+  session = {kind:"quiz", ids, i:0, revealed:false, done:[], promote:[], weak:[]};
+  render();
 }
 function startSession(kind, any){
   let ids;
@@ -4451,6 +4505,7 @@ document.addEventListener("click", async e=>{
   if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; return render(); }
   if(a==="start-fig") return startSession("fig", false);
   if(a==="start-fig-any") return startSession("fig", true);
+  if(a==="start-quiz") return startQuiz();
   if(a==="start-link") return startSession("link", false);
   if(a==="start-link-any") return startSession("link", true);
   if(a==="reveal"){ session.revealed=true; render(); const an=$("#v-repasar .answer"); if(an){ an.tabIndex=-1; an.focus({preventScroll:true}); } return; }
@@ -4615,7 +4670,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
-  SCHEMA, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  SCHEMA, quizItems, reviewFig, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 

@@ -1346,10 +1346,13 @@ def sin_espacio_avisa(browser):
 def instantanea_diaria_al_abrir(browser):
     seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
     ctx, p, errors = open_app(browser, seed=seed)
+    # La diaria se hace sin retrasar el arranque: se espera a que aparezca.
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
     sn = p.evaluate("() => window.__bachateca.listSnapshots()")
     assert len(sn) == 1 and sn[0]["reason"] == "diaria" and sn[0]["nFig"] == 1, sn
     p.reload()
     p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.wait_for_timeout(500)   # margen para que una diaria repetida (error) llegara a escribirse
     assert len(p.evaluate("() => window.__bachateca.listSnapshots()")) == 1
     assert not errors, errors
     ctx.close()
@@ -1384,14 +1387,21 @@ def encoger_guarda_instantanea(browser):
 
 @test
 def instantanea_que_falla_no_impide_guardar(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {f"f{i}": fig(i, "a", "b") for i in range(20)}}
     init = """const put = IDBObjectStore.prototype.put;
       IDBObjectStore.prototype.put = function (v, k) {
         if (typeof k === "string" && k.startsWith("snap:")) throw new DOMException("simulado", "QuotaExceededError");
         return put.apply(this, arguments); };"""
-    ctx, p, errors = open_app(browser, init=init)
-    p.evaluate("() => document.querySelector('[data-act=\"examples\"]').click()")
-    p.evaluate("() => window.__bachateca.flush()")
-    assert len(stored_state(p)["figures"]) == 8
+    ctx, p, errors = open_app(browser, seed=seed, init=init)
+    # El encogimiento intenta la instantánea dentro de la misma transacción: aborta, y el guardado se reintenta solo.
+    p.evaluate("""async () => { const B = window.__bachateca;
+      for (let i = 0; i < 10; i++) B.deleteFigure("f" + i);
+      await B.flush(); }""")
+    assert len(stored_state(p)["figures"]) == 10
+    # Con la diaria también fallando, la app arranca y enseña las figuras.
+    p.reload()
+    p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    assert len(p.evaluate("() => window.__bachateca.state().figures")) == 10
     assert not errors, errors
     ctx.close()
 

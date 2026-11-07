@@ -1204,13 +1204,18 @@ function saveNow(){
 async function doSave(){
   if(safeMode) return;
   const n = Object.keys(S.figures||{}).length;
-  // Si de golpe quedan muchas menos figuras, se guarda antes una instantánea de lo que había en el almacén (no de la memoria).
-  // Si la instantánea falla, el guardado sigue igualmente.
-  if(idb && lastFigN!=null && n < lastFigN - 5 && n < lastFigN * 0.7){
-    try{ await takeSnapshot("antes-de-encoger", await kvGet("state")); }catch{}
-  }
   S.guardado=Date.now(); const snap=clone(S); let ok=false;
-  try{ if(idb){ await kvSet("state", snap); ok=true; try{ localStorage.removeItem(LS_FALLBACK); }catch{} } else ok=lsSet(LS_FALLBACK, snap); }
+  // Si de golpe quedan muchas menos figuras, la copia guardada anterior pasa a una instantánea en la MISMA transacción
+  // que escribe lo nuevo (iOS puede suspender la página entre pasos). Si esa transacción falla, se reintenta solo el guardado.
+  const encoge = idb && lastFigN!=null && n < lastFigN - 5 && n < lastFigN * 0.7;
+  try{
+    if(idb){
+      let hecho = false;
+      if(encoge){ try{ await kvSetWithSnap("antes-de-encoger", snap); hecho = true; pruneSnapshots().catch(()=>{}); }catch{} }
+      if(!hecho) await kvSet("state", snap);
+      ok=true; try{ localStorage.removeItem(LS_FALLBACK); }catch{}
+    } else ok=lsSet(LS_FALLBACK, snap);
+  }
   catch{ ok=lsSet(LS_FALLBACK, snap); }
   if(ok) lastFigN = n; else toast("No se ha podido guardar. Libera espacio en el iPhone y vuelve a intentarlo.");
 }
@@ -1221,6 +1226,23 @@ const SNAP_RANGE = () => IDBKeyRange.bound(SNAP, SNAP + "\uffff");
 let lastSnapAt = 0;
 const snapKeys = async () => (await tx("kv","readonly",st=>st.getAllKeys(SNAP_RANGE()))) || [];
 const snapParse = k => { const m = /^snap:(\d+):(.*)$/.exec(k); return m ? {at:+m[1], reason:m[2]} : null; };
+async function pruneSnapshots(){
+  const all = (await snapKeys()).map(k=>({k, ...snapParse(k)})).filter(x=>x.reason!=null).sort((a,b)=>b.at-a.at);
+  const dia = all.filter(x=>x.reason==="diaria"), otras = all.filter(x=>x.reason!=="diaria");
+  for(const x of [...dia.slice(SNAP_KEEP.diaria), ...otras.slice(SNAP_KEEP.otras)]) await tx("kv","readwrite",st=>st.delete(x.k));
+}
+// Copia el «state» guardado a una instantánea y escribe el nuevo, todo en una sola transacción (o ninguna de las dos cosas).
+function kvSetWithSnap(reason, snap){
+  return new Promise((res,rej)=>{
+    const at = lastSnapAt = Math.max(Date.now(), lastSnapAt + 1);
+    const t = idb.transaction("kv","readwrite"), st = t.objectStore("kv"), g = st.get("state");
+    g.onsuccess = () => { const o = g.result;
+      // Si la instantánea no se puede ni pedir, se escribe lo nuevo igualmente (un fallo asíncrono aborta y se reintenta fuera).
+      if(o) try{ st.put({at, reason, nFig:Object.keys(o.figures||{}).length, nLog:Object.keys(o.logs||{}).length, schema:o.schema, state:o}, `${SNAP}${at}:${reason}`); }catch{}
+      st.put(snap, "state"); };
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error("cancelado"));
+  });
+}
 async function takeSnapshot(reason, state = S){
   if(safeMode || !idb || !state) return null;
   try{
@@ -1228,11 +1250,15 @@ async function takeSnapshot(reason, state = S){
     const at = lastSnapAt = Math.max(Date.now(), lastSnapAt + 1);
     const key = `${SNAP}${at}:${reason}`;
     await kvSet(key, {at, reason, nFig:Object.keys(state.figures||{}).length, nLog:Object.keys(state.logs||{}).length, schema:state.schema, state:clone(state)});
-    const all = (await snapKeys()).map(k=>({k, ...snapParse(k)})).filter(x=>x.reason!=null).sort((a,b)=>b.at-a.at);
-    const dia = all.filter(x=>x.reason==="diaria"), otras = all.filter(x=>x.reason!=="diaria");
-    for(const x of [...dia.slice(SNAP_KEEP.diaria), ...otras.slice(SNAP_KEEP.otras)]) await tx("kv","readwrite",st=>st.delete(x.k));
+    await pruneSnapshots();
     return key;
   }catch{ return null; }
+}
+// Una «diaria» por día, solo con datos bien leídos; se decide mirando únicamente las claves.
+async function takeDaily(){
+  if(safeMode || !idb || !(lastFigN > 0)) return;
+  const hoy = todayStr();
+  if(!(await snapKeys()).some(k=>{ const x=snapParse(k); return x && x.reason==="diaria" && dayOf(x.at)===hoy; })) await takeSnapshot("diaria");
 }
 async function listSnapshots(){
   if(!idb) return [];
@@ -1329,14 +1355,10 @@ async function initStore(){
     applyData(c);
     if(old !== c.schema) saveNow();   // guarda ya la versión al día (no cuenta como cambio para la copia)
     lastFigN = Object.keys(S.figures||{}).length;
-    // Una instantánea «diaria» por día, solo con datos bien leídos.
-    if(!safeMode && idb && lastFigN > 0){
-      const hoy = todayStr();
-      if(!(await listSnapshots()).some(x=>x.reason==="diaria" && dayOf(x.at)===hoy)) await takeSnapshot("diaria");
-    }
   }
   assetsApi = idb && !safeMode ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
+  takeDaily().catch(()=>{});   // sin esperar: el arranque no depende del almacén de instantáneas
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
   await loadCoverKeys(); render();
   setTimeout(genMissingThumbs, 1200);

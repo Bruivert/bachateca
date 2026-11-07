@@ -1508,6 +1508,62 @@ def restaurar_sin_copia_previa_no_cambia_nada(browser):
     ctx.close()
 
 
+@test
+def copia_con_id_malicioso_no_ejecuta(browser):
+    ctx, p, errors = open_app(browser)
+    mal = {"schema": 6, "figures": {"x": {"id": 'x"><img src=x onerror="window.__pwn=1">', "nombre": "Mala", "entrada": "a", "salida": "b"}}, "logs": {}}
+    import_text(p, json.dumps(mal))
+    assert "descartada" in p.locator(".toast").inner_text()
+    p.fill("#imp-text", "")
+    p.keyboard.press("Escape")
+    p.click('[data-tab="repertorio"]')
+    p.wait_for_timeout(200)
+    assert p.evaluate("() => window.__pwn") is None
+    assert p.evaluate("() => Object.keys(window.__bachateca.state().figures).length") == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def id_raro_en_los_datos_se_escapa(browser):
+    seed = {"schema": 6, "figures": {'a"b': fig(1, "a", "b", id='a"b')}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('[data-tab="repertorio"]')
+    p.wait_for_timeout(200)
+    assert p.locator("#v-repertorio .gcard").first.get_attribute("data-view") == 'a"b'
+    p.locator("#v-repertorio .gcard").first.click()
+    p.wait_for_timeout(300)
+    assert p.locator(".fview").count() == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def copia_mal_formada_no_rompe(browser):
+    ctx, p, errors = open_app(browser)
+    import_text(p, json.dumps({"figures": [1, 2]}))
+    assert p.locator(".toast").inner_text().strip()
+    p.fill("#imp-text", json.dumps({"figures": {"a": None, "b": {"id": "b", "nombre": 3}}}))
+    p.click('[data-act="import-merge"]')
+    p.wait_for_timeout(300)
+    assert "descartadas" in p.locator(".toast").inner_text()
+    assert p.evaluate("() => Object.keys(window.__bachateca.state().figures).length") == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def sanear_copia_filtra_figuras_y_registros(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => window.__bachateca.sanitizeImport({figures: {
+      a: {id: "a", nombre: "Ok"}, b: {id: "b", nombre: "  "}, c: [1], 'd e': {id: "d e", nombre: "x"}},
+      logs: {l1: {id: "l1", fecha: "2026-01-01", figs: ["a", 3]}, l2: {id: "l2"}, l3: null}})""")
+    assert list(r["figures"]) == ["a"] and list(r["logs"]) == ["l1"], r
+    assert r["logs"]["l1"]["figs"] == ["a"] and r["descartadas"] == 5, r
+    assert p.evaluate("() => window.__bachateca.sanitizeImport({figures: [1]}).figures") == {}
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

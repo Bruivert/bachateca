@@ -1098,7 +1098,7 @@ function applyData(c){
         schema: Number.isInteger(c.schema) ? c.schema : SCHEMA };
 }
 function lsGet(k){ try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; } catch { return null; } }
-function lsSet(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+function lsSet(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
 const LS_FALLBACK = "bachateca.v1";
 let idb = null;
 function idbOpen(){
@@ -1195,9 +1195,10 @@ function persist(op){
   lsSet(BK_CH, (+lsGet(BK_CH)||0)+1);
 }
 async function saveNow(){
-  saveT=null; if(safeMode) return; const snap=clone(S);
-  try{ if(idb) await kvSet("state", snap); else lsSet(LS_FALLBACK, snap); }
-  catch{ lsSet(LS_FALLBACK, snap); toast("No se pudo guardar en el dispositivo. Revisa el espacio libre."); }
+  saveT=null; if(safeMode) return; S.guardado=Date.now(); const snap=clone(S); let ok=false;
+  try{ if(idb){ await kvSet("state", snap); ok=true; try{ localStorage.removeItem(LS_FALLBACK); }catch{} } else ok=lsSet(LS_FALLBACK, snap); }
+  catch{ ok=lsSet(LS_FALLBACK, snap); }
+  if(!ok) toast("No se ha podido guardar. Libera espacio en el iPhone y vuelve a intentarlo.");
 }
 window.addEventListener("pagehide", ()=>{ if(saveT){ clearTimeout(saveT); saveNow(); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && saveT){ clearTimeout(saveT); saveNow(); } });
@@ -1278,7 +1279,8 @@ function safeHTML(){
 async function initStore(){
   const r = await readStored();
   if(!r.ok) safeMode = true;
-  let c = r.idb || r.ls;
+  // Si hay dos copias, gana la guardada más tarde (ausente = 0); si empatan, la de IndexedDB.
+  let c = r.idb && r.ls ? ((r.ls.guardado||0) > (r.idb.guardado||0) ? r.ls : r.idb) : (r.idb || r.ls);
   if(c){
     const old = c.schema;
     c = migrate(c);

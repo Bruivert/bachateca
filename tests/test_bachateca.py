@@ -40,8 +40,9 @@ def test(fn=None, *, solo_chromium=None):
     return reg(fn) if fn is not None else reg
 
 
-def open_app(browser, seed=None, videos=None, init=None):
+def open_app(browser, seed=None, videos=None, init=None, ls=None):
     """App limpia. seed: estado guardado antes de abrirla (como si viniera de una versión anterior).
+    ls: claves de localStorage que se siembran junto con el estado (valor = JSON).
     init: script que se añade después de sembrar, para que no afecte a la siembra."""
     ctx = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
     # Sin hoja de compartir: así «Guardar en Fotos» y «Exportar» descargan el archivo y se puede comprobar.
@@ -52,9 +53,10 @@ def open_app(browser, seed=None, videos=None, init=None):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: m.type == "error" and not m.text.startswith("Failed to load resource") and errors.append(m.text))
     page.on("response", lambda r: r.status >= 400 and not r.url.endswith("favicon.ico") and errors.append(f"{r.status} {r.url}"))
-    if seed is not None or videos:
+    if seed is not None or videos or ls:
         page.goto(URL.replace("index.html?test", "README.md"))  # mismo origen, sin arrancar la app
-        page.evaluate("""async ([seed, videos]) => {
+        page.evaluate("""async ([seed, videos, ls]) => {
+          for (const [k, v] of Object.entries(ls || {})) localStorage.setItem(k, JSON.stringify(v));
           const db = await new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
             r.onupgradeneeded = () => { r.result.createObjectStore("kv"); r.result.createObjectStore("videos"); };
             r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -63,7 +65,7 @@ def open_app(browser, seed=None, videos=None, init=None):
             for (const id of (videos || [])) t.objectStore("videos").put(new Blob([new Uint8Array(2048)], {type: "video/mp4"}), id);
             t.oncomplete = res; t.onerror = () => rej(t.error); });
           db.close();
-        }""", [seed, videos or []])
+        }""", [seed, videos or [], ls or {}])
     if init:
         ctx.add_init_script(init)
     page.goto(URL)
@@ -1296,6 +1298,47 @@ def sin_indexeddb_sigue_con_localstorage(browser):
     p.evaluate("() => window.__bachateca.flush()")
     n = p.evaluate("() => Object.keys(JSON.parse(localStorage.getItem('bachateca.v1')).figures).length")
     assert n == 8, n
+    ctx.close()
+
+
+@test
+def respaldo_mas_reciente_gana(browser):
+    a = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    b = {"schema": 6, "guardado": 2000, "figures": {"f1": fig(1, "a", "b"), "f2": fig(2, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=a, ls={"bachateca.v1": b})
+    assert len(p.evaluate("() => window.__bachateca.state().figures")) == 2
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def guardar_bien_borra_el_respaldo(browser):
+    b = {"schema": 6, "guardado": 2000, "figures": {}}   # sin figuras, para que se vea el botón de ejemplos
+    ctx, p, errors = open_app(browser, ls={"bachateca.v1": b})
+    p.evaluate("() => document.querySelector('[data-act=\"examples\"]').click()")
+    p.evaluate("() => window.__bachateca.flush()")
+    assert p.evaluate("() => localStorage.getItem('bachateca.v1')") is None
+    assert isinstance(stored_state(p)["guardado"], (int, float))
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def sin_espacio_avisa(browser):
+    init = """const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (v, k) {
+        if (k === "state") throw new DOMException("simulado", "QuotaExceededError");
+        return put.apply(this, arguments); };
+      const set = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k) {
+        if (k === "bachateca.v1") throw new DOMException("simulado", "QuotaExceededError");
+        return set.apply(this, arguments); };"""
+    ctx, p, errors = open_app(browser, init=init)
+    p.evaluate("() => document.querySelector('[data-act=\"examples\"]').click()")
+    p.evaluate("() => window.__bachateca.flush()")
+    p.wait_for_selector(".toast")
+    assert "No se ha podido guardar" in p.inner_text(".toast")
+    assert not errors, errors
     ctx.close()
 
 

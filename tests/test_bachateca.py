@@ -3163,6 +3163,42 @@ def avance_fino_en_comparar(browser):
 
 
 @test
+def superponer_en_comparar(browser):
+    """Superponer apila los dos vídeos en la misma caja con el tuyo a la opacidad elegida; la sincronización sigue."""
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="cmp-open"]')
+    p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    wait_seeked(p)
+    box = "() => ['#cmp-t', '#cmp-m'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })"
+    a, b = p.evaluate(box)
+    assert b[1] > a[1] and p.get_attribute("#cmp-over", "aria-pressed") == "false", (a, b)  # lado a lado (apilados en vertical)
+    assert p.get_attribute("#cmp-op", "aria-label") == "Transparencia de tu vídeo"
+    assert (p.get_attribute("#cmp-op", "min"), p.get_attribute("#cmp-op", "max"), p.input_value("#cmp-op")) == ("20", "80", "50")
+    p.click("#cmp-over")
+    assert p.get_attribute("#cmp-over", "aria-pressed") == "true"
+    a, b = p.evaluate(box)
+    assert a == b, (a, b)
+    opac = "() => +getComputedStyle(document.querySelector('#cmp-m').closest('figure')).opacity"
+    assert abs(p.evaluate(opac) - 0.5) < 0.01
+    p.fill("#cmp-op", "30"); assert abs(p.evaluate(opac) - 0.3) < 0.01
+    p.click("#cmp-mirror-m")
+    assert p.evaluate("() => document.querySelector('#cmp-m').classList.contains('mirror') && !document.querySelector('#cmp-t').classList.contains('mirror')")
+    assert p.get_attribute("#cmp-mirror-m", "aria-pressed") == "true"
+    b0 = p.evaluate("() => window.__bachateca.cmpState().b")
+    p.click("#cmp-play"); p.wait_for_function("b => window.__bachateca.cmpState().b > b + 0.3", arg=b0)
+    p.click("#cmp-play")
+    p.click("#cmp-over")
+    a, b = p.evaluate(box)
+    assert b[1] > a[1] and abs(p.evaluate(opac) - 1) < 0.01, (a, b)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def migracion_11_notas_video(browser):
     ctx, p, errors = open_app(browser)
     r = p.evaluate("""() => { const B = window.__bachateca;

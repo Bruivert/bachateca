@@ -374,6 +374,15 @@ button.card:active{background:var(--surface2)}
 .cmp-v{position:relative;margin:0;background:#000}
 .cmp-v video{display:block;width:100%;height:25vh;object-fit:contain;background:#000}
 .cmp-v video.mirror{transform:scaleX(-1)}
+/* Superponer: las dos figuras comparten caja; la tuya encima con opacidad variable (la sincronización no se toca) */
+.cmp-vids.overlay{display:block;position:relative;height:40vh;background:#000}
+.cmp-vids.overlay .cmp-v{position:absolute;inset:0}
+.cmp-vids.overlay .cmp-v video{height:100%}
+.cmp-vids.overlay .cmp-v:last-child{opacity:var(--cmp-op,.5)}
+.cmp-vids.overlay .cmp-v:last-child figcaption{left:auto;right:10px}
+.cmp-over-row{align-items:center}
+.cmp-over-row label{display:flex;align-items:center;gap:8px;min-height:44px}
+.cmp-over-row input[type=range]{width:120px}
 /* grabarme con conteo: la cámara en directo y el número que suena encima */
 .rc-media{position:relative;background:#000}
 .rc-media video{width:100%;height:46vh;object-fit:cover;display:block;background:#000}
@@ -3127,6 +3136,7 @@ function errReopen(figId, errId){
 }
 let cmp = null;
 function cmpStop(){ if(!cmp) return; cancelAnimationFrame(cmp.raf); cmp.playing = false; ["#cmp-t","#cmp-m"].forEach(k=>{ try{ $(k)?.pause(); }catch{} }); }
+let cmpOv = {on:false, op:50, mirT:false, mirM:false}; // última elección de Superponer, solo durante la sesión
 async function openCompare(figId, attId){
   const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!cmpReady(f, a)) return;
   const [uT, uM] = await Promise.all([vidObjUrl(f.vid).catch(()=>null), vidObjUrl(a.vid).catch(()=>null)]);
@@ -3149,6 +3159,7 @@ async function openCompare(figId, attId){
     <p class="small muted" id="cmp-hint" aria-live="polite"></p>
     <div class="cmp-ctl"><button type="button" class="btn" id="cmp-prev" aria-label="Tiempo anterior">◀︎</button><button type="button" class="btn pri" id="cmp-play">Reproducir</button><button type="button" class="btn" id="cmp-next" aria-label="Tiempo siguiente">▶︎</button></div>
     <div class="pctl" role="group" aria-label="Reproducción">${CMP_RATES.map(x=>`<button type="button" data-crate="${x}" aria-pressed="${x===1}">${String(x).replace(".",",")}×</button>`).join("")}<button type="button" data-cstep="-0.1" aria-label="Atrás 0,1 segundos">‹ 0,1 s</button><button type="button" data-cstep="0.1" aria-label="Adelante 0,1 segundos">0,1 s ›</button><button type="button" id="cmp-mirror" aria-pressed="false">Espejo de la clase</button><button type="button" id="cmp-range" aria-pressed="false">Tramo: toda</button></div>
+    <div class="pctl cmp-over-row" role="group" aria-label="Superponer"><button type="button" id="cmp-over" aria-pressed="false">Superponer</button><label class="small" for="cmp-op">Tu vídeo<input type="range" id="cmp-op" min="20" max="80" step="5" value="${cmpOv.op}" aria-label="Transparencia de tu vídeo"></label><button type="button" id="cmp-mirror-m" aria-pressed="false">Espejo de tu vídeo</button></div>
     <p class="small muted" id="cmp-tempo">${esc(tempo)}</p>
     <section class="fv-card" aria-labelledby="fv-cm"><h3 id="fv-cm">Marcas</h3>
       <div class="fv-actions"><button type="button" class="btn" data-cmk="error">Error aquí</button><button type="button" class="btn" data-cmk="bien">Bien hecho aquí</button></div>
@@ -3175,7 +3186,16 @@ async function openCompare(figId, attId){
     cmp.b = bb;
     try{ T.currentTime = t; M.currentTime = cmpClampT(M, beatToSec(cmp.pM, bb)); }catch{}
     cmpPaint(); });
-  $("#cmp-mirror").onclick = e=>{ const on=!T.classList.contains("mirror"); T.classList.toggle("mirror", on); e.currentTarget.setAttribute("aria-pressed", on); };
+  const mir = (v, btn, k)=>{ const on=!v.classList.contains("mirror"); v.classList.toggle("mirror", on); cmpOv[k]=on; btn.setAttribute("aria-pressed", on); };
+  $("#cmp-mirror").onclick = e=> mir(T, e.currentTarget, "mirT");
+  $("#cmp-mirror-m").onclick = e=> mir(M, e.currentTarget, "mirM");
+  const vids = $(".cmp-vids"), op = $("#cmp-op"), ov = $("#cmp-over");
+  const paintOv = ()=>{ vids.classList.toggle("overlay", cmpOv.on); ov.setAttribute("aria-pressed", cmpOv.on); vids.style.setProperty("--cmp-op", cmpOv.op/100); };
+  ov.onclick = ()=>{ cmpOv.on=!cmpOv.on; paintOv(); announce(cmpOv.on ? "Tu vídeo superpuesto a la clase" : "Vídeos lado a lado"); };
+  op.oninput = ()=>{ cmpOv.op=+op.value; paintOv(); };
+  if(cmpOv.mirT){ T.classList.add("mirror"); $("#cmp-mirror").setAttribute("aria-pressed", true); }
+  if(cmpOv.mirM){ M.classList.add("mirror"); $("#cmp-mirror-m").setAttribute("aria-pressed", true); }
+  paintOv();
   $("#cmp-range").onclick = ()=>{
     if(cmp.pick || cmp.A!==cmp.lo || cmp.B!==cmp.hi){ cmp.pick=null; cmp.A=cmp.lo; cmp.B=cmp.hi; $("#cmp-hint").textContent=""; }
     else { cmp.pick=[]; cmpPause(); $("#cmp-hint").textContent="Toca en la línea el primer y el último tiempo del tramo que quieres repetir."; }

@@ -2508,6 +2508,26 @@ def simulacro_sin_posiciones(browser):
     ctx.close()
 
 
+@test
+def simulacro_solo_falta_el_agarre(browser):
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Sombra", agarreOut="Dos manos"),
+                                 fig(2, "Sombra", "Cerrada", agarreIn="Izq–der")]}
+    ctx, p, errors = open_app(browser, seed={"figures": figs})
+    p.evaluate("() => window.__bachateca.simForce([{pos: 'Sombra', hold: 'Dos manos'}])")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('#v-social [data-act="sim-open"]')
+    p.click("#sim-go")
+    p.click("#sim-ok")
+    t = p.inner_text("[data-sim]")
+    assert "Con Dos manos aún no tienes salida desde aquí." in t and "Figura 2" in t, t
+    assert "pide una en clase" not in t, t
+    assert p.locator("[data-sim] .exits li.dim").count() == 1
+    qs = p.evaluate("() => Object.values(window.__bachateca.state().preguntas || {}).filter(q => !q.resuelta)")
+    assert qs == [], qs
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

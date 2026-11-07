@@ -2598,23 +2598,31 @@ function simRound(){
   };
   tick();
   // Por si el reloj del audio se para (el sistema corta el sonido): la ronda acaba igual, un segundo más tarde.
-  sim.timeout = setTimeout(()=>{ if(sim && sim.fase==="decide") simDecide(true); }, (end - c.currentTime + 1)*1000);
+  // Se arma cuando el audio ya corre: si resume() tarda, contar desde el reloj de pared acabaría la ronda antes de tiempo.
+  const r0 = sim;
+  const arm = ()=>{ if(sim!==r0 || sim.fase!=="decide" || sim.t0+8*sim.beat!==end) return; clearTimeout(sim.timeout);
+    sim.timeout = setTimeout(()=>{ if(sim===r0 && sim.fase==="decide") simDecide(true); }, (end - c.currentTime + 1)*1000); };
+  if(c.state==="running") arm(); else Promise.resolve(c.resume()).then(arm, ()=>{});
 }
 // «La tengo» o se acabó el tiempo: se para el conteo y se enseñan las salidas.
 function simDecide(late){
   if(!sim || sim.fase!=="decide") return;
+  late = late || simBeats() >= 8;   // un toque en el siguiente 1 o después ya llega tarde
   const q = sim.cola[sim.i], beats = late ? null : Math.round(simBeats()*10)/10;
   simQuiet();
   sim.fase = "revela"; sim.res[sim.i] = {pos:q.pos, hold:q.hold, beats, g:null};
-  const ex = exitsFrom(q.pos, q.hold);
-  if(!ex.length) askFor(q.pos);
+  // Si hay salidas pero ninguna con este agarre, se enseñan atenuadas: lo que falta es cambiar de agarre, no una figura nueva.
+  const ex = exitsFrom(q.pos, q.hold), otras = ex.length ? [] : exitsFrom(q.pos);
+  if(!ex.length && !otras.length) askFor(q.pos);
   $("#sim-body").innerHTML = `<p class="small muted">Ronda ${sim.i+1} de ${sim.rondas}</p>
     <div class="flash"><div class="route"><span>Estabas en</span></div>
       <div class="big">${esc(q.pos)}</div>
       ${q.hold ? `<p>Con ${holdName(q.hold)}</p>` : ""}
       ${late ? `<p class="note" role="alert"><b>Se acabó el tiempo</b></p>` : `<p class="small muted">Decidiste en ${fmtBeats(beats)} tiempos.</p>`}
       <div class="answer" id="sim-ans" tabindex="-1">
-        ${ex.length ? `<ul class="exits">${ex.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>` : `<div class="note">Desde aquí aún no tienes salida: básico y pide una en clase.</div>`}
+        ${ex.length ? `<ul class="exits">${ex.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>`
+          : otras.length ? `<div class="note">Con ${holdName(q.hold)} aún no tienes salida desde aquí.</div><ul class="exits">${otras.map(f=>exitLi(f,{dim:true})).join("")}</ul>`
+          : `<div class="note">Desde aquí aún no tienes salida: básico y pide una en clase.</div>`}
         <p class="small muted">¿Cómo te ha salido?</p>
         <div class="grade"><button type="button" class="btn" data-simg="no">No me salió</button><button type="button" class="btn" data-simg="dudas">Dudé</button>${late ? "" : `<button type="button" class="btn" data-simg="fluida">La tenía</button>`}</div>
       </div></div>`;

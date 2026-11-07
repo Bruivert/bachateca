@@ -3647,6 +3647,46 @@ def liberar_ahora(browser):
     ctx.close()
 
 
+@test
+def limpieza_respeta_deshacer(browser):
+    f1 = fig(1, "Cerrada", "Sombra", vid="v1", intentos=[])
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "guardado": 1000, "figures": {"f1": f1}}, videos=["v1", "a1"])
+    # El intento se añade después de la copia diaria: así su vídeo no está en ninguna instantánea.
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
+    p.evaluate("(a) => { const S = window.__bachateca.state(); S.figures.f1.intentos = [a]; window.__bachateca.setFigs(S.figures); }", att(1, "a1"))
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="att-del"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector(".toast .undo")
+    # Con «Deshacer» a la vista, el vídeo del intento cuenta como usado, también para «Liberar ahora».
+    assert p.evaluate("() => window.__bachateca.orphanVideos()") == []
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})") == {"n": 0, "bytes": 0}
+    assert sorted(p.evaluate(_VID_KEYS)) == ["a1", "v1"]
+    p.click(".toast .undo")
+    assert [a["vid"] for a in p.evaluate("() => window.__bachateca.state().figures.f1.intentos")] == ["a1"]
+    assert sorted(p.evaluate(_VID_KEYS)) == ["a1", "v1"]
+    assert p.evaluate("() => window.__bachateca.orphanVideos()") == []
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_automatica_no_actua_sin_figuras(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "guardado": 1000, "figures": {}}, videos=["h1", "h2"],
+                              ls={"bachateca.huerfanos": {"h1": "2026-01-01T00:00:00.000Z", "h2": "2026-01-01T00:00:00.000Z"}})
+    assert p.evaluate("() => window.__bachateca.cleanOrphans()") is None   # el mismo camino que al arrancar
+    p.wait_for_timeout(300)
+    assert sorted(p.evaluate(_VID_KEYS)) == ["h1", "h2"]
+    assert p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.huerfanos'))") == {"h1": "2026-01-01T00:00:00.000Z", "h2": "2026-01-01T00:00:00.000Z"}
+    # «Liberar ahora» sí funciona.
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")["n"] == 2
+    assert p.evaluate(_VID_KEYS) == []
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

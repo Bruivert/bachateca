@@ -1575,10 +1575,10 @@ function saveFigure(f){
 }
 function deleteFigureUndo(id){
   const f=S.figures[id]; if(!f) return;
-  const copy=clone(f); delete S.figures[id]; persist({t:"figdel",id}); render();
-  let undone=false;
-  toast(`«${f.nombre}» borrada`, {label:"Deshacer", fn:()=>{ undone=true; S.figures[id]=copy; persist({t:"fig",id}); render(); toast(`«${copy.nombre}» recuperada`); },
-    onExpire:()=>{ if(!undone) figVids(copy).forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel",id:v}); }); }});
+  const copy=clone(f), vs=figVids(copy); delete S.figures[id]; persist({t:"figdel",id}); render();
+  let undone=false; pendAdd(vs);
+  toast(`«${f.nombre}» borrada`, {label:"Deshacer", fn:()=>{ undone=true; pendDel(vs); S.figures[id]=copy; persist({t:"fig",id}); render(); toast(`«${copy.nombre}» recuperada`); },
+    onExpire:()=>{ pendDel(vs); if(!undone) vs.forEach(v=>{ if(!vidInUse(v)) persist({t:"assetdel",id:v}); }); }});
 }
 function deleteFigure(id){ const vs=figVids(S.figures[id]); delete S.figures[id]; persist({t:"figdel",id}); vs.forEach(v=>persist({t:"assetdel",id:v})); render(); }
 // Vídeos guardados de una figura: el de la clase, los de las partes anteriores y los de sus intentos.
@@ -1599,7 +1599,10 @@ function vidsIn(o, out = new Set(), d = 0){
   for(const k in o){ const v = o[k]; if(k==="vid" && typeof v==="string" && v) out.add(v); else if(v && typeof v==="object") vidsIn(v, out, d+1); }
   return out;
 }
-const refsNow = () => { const r = vidsIn(S); Object.values(S.figures||{}).forEach(f=>figVids(f).forEach(v=>r.add(v))); return r; };
+// Vídeos de lo que acabas de borrar mientras «Deshacer» sigue disponible: cuentan como usados.
+const undoPend = new Set();
+const pendAdd = vs => vs.forEach(v=>{ if(v) undoPend.add(v); }), pendDel = vs => vs.forEach(v=>undoPend.delete(v));
+const refsNow = () => { const r = vidsIn(S); undoPend.forEach(v=>r.add(v)); Object.values(S.figures||{}).forEach(f=>figVids(f).forEach(v=>r.add(v))); return r; };
 const vidOfKey = k => k.startsWith("cover:") ? k.slice(6) : k;
 // Solo con los datos bien leídos y sin una importación o restauración a medias.
 const canClean = () => loaded && !safeMode && !!idb && !importing && !restoring;
@@ -1623,12 +1626,14 @@ async function orphanVideos(){
   for(const k of cand) if(!refs.has(vidOfKey(k))){ const b = await vidGet(k).catch(()=>null); out.push({id:k, bytes:(b && b.size) || 0}); }
   return out;
 }
+// Biblioteca sin figuras (recién instalada, vaciada o leída a medias): la limpieza automática no apunta ni borra nada.
+const libEmpty = () => !(Object.keys(S.figures||{}).length > 0) || !(lastFigN > 0);
 // Borra los huérfanos que llevan 7 días (o todos con {ahora:true}, para «Liberar ahora»). Devuelve {n, bytes} o null si no se ha podido.
 // Una sola a la vez; antes de cada borrado se vuelve a mirar S, por si mientras tanto se ha guardado algo que lo usa.
 let cleaning = Promise.resolve();
 function cleanOrphans(opts = {}){
   const run = async () => {
-    if(!canClean()) return null;
+    if(!canClean() || (!opts.ahora && libEmpty())) return null;
     let orf; try{ orf = await orphanVideos(); }catch{ return null; }
     const now = opts.now ?? Date.now(), m0 = lsGet(LS_HUERF), marks = isObj(m0) ? m0 : {}, next = {};
     const keys = new Set(orf.map(x=>x.id)), size = new Map(orf.map(x=>[x.id, x.bytes])), gone = new Set();
@@ -1642,7 +1647,7 @@ function cleanOrphans(opts = {}){
       if(gone.has(k)) continue;
       const t = Date.parse(marks[k]), first = Number.isFinite(t) && t <= now ? t : now;
       if(!opts.ahora && now - first < HUERF_DIAS*864e5){ next[k] = new Date(first).toISOString(); continue; }
-      if(!canClean()) return null;
+      if(!canClean() || (!opts.ahora && libEmpty())) return null;
       if(refsNow().has(vidOfKey(k))) continue;
       try{ await del(k); if(k===vidOfKey(k) && keys.has(COVER(k)) && !gone.has(COVER(k))) await del(COVER(k)); }
       catch{ next[k] = new Date(first).toISOString(); }
@@ -3632,13 +3637,13 @@ async function attDelete(figId, attId){
   if(!ok) return;
   const a = list[i]; f.intentos = list.filter(x=>x.id!==attId); persist({t:"fig", id:figId});
   closeSheet(); render(); openView(figId);
-  let undone = false;
+  let undone = false; pendAdd([a.vid]);
   toast("Intento borrado", {label:"Deshacer", fn:()=>{
-      undone = true; const g = S.figures[figId]; if(!g) return;
+      undone = true; pendDel([a.vid]); const g = S.figures[figId]; if(!g) return;
       g.intentos = [...intentosOf(g), a].sort((x,y)=>(x.creado||0)-(y.creado||0)); persist({t:"fig", id:figId});
       render(); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); toast("Intento recuperado");
     },
-    onExpire:()=>{ if(!undone && !vidInUse(a.vid)) persist({t:"assetdel", id:a.vid}); }});
+    onExpire:()=>{ pendDel([a.vid]); if(!undone && !vidInUse(a.vid)) persist({t:"assetdel", id:a.vid}); }});
 }
 // Cambia el estado de una figura. Sin dónde empieza o acaba no sale de la lista de espera (ni de incompleta):
 // se abre la ficha con lo que falta señalado. el: el botón pulsado, que se quita si no hay hoja que repintar.
@@ -3743,13 +3748,13 @@ async function ptDelete(figId, ptId){
   if(!ok) return;
   f.partes = list.filter(y=>y.id!==ptId); persist({t:"fig", id:figId});
   closeSheet(); render(); openView(figId);
-  let undone = false;
+  let undone = false; pendAdd([x.vid]);
   toast("Parte borrada", {label:"Deshacer", fn:()=>{
-      undone = true; const g = S.figures[figId]; if(!g) return;
+      undone = true; pendDel([x.vid]); const g = S.figures[figId]; if(!g) return;
       g.partes = [...partesOf(g), x].sort((a,b)=>(a.creado||0)-(b.creado||0)); persist({t:"fig", id:figId});
       render(); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); toast("Parte recuperada");
     },
-    onExpire:()=>{ if(!undone && x.vid && !vidInUse(x.vid)) persist({t:"assetdel", id:x.vid}); }});
+    onExpire:()=>{ pendDel([x.vid]); if(!undone && x.vid && !vidInUse(x.vid)) persist({t:"assetdel", id:x.vid}); }});
 }
 // «Ya está completa»: pasa a En práctica o Disponible y entra en el repaso normal. Se puede borrar el vídeo de las
 // partes anteriores: el de la última clase ya lo tiene todo.

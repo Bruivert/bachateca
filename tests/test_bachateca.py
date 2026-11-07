@@ -2371,6 +2371,29 @@ def importar_preguntas(browser):
     ctx.close()
 
 
+@test(solo_chromium="cámara y micrófono simulados")
+def conteo_pide_sesion_de_audio(browser):
+    # Safari 16.4+: sin audioSession "playback" el interruptor de silencio del iPhone calla el conteo.
+    init = """Object.defineProperty(navigator, 'audioSession', {configurable: true, value: (() => {
+      window.__as = []; let t = 'auto';
+      return {get type(){ return t; }, set type(v){ t = v; window.__as.push(v); }};
+    })()});"""
+    ctx, p, errors = open_app(browser, seed=cmp_seed(intentos=[]), init=init)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.locator('[data-act="rc-open"]').click()
+    p.wait_for_function("!document.querySelector('#rc-go').disabled", timeout=10000)
+    p.click("#rc-go")
+    p.wait_for_function("document.querySelector('#rc-beat').textContent !== ''", timeout=5000)
+    p.wait_for_timeout(1000)
+    p.click("#rc-go")
+    p.wait_for_selector("#att-form #ff-prev", timeout=10000)
+    h = p.evaluate("() => window.__as")
+    assert "play-and-record" in h and h[-1] == "auto", h
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

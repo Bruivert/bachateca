@@ -2341,7 +2341,10 @@ function attCardHTML(f, chev){
 // directo a la grabación, así que queda en el vídeo; y como se sabe cuándo sonó cada número, el pulso sale solo.
 // La voz son 8 archivos cortos (sonidos/conteo); se mide dónde empieza en cada uno para que caiga en el golpe.
 let cntCtx = null, cntVoz = null, cntVozP = null;
-function cntAudio(){ if(!cntCtx){ const AC = window.AudioContext || window.webkitAudioContext; cntCtx = new AC(); } return cntCtx; }
+// Safari 16.4+: con el interruptor de silencio puesto, el audio web calla salvo que la sesión sea «playback»
+// (o «play-and-record» al grabar con micrófono). En otros navegadores no existe y no hace falta.
+function setAudioSession(type){ try{ if(navigator.audioSession) navigator.audioSession.type = type; }catch{} }
+function cntAudio(){ if(!cntCtx){ setAudioSession("playback"); const AC = window.AudioContext || window.webkitAudioContext; cntCtx = new AC(); } return cntCtx; }
 function cntLoad(){
   if(cntVozP) return cntVozP;
   const c = cntAudio();
@@ -2383,6 +2386,7 @@ function rcCleanup(){
   (rc.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} });
   if(rc.stream) rc.stream.getTracks().forEach(t=>t.stop());
   cancelAnimationFrame(rc.raf); clearTimeout(rc.stopT);
+  setAudioSession("auto");   // suelta la sesión: que el iPhone vuelva a su comportamiento normal
   rc = null;
 }
 function openRecCount(figId){
@@ -2428,7 +2432,7 @@ async function rcCam(){
 }
 function rcStart(){
   if(!rc || !rc.stream || rc.rec) return;
-  const c = cntAudio(); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const c = cntAudio(); setAudioSession(rc.mic ? "play-and-record" : "playback"); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
   const mix = c.createMediaStreamDestination();
   if(rc.mic && rc.stream.getAudioTracks().length) c.createMediaStreamSource(rc.stream).connect(mix);
   const out = new MediaStream([...rc.stream.getVideoTracks(), ...mix.stream.getAudioTracks()]);

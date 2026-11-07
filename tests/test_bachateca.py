@@ -1276,6 +1276,19 @@ def lectura_fallida_una_vez_se_recupera(browser):
 
 
 @test
+def modo_seguro_conserva_el_aviso_al_buscar(browser):
+    ctx, p, errors = open_app(browser, init=_parche_lectura(False))
+    p.evaluate("() => document.querySelector('[data-act=examples]').click()")
+    p.click('[data-tab="repertorio"]')
+    p.fill("#f-q", "a")
+    p.type("#f-q", "b")
+    assert p.locator("#v-repertorio #safe-note").count() == 1
+    assert p.locator("#v-repertorio #safe-note").is_visible()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def sin_indexeddb_sigue_con_localstorage(browser):
     ctx, p, errors = open_app(browser, init='Object.defineProperty(window, "indexedDB", {value: undefined, configurable: true});')
     assert p.locator("#safe-note").count() == 0

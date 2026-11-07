@@ -1269,6 +1269,8 @@ async function readStored(){
   }
   return {ok:false, idb:null, ls};
 }
+// Idempotente: lo usan todos los caminos que reescriben una vista (render, búsqueda, repaso).
+function safeNote(v){ if(safeMode && v && !v.querySelector("#safe-note")) v.insertAdjacentHTML("afterbegin", safeHTML()); }
 function safeHTML(){
   return `<div class="note" id="safe-note" role="alert">No se han podido leer tus datos. Para no estropearlos, la app no guardará nada hasta que se lean bien.
     <div class="row" style="margin-top:8px"><button class="btn sm" data-act="safe-retry">Volver a intentarlo</button></div></div>`;
@@ -1623,7 +1625,7 @@ function renderRepertorio(){
   const fb=$("#f-baile"); if(fb) fb.onchange=e=>{filt.baile=e.target.value; render();};
 
 }
-function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
+function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); safeNote($("#v-repertorio")); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
 
 // ---------- vista: repasar ----------
 function renderRepasar(){
@@ -1707,7 +1709,7 @@ function renderRepasar(){
     return;
   }
   const f = S.figures[session.ids[session.i]];
-  if(!f){ session.i++; return renderRepasar(); }
+  if(!f){ session.i++; renderRepasar(); return safeNote($("#v-repasar")); }
   const ms = memState(f);
   v.innerHTML = `${head}
     <div class="flash${f.thumb?" has-bg":""}">${f.thumb?`<span class="flash-bgw" aria-hidden="true"><img src="${esc(f.thumb)}" alt=""></span>`:""}
@@ -3816,7 +3818,7 @@ function render(){
   else if(tab==="repasar") renderRepasar();
   else if(tab==="enlazar") renderEnlazar();
   else if(tab==="social") renderSocial();
-  if(safeMode) $("#v-"+tab).insertAdjacentHTML("afterbegin", safeHTML());
+  safeNote($("#v-"+tab));
   hydrateVideos($("#v-"+tab)); hydrateCovers($("#v-"+tab));
   justSaved = null; lastSal = null;
   if(fk && !$("#sheet-root .sheet") && !$("#overlay-root").firstElementChild){ const el=$("#v-"+tab).querySelector(fk); if(el && el!==document.activeElement) el.focus({preventScroll:true}); }

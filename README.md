@@ -31,7 +31,8 @@ El código queda público, pero **tus datos no**: figuras, registros y vídeos s
 
 Todo vive en el iPhone: si borras la app, se pierde. Cada cierto tiempo:
 - **Ajustes → Exportar copia** (figuras, registros y ajustes) y guárdala en Archivos o iCloud Drive.
-- Los vídeos ya están en tu carrete; desde cada figura puedes usar **Guardar en Fotos**.
+- Los vídeos: **Ajustes → Copia completa** los guarda después de la copia. Guárdalos también en **Archivos o iCloud Drive**
+  (no en Fotos, que puede cambiarles el nombre): así **Restaurar o importar → Recuperar vídeos** los devuelve a su figura.
 
 **Ajustes → Instantáneas**: la app guarda sola una copia al día y otra antes de importar o restaurar; no sustituyen a
 Exportar, porque viven en el mismo iPhone.
@@ -65,7 +66,7 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
   - En **«Errores que cometo»** se cuentan las repeticiones (×N). Puedes marcar un error como **«Ya no me pasa»** y
     volver a ponerlo con **«Me ha vuelto a pasar»**. Mientras un error siga activo, la figura se repasa como mucho
     cada 7 días.
-  - **«Opciones de la cadena»**: terminar en una figura, incluir una, dejar fuera otras, y elegir la longitud (de 2 a 6).
+  - **«Opciones de la cadena»**: terminar en una posición, incluir una figura, dejar fuera otras, y elegir la longitud (de 2 a 6).
 
 ## Vídeo y práctica (versión 1.53)
 
@@ -85,7 +86,7 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
 - **Copia completa** (Ajustes): guarda un JSON con todas tus figuras y registros, más todos tus vídeos. Guárdala en
   **Archivos o iCloud Drive**, no en Fotos: Fotos puede cambiar el nombre de los archivos y entonces un vídeo no
   sabría a qué figura volver.
-- **Recuperar vídeos**: elige los archivos de vídeo de la copia; cada uno vuelve a su figura por el id que lleva en el nombre.
+- **Recuperar vídeos**: elige en Archivos los vídeos de la copia; cada uno vuelve a su figura por el id que lleva en el nombre.
 - **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
   una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
 

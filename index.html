@@ -949,7 +949,7 @@ function unmarkLink(k){ if(S.enlaces) delete S.enlaces[k]; persist({t:"meta"}); 
 function lnHTML(a, b, enCadena){
   const on = linkDone(a, b), d = `data-act="ln-mark" data-a="${esc(a.id)}" data-b="${esc(b.id)}"`;
   if(enCadena) return on ? `<div class="small ln-ok">✓ comprobado</div>` : `<div><button type="button" class="btn ghost ln-btn" ${d}>Lo he bailado</button></div>`;
-  return `<button type="button" class="ln-tg${on?" on":""}" ${d} aria-pressed="${on}" aria-label="Lo he bailado: ${esc(a.nombre)} y ${esc(b.nombre)}">${on?"✓ ":""}Lo he bailado</button>`;
+  return `<button type="button" class="ln-tg${on?" on":""}" ${d} aria-pressed="${on}" aria-label="Lo he bailado: de ${esc(a.nombre)} a ${esc(b.nombre)}">${on?"✓ ":""}Lo he bailado</button>`;
 }
 const lrKey = (pos, baile = baileSel) => baile + "␟" + pos;
 const dueLinks = () => { const t=todayStr(); return linkPositions().filter(p=>{ const r=S.linkRep[lrKey(p)]; return !r || !r.due || r.due<=t; }); };
@@ -1862,7 +1862,7 @@ function renderInicio(){
   const items = [
     fStep && `<li>${ico("brain")}<span><b>Recuerda ${pl(fStep.ids.length,"figura","figuras")}</b><span>${esc(names(fStep.ids))}</span></span></li>`,
     lStep && `<li>${ico("link")}<span><b>Salidas desde ${esc(joinY(lStep.ids))}</b><span>${plan.bloq && lStep.ids[0]===plan.bloq ? "Donde te bloqueaste en el último social" : "Nombra dos salidas y márcalas con el cuerpo"}</span></span></li>`,
-    cStep && `<li>${ico("music")}<span><b>Cadena desde ${esc(cStep.pos)}</b><span>Hasta 4 figuras seguidas, con una canción</span></span></li>`
+    cStep && `<li>${ico("music")}<span><b>Cadena desde ${esc(cStep.pos)}</b><span>Hasta ${chainN} figuras seguidas, con una canción</span></span></li>`
   ].filter(Boolean);
   const carr = dF.slice().sort(byMem).slice(0,8);
   // Siguiente paso: la posición a la que llegas y desde la que te faltan salidas seguras.
@@ -2573,7 +2573,10 @@ function deleteLog(id){
   const same = (a,b) => JSON.stringify(a||null)===JSON.stringify(b||null);
   const quitados = {};
   Object.entries(l.repAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
-    if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){ quitados[fid]={rep:clone(f.rep), antes}; if(antes) f.rep=clone(antes); else delete f.rep; persist({t:"fig",id:fid}); } });
+    if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){
+      const rep=clone(f.rep); if(antes) f.rep=clone(antes); else delete f.rep;
+      // El repaso de antes puede ser de cuando no había errores activos: también se limita (antes = lo que queda, para el Deshacer).
+      capByErrors(f); quitados[fid]={rep, antes: clone(f.rep||null)}; persist({t:"fig",id:fid}); } });
   const ejQuitados = {};
   Object.entries(l.ejecAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
     if(f && same(f.ejec, (l.ejecDespues||{})[fid])){ ejQuitados[fid]={ejec:clone(f.ejec), antes}; if(antes) f.ejec=clone(antes); else delete f.ejec; persist({t:"fig",id:fid}); } });
@@ -2582,7 +2585,7 @@ function deleteLog(id){
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
     // Vuelve a poner los repasos que quitó el borrado, solo si la figura sigue como la dejó el borrado.
-    Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; persist({t:"fig",id:fid}); } });
+    Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; capByErrors(f); persist({t:"fig",id:fid}); } });
     Object.entries(ejQuitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.ejec, q.antes)){ f.ejec=q.ejec; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
@@ -2988,7 +2991,9 @@ function guidedPlan(mins){
   const ls = [...done.filter(e=>isDue(S.figures[e.b])).map(e=>({a:e.a, b:e.b})), ...dueLinks().map(pos=>({pos, baile:baileSel})),
     ...done.filter(e=>!isDue(S.figures[e.b])).map(e=>({a:e.a, b:e.b}))];
   // La cadena empieza donde empieza la primera figura del plan (si tiene ruta) o en la primera posición con salidas.
-  const f0 = fs.find(placed), st = f0 ? f0.entrada : linkPositions()[0], ch = st ? makeChain(st) : null;
+  // Sin las opciones de Enlazar (agarre elegido, terminar en, incluir, dejar fuera, longitud): una cadena normal de 4.
+  const f0 = fs.find(placed), st = f0 ? f0.entrada : linkPositions()[0];
+  const ch = st ? buildChain(chainPool(), {start: st, n: 4, prefer: (p, f) => p && linkDone(p, f) ? 1 : 0}) : null;
   const cs = ch && !ch.noPath ? (ch.steps||[]).filter(s=>s.f) : [];
   const cad = cs.length>=2 ? {pos: cs[0].f.entrada, ids: cs.map(s=>s.f.id)} : null;
   const room = c.n - (cad ? 1 : 0);
@@ -3398,7 +3403,7 @@ function nvAct(a, d, t){
 function errDelete(figId, errId){
   const f = S.figures[figId], es = erroresOf(f), i = es.findIndex(e=>e.id===errId); if(i<0) return;
   const e = es[i]; f.errores = es.filter(x=>x.id!==errId); persist({t:"fig", id:figId}); openView(figId);
-  toast("Error quitado", {label:"Deshacer", fn:()=>{ const g=S.figures[figId]; if(!g) return; g.errores=[...erroresOf(g)]; g.errores.splice(i,0,e); persist({t:"fig",id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); }});
+  toast("Error quitado", {label:"Deshacer", fn:()=>{ const g=S.figures[figId]; if(!g) return; g.errores=[...erroresOf(g)]; g.errores.splice(i,0,e); capByErrors(g); persist({t:"fig",id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); }});
 }
 // «Ya no me pasa» / «Me ha vuelto a pasar»: cambian `resuelto` (y al reabrir, veces y ultima); Deshacer devuelve el error tal cual estaba.
 function errSet(figId, errId, antes, despues, msg){
@@ -3422,7 +3427,7 @@ let cmpOv = {on:false, op:50, mirT:false, mirM:false}; // última elección de S
 async function openCompare(figId, attId){
   const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!cmpReady(f, a)) return;
   const [uT, uM] = await Promise.all([vidObjUrl(f.vid).catch(()=>null), vidObjUrl(a.vid).catch(()=>null)]);
-  if(!uT || !uM){ toast("Uno de los vídeos no está en este dispositivo: las copias no incluyen vídeos."); return; }
+  if(!uT || !uM){ toast("Uno de los vídeos no está en este dispositivo. Si lo guardaste, recupéralo en Ajustes → Restaurar o importar → «Recuperar vídeos»."); return; }
   const b0 = +f.tiempo===5 ? 5 : 1, n = Math.max(2, +f.tiempos||8);
   cmpStop();
   cmp = {figId, attId, pT:f.pulso, pM:a.pulso, lo:b0, hi:b0+n, A:b0, B:b0+n, b:b0, rate:1, playing:false, raf:0, pick:null, form:null};
@@ -3963,6 +3968,13 @@ function setBusyUI(on){
   const sb=document.querySelector('#sheet-root form button[type="submit"]'); if(sb) sb.textContent = on ? "Guardando…" : "Guardar";
   if(on) askWake(); else if(tab!=="social") releaseWake();
 }
+// Las notas del vídeo (f.notasVid) hablan del vídeo de ahora: al guardar con otro vídeo, o sin vídeo, se borran. Se avisa antes.
+function nvLossHTML(){
+  if(!vstate || vstate.kind) return "";
+  const n = erroresNv(S.figures[vstate.figId]?.notasVid).length;
+  const cambia = (vstate.file && (!vstate.fromId || vstate.compact)) || (vstate.remove && vstate.cur);
+  return n && cambia ? `<p class="small" id="nv-loss" role="status" style="color:var(--warn)">${n===1?"Su nota del vídeo se borrará":`Sus ${n} notas del vídeo se borrarán`} al guardar.</p>` : `<p id="nv-loss" role="status" hidden></p>`;
+}
 function renderVidbox(){
   const box=$("#vidbox"); if(!box||!vstate) return;
   if(!assetsApi){ box.hidden=true; box.innerHTML=""; return; }
@@ -3983,7 +3995,7 @@ function renderVidbox(){
       <p class="small muted">Pausa donde empieza la figura y pulsa «Marcar inicio»; igual con el final. Al reproducirla empezará y acabará en tus marcas (${fmtT(seg)}).</p>
       <label class="small row" for="ff-compact" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ff-compact" ${vstate.compact?"checked":""}><span>Guardar solo el fragmento en calidad media: ocupa mucho menos, pero tarda lo que dura el fragmento.</span></label>
       ${vstate.fromId?"":`<p class="small muted">Vídeo de ${fmtMB(vstate.file.size)}. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`}
-      <p class="vprog" id="vprog" aria-live="polite"></p>
+      <p class="vprog" id="vprog" aria-live="polite"></p>${nvLossHTML()}
       <div class="row"><button type="button" class="btn sm" data-pick="ff-file">Elegir otro</button><button type="button" class="btn ghost sm" data-vid="cancel">${vstate.fromId?"Cancelar recorte":"No usar este vídeo"}</button>${ai}</div>${aiOut}`;
   } else if(vstate.cur && !vstate.remove){
     box.innerHTML=`${pick}${playerHTML({vid:vstate.cur, vidTrim:vstate.trim, thumb:vstate.thumb})}
@@ -3998,13 +4010,13 @@ function renderVidbox(){
       <p class="small muted">Grábate haciendo la figura entera. Luego marcas dónde empieza y acaba. Se guarda en este dispositivo; no se sube a ningún sitio.</p>`;
   } else {
     box.innerHTML=`${pick}<button type="button" class="btn" data-pick="ff-file">Añadir vídeo de la clase</button>
-      <p class="small muted">${vstate.remove?"El vídeo se quitará al guardar. ":""}Elígelo desde Fotos. Se guarda en este dispositivo con su calidad original y marcas dónde empieza y acaba la figura.</p>`;
+      <p class="small muted">${vstate.remove?"El vídeo se quitará al guardar. ":""}Elígelo desde Fotos. Se guarda en este dispositivo con su calidad original y marcas dónde empieza y acaba la figura.</p>${nvLossHTML()}`;
   }
   ["ff-file","ff-cam"].forEach(k=>{ const fi=$("#"+k); if(fi) fi.onchange=()=>{
     const file=fi.files[0]; if(!file) return;
     useVideoFile(file);
   }; });
-  const cc=$("#ff-compact"); if(cc) cc.onchange=()=>{ vstate.compact=cc.checked; };
+  const cc=$("#ff-compact"); if(cc) cc.onchange=()=>{ vstate.compact=cc.checked; const o=$("#nv-loss"); if(o) o.outerHTML=nvLossHTML(); };
   box.querySelectorAll("[data-vid]").forEach(b=> b.onclick=async()=>{
     const k=b.dataset.vid, pv=$("#ff-prev");
     if(k==="start" && pv){ vstate.start=Math.min(pv.currentTime, Math.max(0,(vstate.end||vstate.dur)-1)); refreshTrim(); }
@@ -4013,7 +4025,7 @@ function renderVidbox(){
     else if(k==="remove"){ vstate.remove=true; renderVidbox(); }
     else if(k==="retrim"){
       const blob=vstate.curBlob || await vidGet(vstate.cur).catch(()=>null);
-      if(!blob){ toast("Este vídeo no está en este dispositivo: las copias no incluyen vídeos."); return; }
+      if(!blob){ toast("Este vídeo no está en este dispositivo. Si lo guardaste, recupéralo en Ajustes → Restaurar o importar → «Recuperar vídeos»."); return; }
       vstate.fromId=vstate.cur; vstate.file=blob; vstate.url=vidCache.get(vstate.cur)||URL.createObjectURL(blob);
       vstate.start=vstate.trim?.start||0; vstate.end=vstate.trim?.end||0; vstate.dur=0; loadPrev();
     }
@@ -4099,7 +4111,7 @@ function hydrateVideos(root){
   (root||document).querySelectorAll("video[data-vid]:not([data-h])").forEach(async v=>{
     v.dataset.h="1"; const id=v.dataset.vid, s=+v.dataset.s||0, e=+v.dataset.e||0;
     const url=await vidObjUrl(id).catch(()=>null);
-    if(!url){ const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted">Este vídeo no está en este dispositivo: las copias no incluyen vídeos.</p>`; return; }
+    if(!url){ const p=v.closest(".player"); if(p) p.innerHTML=`<p class="small muted">Este vídeo no está en este dispositivo. Si lo guardaste, recupéralo en Ajustes → Restaurar o importar → «Recuperar vídeos».</p>`; return; }
     v.addEventListener("loadedmetadata",()=>{ if(s>0) try{ v.currentTime=s; }catch{} });
     v.addEventListener("seeked",()=>backfillThumb(id, v), {once:true});
     v.addEventListener("playing",()=>setTimeout(()=>backfillThumb(id, v),300));
@@ -4178,7 +4190,14 @@ const vidsUnsaved = () => vidsAll().filter(x=>!x.saved);
 // fullDone guarda los que ya han salido en esta copia completa; null fuera de esa pantalla.
 let fullDone = null;
 const fullOn = () => setView==="videos" && !!fullDone;
-const vidsPending = () => fullOn() ? vidsAll().filter(x=>!fullDone.has(x.vid)) : vidsUnsaved();
+// fullKeys: los vídeos que de verdad están en el dispositivo (se leen al abrir esa pantalla). Los que faltan no se cuentan como pendientes.
+let fullKeys = null;
+const vidsPending = () => fullOn() ? vidsAll().filter(x=>!fullDone.has(x.vid) && (!fullKeys || fullKeys.has(x.vid))) : vidsUnsaved();
+const fullMissing = () => fullKeys ? new Set(vidsAll().map(x=>x.vid).filter(v=>!fullKeys.has(v))).size : 0;
+async function loadFullKeys(){
+  try{ fullKeys = new Set(((idb && await tx("videos","readonly",st=>st.getAllKeys()))||[]).filter(k=>typeof k==="string")); }
+  catch{ fullKeys = null; }
+}
 // iOS comparte varios vídeos a la vez («Guardar N vídeos»), pero cada envío necesita un toque:
 // se mandan por tandas de hasta 5 y unos 200 MB, y el botón ofrece la siguiente tanda.
 const VID_BATCH = 5, VID_BATCH_BYTES = 200*1048576;
@@ -4230,13 +4249,14 @@ async function saveVidBatch(){
 async function exportFull(){
   if(!(await exportBackup())) return;
   if(!vidsAll().length) return;
-  fullDone = new Set(); vidBatch = null; setGo("videos");
+  fullDone = new Set(); vidBatch = null; await loadFullKeys(); setGo("videos");
 }
 function fullVidsHTML(){
-  const n = vidsPending().length;
+  const n = vidsPending().length, m = fullMissing();
   return `<div class="panel">
       <p><b>Ahora tus vídeos: ${n}</b></p>
-      <p class="small muted">${n ? `Se guardan por tandas de hasta ${VID_BATCH} con la hoja de compartir: elige «Guardar vídeos» o «Guardar en Archivos». Cada archivo lleva en el nombre el código de su vídeo, para poder devolverlo a su figura con «Recuperar vídeos».` : "Listo: la copia y todos tus vídeos están guardados."}</p>
+      ${m ? `<p class="small muted">${m===1?"1 no está":`${m} no están`} en este dispositivo.</p>` : ""}
+      <p class="small muted">${n ? `Se guardan por tandas de hasta ${VID_BATCH} con la hoja de compartir: elige «Guardar en Archivos» (o iCloud Drive), no «Guardar vídeos»: Fotos puede cambiarles el nombre y entonces no vuelven solos a su figura. Cada archivo lleva en el nombre el código de su vídeo, para poder devolverlo a su figura con «Recuperar vídeos».` : m ? "Listo: la copia y los vídeos de este dispositivo están guardados." : "Listo: la copia y todos tus vídeos están guardados."}</p>
       ${n ? `<div class="row"><button class="btn pri" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)}</button></div>` : ""}
     </div>`;
 }
@@ -4245,27 +4265,29 @@ function fullVidsHTML(){
 let recovering = false;
 async function recoverVideos(list){
   if(safeMode){ toast("Modo seguro: no se pueden guardar vídeos."); return; }
+  if(!loaded){ toast("Espera a que se cargue tu repertorio."); return; }
   if(recovering || importing || restoring){ toast("Espera a que termine lo que está en marcha."); return; }
   recovering = true;
-  let n = 0, m = 0, k = 0, err = null;
+  let n = 0, m = 0, k = 0, skip = 0, err = null;
   try{
     const refs = vidsIn(S); Object.values(S.figures||{}).forEach(f=>figVids(f).forEach(v=>refs.add(v)));
     for(const file of list){
       const id = vidIdFromName(file.name);
       if(!id || !refs.has(id)){ m++; continue; }
-      if(await vidGet(id).catch(()=>null)){ k++; continue; }
+      // Si no se puede mirar si ya está, no se escribe: podría pisar el vídeo bueno.
+      try{ if(await vidGet(id)){ k++; continue; } }catch{ skip++; continue; }
       try{ await vidPut(id, file); n++; }catch(e){ err = e; break; }
     }
   }finally{ recovering = false; }
   if(n) setTimeout(genMissingThumbs, 300);
   render(); if($('[aria-label="Ajustes"]')) openSettings();
-  const msg = `${pl(n,"vídeo recuperado","vídeos recuperados")}${m?` · ${m} ${m===1?"no corresponde":"no corresponden"} a ninguna figura`:""}${k?` · ${k} ya estaban`:""}`;
+  const msg = `${pl(n,"vídeo recuperado","vídeos recuperados")}${m?` · ${m} ${m===1?"no corresponde":"no corresponden"} a ninguna figura`:""}${k?` · ${k} ya estaban`:""}${skip?` · ${skip} no se ${skip===1?"pudo":"pudieron"} comprobar`:""}`;
   toast(err ? `${err.userMsg||"No se pudo guardar un vídeo."} ${msg}` : msg);
 }
 function vidsUnsavedHTML(){
   const n = vidsUnsaved().length; if(!n) return "";
-  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. La copia de seguridad no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}.
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)} en Fotos</button></div></div>`;
+  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. La copia de seguridad no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}. Guárdalos en Archivos o iCloud Drive para poder recuperarlos con «Recuperar vídeos».
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)}</button></div></div>`;
 }
 // Social de otro día sin registrar: registrarlo con su fecha o descartarlo (con Deshacer).
 function staleHTML(){
@@ -4742,7 +4764,7 @@ function openSettings(){
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   const bk = backupInfo(), bs = backupStatus(bk);
   // La copia completa solo vive en su pantalla: al salir, la tanda vuelve a ser la de los vídeos sin copia.
-  if(setView!=="videos") fullDone = null;
+  if(setView!=="videos"){ fullDone = null; fullKeys = null; }
   if(vidBatch && vidBatch.full!==fullOn()) vidBatch = null;
   if(!vidBatch && vidsPending().length) prepVidBatch();
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
@@ -4761,7 +4783,7 @@ function openSettings(){
     </div>
     <div class="panel">
       <h3>Recuperar vídeos</h3>
-      <p class="small muted">Elige los vídeos que guardaste con «Copia completa» o «Guardar en Fotos». Cada uno vuelve a su figura por el código de su nombre; los que ya están en este dispositivo no se tocan.</p>
+      <p class="small muted">Elige en Archivos (o iCloud Drive) los vídeos que guardaste allí con «Copia completa». Cada uno vuelve a su figura por el código de su nombre; los que ya están en este dispositivo no se tocan. Los que guardaste en Fotos pueden haber perdido su nombre: esos no se reconocen.</p>
       <div class="row"><button type="button" class="btn" data-pick="vid-rec">Elegir vídeos</button><input type="file" id="vid-rec" multiple accept="video/*" class="sr" tabindex="-1" aria-hidden="true"></div>
     </div>`;
   else if(setView==="videos") body = fullVidsHTML();
@@ -4934,6 +4956,7 @@ async function importData1(replace){
       if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
       const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
       if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
+      capByErrors(f);   // D8 también para lo importado: con errores activos, el repaso no queda a más de 7 días
       S.figures[f.id]=f; persist({t:"fig",id:f.id});
       if(failImport){ failImport = false; throw new Error("fallo simulado"); }
     });
@@ -5107,7 +5130,9 @@ document.addEventListener("click", async e=>{
     if(antes) unmarkLink(k); else markLink(d.a, d.b);
     // En la ficha se repinta conservando el scroll; en la cadena, la vista.
     const enFicha = !!t.closest("[data-viewfig]"), sh = enFicha && $(".sheet"), y = sh ? sh.scrollTop : 0;
-    if(sh){ openView(d.a); const s2=$(".sheet"); if(s2) s2.scrollTop=y; } else render();
+    if(sh){ openView(d.a); const s2=$(".sheet"); if(s2) s2.scrollTop=y;
+      // El repintado cambia el botón: el foco vuelve al mismo para poder seguir con el teclado o VoiceOver.
+      $(`[data-viewfig] [data-act="ln-mark"][data-a="${CSS.escape(d.a)}"][data-b="${CSS.escape(d.b)}"]`)?.focus({preventScroll:true}); } else render();
     announce(antes ? "Enlace sin comprobar" : "Enlace comprobado");
     if(antes) toast(`Quitado: ${A.nombre} → ${B.nombre}`, {label:"Deshacer", fn:()=>{ (S.enlaces ||= {})[k]=antes; persist({t:"meta"}); if(enFicha && S.figures[d.a]) openView(d.a); else render(); }});
     return;
@@ -5264,7 +5289,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, socSort, bkSort, bumpEjec, 
   SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, vidFileName, vidIdFromName, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, videoRefs: async ()=>[...await videoRefs()], orphanVideos, cleanOrphans, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, videoRefs: async ()=>[...await videoRefs()], orphanVideos, cleanOrphans, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, recoverVideos, deleteLog, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

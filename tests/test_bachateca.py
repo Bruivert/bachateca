@@ -3825,6 +3825,158 @@ def de_151_a_154(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- revisión final (1.52–1.54)
+@test
+def recuperar_videos_si_falla_la_lectura_no_escribe(browser):
+    """Si no se puede mirar si un vídeo ya está, no se escribe encima: cuenta como no comprobado."""
+    d = __import__("tempfile").mkdtemp()
+    q = os.path.join(d, "Figura 1 · v1.mp4")
+    __import__("shutil").copy(FIXTURE, q)
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}
+    falla = """globalThis.__fallaGet = 0; const g = IDBObjectStore.prototype.get;
+      IDBObjectStore.prototype.get = function (k) {
+        if (k === "v1" && globalThis.__fallaGet > 0) { globalThis.__fallaGet--; throw new DOMException("simulado", "UnknownError"); }
+        return g.apply(this, arguments); };"""
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"], init=falla)
+    antes = stored_video_sizes(p)
+    p.click("#btn-settings")
+    p.click('[data-setv="importar"]')
+    p.evaluate("() => { globalThis.__fallaGet = 1; }")
+    p.set_input_files("#vid-rec", [q])
+    p.wait_for_function("document.querySelector('.toast') && /recuperad/.test(document.querySelector('.toast').innerText)")
+    t = p.locator(".toast").inner_text()
+    assert "0 vídeos recuperados" in t and "1 no se pudo comprobar" in t, t
+    assert stored_video_sizes(p) == antes == {"v1": 2048}, stored_video_sizes(p)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def recuperar_videos_espera_a_que_cargue(browser):
+    ctx = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
+    # IndexedDB que nunca contesta: la app se queda «cargando».
+    ctx.add_init_script("indexedDB.open = () => ({});")
+    p = ctx.new_page()
+    errors = []
+    p.on("pageerror", lambda e: errors.append(str(e)))
+    p.goto(URL)
+    p.wait_for_function("window.__bachateca")
+    assert p.evaluate("() => window.__bachateca.ready()") is False
+    p.evaluate("() => window.__bachateca.recoverVideos([new File([new Uint8Array(16)], 'Figura 1 · v1.mp4', {type: 'video/mp4'})])")
+    p.wait_for_selector(".toast:has-text('Espera a que se cargue tu repertorio.')")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def lo_he_bailado_conserva_el_foco(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos"), "f2": fig(2, "Abierta 2 manos", "Cerrada")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    b = p.locator('[data-act="ln-mark"]')
+    assert "de Figura 1 a Figura 2" in b.get_attribute("aria-label"), b.get_attribute("aria-label")
+    b.focus(); p.keyboard.press("Enter")
+    foco = "() => { const a = document.activeElement; return a && a.dataset.act === 'ln-mark' && a.dataset.a === 'f1' && a.dataset.b === 'f2' ? a.getAttribute('aria-pressed') : null; }"
+    p.wait_for_function(foco)
+    assert p.evaluate(foco) == "true"
+    p.keyboard.press("Enter")
+    assert p.evaluate(foco) == "false"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cambiar_video_avisa_de_las_notas(browser):
+    notas = [{"id": "n1", "s": 0.5, "texto": "uno"}, {"id": "n2", "s": 1, "texto": "dos"}]
+    ctx, p, errors = nv_open(browser, nv_seed(notasVid=notas))
+    p.click('[data-edit="f1"]')
+    p.wait_for_selector('#vidbox [data-vid="remove"]')
+    aviso = "Sus 2 notas del vídeo se borrarán al guardar."
+    assert aviso not in p.inner_text("#vidbox")
+    p.click('#vidbox [data-vid="remove"]')
+    assert aviso in p.inner_text("#vidbox"), p.inner_text("#vidbox")
+    p.set_input_files("#ff-file", FIXTURE)
+    p.wait_for_selector("#ff-prev")
+    assert aviso in p.inner_text("#vidbox"), p.inner_text("#vidbox")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def copia_completa_cuenta_solo_los_que_estan(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", vid="v2")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"])
+    p.click("#btn-settings")
+    with p.expect_download():
+        p.click('[data-act="export-full"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector("text=Ahora tus vídeos: 1")
+    assert "1 no está en este dispositivo" in p.inner_text(".sheet"), p.inner_text(".sheet")
+    p.wait_for_timeout(300)
+    with p.expect_download() as dl:
+        p.click('[data-act="save-vids"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    assert dl.value.suggested_filename == "Figura 1 · v1.mp4"
+    p.wait_for_selector("text=Ahora tus vídeos: 0")
+    assert "1 no está en este dispositivo" in p.inner_text(".sheet")
+    assert p.locator('[data-act="save-vids"]').count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def errores_activos_limitan_el_repaso_siempre(browser):
+    lejos = {"step": 4, "due": "2999-01-01", "last": "2026-01-01"}
+    err = [{"id": "e1", "nota": "me adelanto", "fecha": "2026-01-01", "veces": 1}]
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", rep=dict(lejos), errores=err),
+                        "f2": fig(2, "Sombra", "Cerrada", rep=dict(lejos), errores=err)},
+            "logs": {"l1": {"id": "l1", "fecha": "2026-01-02", "figs": ["f2"], "repAntes": {"f2": dict(lejos)},
+                            "repDespues": {"f2": dict(lejos, step=5, due="2999-02-01")}}}}
+    seed["figures"]["f2"]["rep"] = dict(lejos, step=5, due="2999-02-01")
+    ctx, p, errors = open_app(browser, seed=seed)
+    tope = p.evaluate("() => window.__bachateca.todayStr(7)")
+    # Deshacer «quitar error»: vuelve un error activo y el repaso no pasa de 7 días.
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="err-del"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.due") == "2999-01-01"
+    p.click(".toast .undo")
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    p.keyboard.press("Escape")
+    # Borrar el registro devuelve repAntes, también limitado; su Deshacer deja el repaso del registro.
+    p.evaluate("() => window.__bachateca.deleteLog('l1')")
+    r = p.evaluate("() => window.__bachateca.state().figures.f2.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    p.click(".toast .undo")
+    r = p.evaluate("() => window.__bachateca.state().figures.f2.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    p.keyboard.press("Escape")
+    p.wait_for_selector("#sheet-root .sheet", state="detached")
+    # Importada con un error activo.
+    f3 = fig(3, "Cerrada", "Abierta", rep=dict(lejos), errores=err)
+    import_text(p, json.dumps({"schema": 11, "figures": {"f3": f3}, "logs": {}}))
+    r = p.evaluate("() => window.__bachateca.state().figures.f3.rep")
+    assert r["due"] == tope and r["step"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def practica_guiada_ignora_las_opciones_de_enlazar(browser):
+    ls = {"bachateca.cadena": {"end": "Ninguna", "must": "f9", "exclude": ["f2"], "n": 2}}
+    ctx, p, errors = open_app(browser, seed=guia_seed(), ls=ls)
+    for _ in range(5):
+        plan = p.evaluate("() => window.__bachateca.guidedPlan(10)")
+        cad = [b for b in plan if b["tipo"] == "cadena"]
+        assert cad, plan
+        ids = cad[0]["ref"]["ids"]
+        assert len(ids) >= 3 and "f2" in ids, ids
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

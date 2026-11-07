@@ -1526,7 +1526,7 @@ def copia_con_id_malicioso_no_ejecuta(browser):
 
 @test
 def id_raro_en_los_datos_se_escapa(browser):
-    seed = {"schema": 6, "figures": {'a"b': fig(1, "a", "b", id='a"b')}, "logs": {}}
+    seed = {"schema": 6, "figures": {'a"b': fig(1, "a", "b", id='a"b', rep={"step": 1, "due": "2000-01-01", "aciertos": 0, "fallos": 0})}, "logs": {}}
     ctx, p, errors = open_app(browser, seed=seed)
     p.click('[data-tab="repertorio"]')
     p.wait_for_timeout(200)
@@ -1534,6 +1534,12 @@ def id_raro_en_los_datos_se_escapa(browser):
     p.locator("#v-repertorio .gcard").first.click()
     p.wait_for_timeout(300)
     assert p.locator(".fview").count() == 1
+    p.keyboard.press("Escape")
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('[data-act="start-fig"]')
+    p.click('[data-act="reveal"]')
+    p.click('[data-grade="fluida"]')
+    assert p.locator('[data-promote]').first.get_attribute("data-promote") == 'a"b'
     assert not errors, errors
     ctx.close()
 
@@ -1548,6 +1554,29 @@ def copia_mal_formada_no_rompe(browser):
     p.wait_for_timeout(300)
     assert "descartadas" in p.locator(".toast").inner_text()
     assert p.evaluate("() => Object.keys(window.__bachateca.state().figures).length") == 0
+    p.fill("#imp-text", json.dumps({"figures": {"a": {"id": "a", "nombre": "A"}}, "logs": {"l": {"id": "l", "fecha": "2026-01-01", "figs": "abc"}}}))
+    p.click('[data-act="import-merge"]')
+    p.wait_for_timeout(300)
+    p.keyboard.press("Escape")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.wait_for_timeout(300)
+    assert p.locator(".sheet").count() == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def reemplazar_no_borra_lo_que_venia_mal_formado(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b", id="f1"), "f2": fig(2, "a", "b", id="f2")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    bak = {"schema": 6, "figures": {"f1": fig(1, "a", "b", id="f1"), "f2": {"id": "f2", "nombre": " "}}, "logs": {}}
+    import_text(p, json.dumps(bak), replace=True)
+    assert "1 entrada está mal formada" in p.locator(".confirm").inner_text()
+    p.click('[data-cf="ok"]')
+    p.wait_for_timeout(300)
+    ids = p.evaluate("() => Object.keys(window.__bachateca.state().figures).sort()")
+    assert ids == ["f1", "f2"], ids
     assert not errors, errors
     ctx.close()
 

@@ -1749,7 +1749,7 @@ function renderRepasar(){
       <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
       <ul class="rv-list">${items.map((x,n)=>`<li class="rv-${x.g}" style="--n:${n}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
-      <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${i}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
+      <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${esc(i)}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
       ${next?`<p class="small muted">${next}</p>`:""}
       ${training && training.i < training.steps.length-1 ? `<button class="btn pri" data-act="train-next">Seguir el entreno: ${esc(trainLabel(training.steps[training.i+1]))}</button><button class="btn" data-act="end">Terminar aquí</button>` :
@@ -3850,7 +3850,7 @@ function sanitizeImport(d){
   const figures={}, logs={}; let descartadas=0;
   const fs = isObj(d&&d.figures) ? Object.values(d.figures) : [], ls = isObj(d&&d.logs) ? Object.values(d.logs) : [];
   fs.forEach(f=>{ if(isObj(f) && ID_RE.test(f.id) && typeof f.nombre==="string" && f.nombre.trim()) figures[f.id]=f; else descartadas++; });
-  ls.forEach(l=>{ if(isObj(l) && ID_RE.test(l.id) && typeof l.fecha==="string"){ if(Array.isArray(l.figs)) l.figs=l.figs.filter(x=>typeof x==="string"); logs[l.id]=l; } else descartadas++; });
+  ls.forEach(l=>{ if(isObj(l) && ID_RE.test(l.id) && typeof l.fecha==="string") logs[l.id]={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []}; else descartadas++; });
   return {figures, logs, descartadas};
 }
 async function importData(replace){
@@ -3860,16 +3860,19 @@ async function importData(replace){
   if(!d || !d.figures || typeof d.figures!=="object"){ toast("Ese archivo no es una copia de Bachateca."); return; }
   if(Number.isInteger(d.schema) && d.schema > SCHEMA){ toast("Esa copia es de una versión más nueva de Bachateca. Actualiza la app (ábrela con conexión) y vuelve a importarla."); return; }
   d = migrate(d);
+  // Lo que venía en la copia aunque esté mal formado: en «Reemplazar» eso no se borra de este dispositivo.
+  const rawIds = o => new Set(isObj(o) ? Object.entries(o).flatMap(([k,v])=>[k, ...(isObj(v)&&typeof v.id==="string"?[v.id]:[])]) : []);
+  const inFigs = rawIds(d.figures), inLogs = rawIds(d.logs);
   const san = sanitizeImport(d), desc = san.descartadas ? ` · ${san.descartadas} descartadas por estar mal formadas` : "";
   d.figures = san.figures; d.logs = san.logs;
   const inc=Object.values(d.figures), nIn=inc.length;
   if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."+desc); return; }
   if(!nIn && !Object.keys(d.logs).length){ toast("Esa copia no tiene figuras ni registros que añadir."+desc); return; }
   const nNew=inc.filter(f=>!S.figures[f.id]).length, nOld=nIn-nNew;
-  if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Las figuras, registros y vídeos que no estén en ella se borran y no se puede deshacer.`, ok:"Reemplazar todo"}))) return;
+  if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Las figuras, registros y vídeos que no estén en ella se borran y no se puede deshacer.${san.descartadas?` ${san.descartadas} ${san.descartadas===1?"entrada está mal formada y no se importará":"entradas están mal formadas y no se importarán"}.`:""}`, ok:"Reemplazar todo"}))) return;
   if(replace){
-    Object.keys(S.figures).forEach(id=>{ if(!d.figures[id]) deleteFigure(id); });
-    Object.keys(S.logs).forEach(id=>{ if(!(d.logs||{})[id]){ delete S.logs[id]; persist({t:"logdel",id}); } });
+    Object.keys(S.figures).forEach(id=>{ if(!d.figures[id] && !inFigs.has(id)) deleteFigure(id); });
+    Object.keys(S.logs).forEach(id=>{ if(!d.logs[id] && !inLogs.has(id)){ delete S.logs[id]; persist({t:"logdel",id}); } });
   }
   // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
   inc.forEach(f=>{

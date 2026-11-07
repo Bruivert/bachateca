@@ -1194,11 +1194,53 @@ function persist(op){
   clearTimeout(saveT); saveT=setTimeout(saveNow, 150);
   lsSet(BK_CH, (+lsGet(BK_CH)||0)+1);
 }
-async function saveNow(){
-  saveT=null; if(safeMode) return; S.guardado=Date.now(); const snap=clone(S); let ok=false;
+// Los guardados se encadenan: así dos llamadas seguidas (el retraso de 150 ms y un flush directo) nunca se solapan,
+// y cada uno copia S justo cuando le toca escribir, de modo que el último en escribir lleva siempre lo más reciente.
+let saveChain = Promise.resolve(), lastFigN = null;
+function saveNow(){
+  saveT=null; if(safeMode) return Promise.resolve();
+  return saveChain = saveChain.then(doSave, doSave);
+}
+async function doSave(){
+  if(safeMode) return;
+  const n = Object.keys(S.figures||{}).length;
+  // Si de golpe quedan muchas menos figuras, se guarda antes una instantánea de lo que había en el almacén (no de la memoria).
+  // Si la instantánea falla, el guardado sigue igualmente.
+  if(idb && lastFigN!=null && n < lastFigN - 5 && n < lastFigN * 0.7){
+    try{ await takeSnapshot("antes-de-encoger", await kvGet("state")); }catch{}
+  }
+  S.guardado=Date.now(); const snap=clone(S); let ok=false;
   try{ if(idb){ await kvSet("state", snap); ok=true; try{ localStorage.removeItem(LS_FALLBACK); }catch{} } else ok=lsSet(LS_FALLBACK, snap); }
   catch{ ok=lsSet(LS_FALLBACK, snap); }
-  if(!ok) toast("No se ha podido guardar. Libera espacio en el iPhone y vuelve a intentarlo.");
+  if(ok) lastFigN = n; else toast("No se ha podido guardar. Libera espacio en el iPhone y vuelve a intentarlo.");
+}
+// ---------- instantáneas ----------
+// Copias completas de los datos dentro del propio almacén («kv», clave «snap:<ms>:<motivo>»), para poder volver atrás.
+const SNAP = "snap:", SNAP_KEEP = {diaria: 7, otras: 5};
+const SNAP_RANGE = () => IDBKeyRange.bound(SNAP, SNAP + "\uffff");
+let lastSnapAt = 0;
+const snapKeys = async () => (await tx("kv","readonly",st=>st.getAllKeys(SNAP_RANGE()))) || [];
+const snapParse = k => { const m = /^snap:(\d+):(.*)$/.exec(k); return m ? {at:+m[1], reason:m[2]} : null; };
+async function takeSnapshot(reason, state = S){
+  if(safeMode || !idb || !state) return null;
+  try{
+    // Marca única: dos instantáneas en el mismo milisegundo no deben pisarse.
+    const at = lastSnapAt = Math.max(Date.now(), lastSnapAt + 1);
+    const key = `${SNAP}${at}:${reason}`;
+    await kvSet(key, {at, reason, nFig:Object.keys(state.figures||{}).length, nLog:Object.keys(state.logs||{}).length, schema:state.schema, state:clone(state)});
+    const all = (await snapKeys()).map(k=>({k, ...snapParse(k)})).filter(x=>x.reason!=null).sort((a,b)=>b.at-a.at);
+    const dia = all.filter(x=>x.reason==="diaria"), otras = all.filter(x=>x.reason!=="diaria");
+    for(const x of [...dia.slice(SNAP_KEEP.diaria), ...otras.slice(SNAP_KEEP.otras)]) await tx("kv","readwrite",st=>st.delete(x.k));
+    return key;
+  }catch{ return null; }
+}
+async function listSnapshots(){
+  if(!idb) return [];
+  try{
+    const ks = await snapKeys(), out = [];
+    for(const k of ks){ const v = await kvGet(k); if(v) out.push({key:k, at:v.at, reason:v.reason, nFig:v.nFig, nLog:v.nLog}); }
+    return out.sort((a,b)=>b.at-a.at);
+  }catch{ return []; }
 }
 window.addEventListener("pagehide", ()=>{ if(saveT){ clearTimeout(saveT); saveNow(); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && saveT){ clearTimeout(saveT); saveNow(); } });
@@ -1286,6 +1328,12 @@ async function initStore(){
     c = migrate(c);
     applyData(c);
     if(old !== c.schema) saveNow();   // guarda ya la versión al día (no cuenta como cambio para la copia)
+    lastFigN = Object.keys(S.figures||{}).length;
+    // Una instantánea «diaria» por día, solo con datos bien leídos.
+    if(!safeMode && idb && lastFigN > 0){
+      const hoy = todayStr();
+      if(!(await listSnapshots()).some(x=>x.reason==="diaria" && dayOf(x.at)===hoy)) await takeSnapshot("diaria");
+    }
   }
   assetsApi = idb && !safeMode ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
@@ -4024,7 +4072,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), takeSnapshot, listSnapshots, setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

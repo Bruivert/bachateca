@@ -1046,9 +1046,10 @@ function backupStatus(b){
 async function exportBackup(){
   // En modo seguro S no son tus datos (no se han podido leer): exportarlo daría una copia vacía o vieja por buena.
   if(safeMode){ toast("Modo seguro: no se puede exportar."); return; }
-  if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return;
+  if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return false;
   lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copia exportada"); render();
   if($('[aria-label="Ajustes"]')) openSettings(); else if($('[data-sheet="log"]')) openLog();
+  return true;
 }
 function nextRep(r0,g){
   const r=Object.assign({step:0,aciertos:0,fallos:0}, r0||{});
@@ -3188,9 +3189,8 @@ function openAttemptView(figId, attId){
 async function attSaveVid(figId, attId){
   const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!a) return;
   if(!attBlob || attBlob.vid!==a.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
-  const b = attBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-  const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
-  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
+  const b = attBlob.b, ty=b.type||"video/mp4";
+  const ok = await confirmSaved(await shareOrDownload(new File([b], vidFileName(attName(f, a), a.vid, ty), {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
 }
 // ---------- pulso: marcar los tiempos de la música en un vídeo ----------
@@ -3737,9 +3737,8 @@ function openParteView(figId, ptId){
 async function ptSaveVid(figId, ptId){
   const f = S.figures[figId], x = partesOf(f).find(y=>y.id===ptId); if(!x || !x.vid) return;
   if(!ptBlob || ptBlob.vid!==x.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
-  const b = ptBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-  const name = parteName(f, x).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "parte";
-  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
+  const b = ptBlob.b, ty=b.type||"video/mp4";
+  const ok = await confirmSaved(await shareOrDownload(new File([b], vidFileName(parteName(f, x), x.vid, ty), {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, x.vid); toast("Vídeo guardado"); if($(`[data-viewpt="${CSS.escape(ptId)}"]`)) openParteView(figId, ptId); }
 }
 async function ptDelete(figId, ptId){
@@ -4020,9 +4019,9 @@ function renderVidbox(){
     }
     else if(k==="savevid"){
       const blob=vstate.curBlob; if(!blob){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
-      const ty=blob.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+      const ty=blob.type||"video/mp4";
       const vidId = vstate.cur, figId = vstate.figId;
-      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(how=>confirmSaved(how, "el vídeo", "Sí, está guardado")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
+      shareOrDownload(new File([blob], vidFileName($("#ff-nombre")?.value || S.figures[figId]?.nombre || "bachateca", vidId, ty), {type:ty})).then(how=>confirmSaved(how, "el vídeo", "Sí, está guardado")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
     }
     else if(k==="ai"){ prepareCapture(); }
   });
@@ -4157,14 +4156,29 @@ function markVidSaved(figId, vidId){
   if(!it || it.vidSaved===vidId) return;
   it.vidSaved = vidId; persist({t:"fig", id:f.id});
 }
+// Cada vídeo que sale de la app lleva su id al final del nombre («<nombre> · <id>.mp4»): es lo único que permite
+// devolverlo a su figura, parte o intento con «Recuperar vídeos» si un día hay que reinstalar.
+const vidExt = ty => ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
+const vidFileName = (nombre, id, ty) => `${String(nombre||"").replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "vídeo"} · ${id}.${vidExt(ty||"video/mp4")}`;
+// Admite el « (1)» que añaden algunas descargas repetidas. Sin id válido, null.
+function vidIdFromName(name){
+  const m = /· ([^\s·]+?)(?: ?\(\d+\))?\.[A-Za-z0-9]{1,5}$/.exec(String(name||""));
+  return m && okId(m[1]) ? m[1] : null;
+}
 const attName = (f, a) => `${f.nombre} · intento ${fmtDate(a.fecha)}`;
 const parteName = (f, x) => `${f.nombre} · parte ${partesOf(f).indexOf(x)+1} (${fmtDate(x.fecha)})`;
-// Un elemento por vídeo sin copia: {id: figura, att: intento (si lo es), vid, nombre}. La figura más reciente primero.
-const vidsUnsaved = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
-  ...(f.vid && f.vidSaved!==f.vid ? [{id:f.id, vid:f.vid, nombre:f.nombre}] : []),
-  ...partesOf(f).filter(x=>x.vid && x.vidSaved!==x.vid).map(x=>({id:f.id, parte:x.id, vid:x.vid, nombre:parteName(f,x)})),
-  ...intentosOf(f).filter(a=>a.vid && a.vidSaved!==a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a)}))
+// Un elemento por vídeo: {id: figura, parte/att (si lo es), vid, nombre, saved}. La figura más reciente primero.
+const vidsAll = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
+  ...(f.vid ? [{id:f.id, vid:f.vid, nombre:f.nombre, saved:f.vidSaved===f.vid}] : []),
+  ...partesOf(f).filter(x=>x.vid).map(x=>({id:f.id, parte:x.id, vid:x.vid, nombre:parteName(f,x), saved:x.vidSaved===x.vid})),
+  ...intentosOf(f).filter(a=>a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a), saved:a.vidSaved===a.vid}))
 ]);
+const vidsUnsaved = () => vidsAll().filter(x=>!x.saved);
+// «Copia completa»: después del JSON se mandan todos los vídeos, también los que ya tenían copia.
+// fullDone guarda los que ya han salido en esta copia completa; null fuera de esa pantalla.
+let fullDone = null;
+const fullOn = () => setView==="videos" && !!fullDone;
+const vidsPending = () => fullOn() ? vidsAll().filter(x=>!fullDone.has(x.vid)) : vidsUnsaved();
 // iOS comparte varios vídeos a la vez («Guardar N vídeos»), pero cada envío necesita un toque:
 // se mandan por tandas de hasta 5 y unos 200 MB, y el botón ofrece la siguiente tanda.
 const VID_BATCH = 5, VID_BATCH_BYTES = 200*1048576;
@@ -4174,26 +4188,27 @@ let vidBatch = null, vidBatchP = null;
 function prepVidBatch(){
   if(vidBatchP) return vidBatchP;
   vidBatchP = (async()=>{
-    const files = [], ids = []; let bytes = 0;
-    for(const f of vidsUnsaved()){
+    const files = [], ids = [], full = fullOn(); let bytes = 0;
+    for(const f of vidsPending()){
       if(files.length>=VID_BATCH) break;
       const b = await vidGet(f.vid).catch(()=>null); if(!b) continue;
       if(files.length && bytes + b.size > VID_BATCH_BYTES) break;
-      const ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
-      const name = (f.nombre||"figura").replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "figura";
-      files.push(new File([b], `${name}.${ext}`, {type:ty})); ids.push([f.id, f.vid]); bytes += b.size;
+      const ty=b.type||"video/mp4";
+      files.push(new File([b], vidFileName(f.nombre||"figura", f.vid, ty), {type:ty})); ids.push([f.id, f.vid]); bytes += b.size;
     }
-    vidBatch = {files, ids};
-  })().catch(()=>{ vidBatch = {files:[], ids:[]}; }).finally(()=>{ vidBatchP = null; });
+    vidBatch = {files, ids, full};
+  })().catch(()=>{ vidBatch = {files:[], ids:[], full:fullOn()}; }).finally(()=>{ vidBatchP = null; });
   return vidBatchP;
 }
 async function saveVidBatch(){
-  if(!vidsUnsaved().length){ toast("Todos tus vídeos tienen copia."); return; }
+  if(!vidsPending().length){ toast(fullOn() ? "Ya están todos tus vídeos." : "Todos tus vídeos tienen copia."); return; }
+  // Una tanda preparada para la otra lista (solo sin copia / copia completa) no sirve.
+  if(vidBatch && vidBatch.full!==fullOn()) vidBatch = null;
   const batch = vidBatch;
   if(!batch){ toast("Preparando los vídeos… vuelve a pulsar."); prepVidBatch(); return; }
   if(!batch.files.length){ vidBatch = null; toast("No se encontraron los vídeos en el dispositivo."); return; }
-  // Lo que ya se guardó desde la ficha mientras tanto no se vuelve a mandar.
-  const still = new Set(vidsUnsaved().map(f=>f.vid));
+  // Lo que ya se guardó (desde la ficha o en otra tanda) mientras tanto no se vuelve a mandar.
+  const still = new Set(vidsPending().map(f=>f.vid));
   const keep = batch.ids.map((x,i)=>still.has(x[1]) ? i : -1).filter(i=>i>=0);
   if(!keep.length){ vidBatch = null; prepVidBatch(); toast("Preparando los vídeos… vuelve a pulsar."); return; }
   const files = keep.map(i=>batch.files[i]); let ids = keep.map(i=>batch.ids[i]);
@@ -4207,10 +4222,45 @@ async function saveVidBatch(){
   }
   if(!ok) return;
   vidBatch = null;
-  ids.forEach(([fid,vid])=>markVidSaved(fid, vid));
-  const left = vidsUnsaved().length;
+  ids.forEach(([fid,vid])=>{ markVidSaved(fid, vid); if(fullOn()) fullDone.add(vid); });
+  const left = vidsPending().length;
   toast(left ? `${pl(ids.length,"vídeo guardado","vídeos guardados")}. Quedan ${left}.` : "Listo: todos tus vídeos tienen copia.");
   if($('[aria-label="Ajustes"]')) openSettings();
+}
+async function exportFull(){
+  if(!(await exportBackup())) return;
+  if(!vidsAll().length) return;
+  fullDone = new Set(); vidBatch = null; setGo("videos");
+}
+function fullVidsHTML(){
+  const n = vidsPending().length;
+  return `<div class="panel">
+      <p><b>Ahora tus vídeos: ${n}</b></p>
+      <p class="small muted">${n ? `Se guardan por tandas de hasta ${VID_BATCH} con la hoja de compartir: elige «Guardar vídeos» o «Guardar en Archivos». Cada archivo lleva en el nombre el código de su vídeo, para poder devolverlo a su figura con «Recuperar vídeos».` : "Listo: la copia y todos tus vídeos están guardados."}</p>
+      ${n ? `<div class="row"><button class="btn pri" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)}</button></div>` : ""}
+    </div>`;
+}
+// «Recuperar vídeos»: el id sale del nombre del archivo. Solo se guarda si alguna figura, parte o intento lo usa
+// y no está ya en el dispositivo. De uno en uno: en el iPhone, leerlos a la vez puede agotar la memoria.
+let recovering = false;
+async function recoverVideos(list){
+  if(safeMode){ toast("Modo seguro: no se pueden guardar vídeos."); return; }
+  if(recovering || importing || restoring){ toast("Espera a que termine lo que está en marcha."); return; }
+  recovering = true;
+  let n = 0, m = 0, k = 0, err = null;
+  try{
+    const refs = vidsIn(S); Object.values(S.figures||{}).forEach(f=>figVids(f).forEach(v=>refs.add(v)));
+    for(const file of list){
+      const id = vidIdFromName(file.name);
+      if(!id || !refs.has(id)){ m++; continue; }
+      if(await vidGet(id).catch(()=>null)){ k++; continue; }
+      try{ await vidPut(id, file); n++; }catch(e){ err = e; break; }
+    }
+  }finally{ recovering = false; }
+  if(n) setTimeout(genMissingThumbs, 300);
+  render(); if($('[aria-label="Ajustes"]')) openSettings();
+  const msg = `${pl(n,"vídeo recuperado","vídeos recuperados")}${m?` · ${m} ${m===1?"no corresponde":"no corresponden"} a ninguna figura`:""}${k?` · ${k} ya estaban`:""}`;
+  toast(err ? `${err.userMsg||"No se pudo guardar un vídeo."} ${msg}` : msg);
 }
 function vidsUnsavedHTML(){
   const n = vidsUnsaved().length; if(!n) return "";
@@ -4657,7 +4707,7 @@ function listHTML(kind, bare){
 }
 // Pantalla de Ajustes abierta: null es el menú; si no, una de SET_VIEWS.
 let setView = null;
-const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas"};
+const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas", videos:"Copia completa"};
 function setGo(v){ setView=v; confirmKey=null; editKey=null; openSettings(); const sh=$(".sheet"); if(sh) sh.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); }
 const SNAP_WHY = {diaria:"Copia del día", "antes-de-importar":"Antes de importar", "antes-de-reemplazar":"Antes de reemplazar todo", "antes-de-restaurar":"Antes de restaurar", "antes-de-encoger":"Antes de borrar muchas figuras", "copia-local":"Copia guardada aparte"};
 const snapWhen = at => { try{ return new Date(at).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }catch{ return ""; } };
@@ -4691,7 +4741,10 @@ function openSettings(){
     if(!el || !b || !vs.length) return; el.textContent = `${pl(vs.length,"vídeo sin figura","vídeos sin figura")} · ${fmtMB(l.reduce((t,x)=>t+x.bytes,0))}`; el.hidden = b.hidden = false; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
   const bk = backupInfo(), bs = backupStatus(bk);
-  if(!vidBatch && vidsUnsaved().length) prepVidBatch();
+  // La copia completa solo vive en su pantalla: al salir, la tanda vuelve a ser la de los vídeos sin copia.
+  if(setView!=="videos") fullDone = null;
+  if(vidBatch && vidBatch.full!==fullOn()) vidBatch = null;
+  if(!vidBatch && vidsPending().length) prepVidBatch();
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
   const row = (v, t, val) => `<button type="button" class="mrow" data-setv="${v}"><span>${t}</span>${val!==""?`<span class="mv">${val}</span>`:""}${CHEV}</button>`;
   const head = setView
@@ -4705,7 +4758,13 @@ function openSettings(){
       <div class="row"><button type="button" class="btn" data-pick="imp-file">Elegir archivo de copia</button><input type="file" id="imp-file" accept="application/json,.json" class="sr" tabindex="-1" aria-hidden="true"></div>
       <textarea id="imp-text" placeholder="…o pega aquí el texto de una copia" aria-label="Texto de la copia"></textarea>
       <div class="row"><button class="btn" data-act="import-merge">Añadir al repertorio</button><button class="btn danger" data-act="import-replace">Reemplazar todo</button></div>
+    </div>
+    <div class="panel">
+      <h3>Recuperar vídeos</h3>
+      <p class="small muted">Elige los vídeos que guardaste con «Copia completa» o «Guardar en Fotos». Cada uno vuelve a su figura por el código de su nombre; los que ya están en este dispositivo no se tocan.</p>
+      <div class="row"><button type="button" class="btn" data-pick="vid-rec">Elegir vídeos</button><input type="file" id="vid-rec" multiple accept="video/*" class="sr" tabindex="-1" aria-hidden="true"></div>
     </div>`;
+  else if(setView==="videos") body = fullVidsHTML();
   else if(setView==="espacio") body = `<div class="panel">
       <p class="small muted" id="vid-usage">Calculando…</p>
       <p class="small muted" id="orph-st" hidden></p>
@@ -4724,8 +4783,8 @@ function openSettings(){
   else body = `<div class="panel">
       <h3>Copia de seguridad</h3>
       <p><b class="bk-st${bk.stale?" due":""}">${esc(bs.main)}</b>${bs.since?` <span class="muted">${esc(bs.since)}</span>`:""}</p>
-      <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; cada vídeo se guarda aparte con «Guardar en Fotos»).</p>
-      <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="copy">Copiar como texto</button></div>
+      <p class="small muted">Todo se guarda solo en este dispositivo: si borras la app, se pierde. Exporta una copia de vez en cuando (figuras, registros y ajustes; los vídeos van aparte: «Copia completa» los guarda todos después de la copia).</p>
+      <div class="row"><button class="btn${bk.stale?" pri":""}" data-act="export">Exportar copia</button><button class="btn" data-act="export-full">Copia completa</button><button class="btn" data-act="copy">Copiar como texto</button></div>
       <textarea id="exp-text" readonly hidden aria-label="Texto de tu copia"></textarea>
       ${vidsUnsavedHTML()}
     </div>
@@ -4740,6 +4799,7 @@ function openSettings(){
     ${head}
     ${body}
   </div></div>`;
+  const vr=$("#vid-rec"); if(vr) vr.onchange = e=>{ const l=[...(e.target.files||[])]; e.target.value=""; if(l.length) recoverVideos(l); };
   const fi=$("#imp-file"); if(fi) fi.onchange = async e=>{ const file=e.target.files[0]; if(!file) return; try{ $("#imp-text").value = await file.text(); toast("Archivo cargado. Elige «Añadir al repertorio» o «Reemplazar todo»."); }catch{ toast("No se pudo leer el archivo."); } };
   const s=$(".sheet"); if(s) s.scrollTop=sc;
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
@@ -5115,6 +5175,7 @@ document.addEventListener("click", async e=>{
   if(a==="inc-done") return openIncDone(d.id);
   if(a==="export") return exportBackup();
   if(a==="save-vids") return saveVidBatch();
+  if(a==="export-full") return exportFull();
   if(a==="orph-free") return freeOrphans();
   if(a==="persist"){
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok=>{ toast(ok?"Datos protegidos":"El sistema no lo ha permitido. Instala la app en la pantalla de inicio y vuelve a probar."); openSettings(); });
@@ -5202,7 +5263,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, socSort, bkSort, bumpEjec, 
-  SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, vidFileName, vidIdFromName, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, videoRefs: async ()=>[...await videoRefs()], orphanVideos, cleanOrphans, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 

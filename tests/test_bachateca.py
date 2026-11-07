@@ -251,7 +251,7 @@ def aviso_videos_sin_copia(browser):
     assert dl.value.suggested_filename.startswith("Figura")
     p.wait_for_timeout(300)
     # Figura 2 es la más reciente, va primero; Figura 1 ya tenía copia: no queda ninguno.
-    assert dl.value.suggested_filename == "Figura 2.mp4", dl.value.suggested_filename
+    assert dl.value.suggested_filename == "Figura 2 · v2.mp4", dl.value.suggested_filename
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert "todos tus vídeos" in p.locator(".toast").inner_text()
     p.evaluate("() => window.__bachateca.flush()")
@@ -484,6 +484,7 @@ def intento_grabado(browser):
         p.click('[data-act="att-savevid"]')
     p.click('#confirm-root [data-cf="ok"]')
     assert dl.value.suggested_filename.startswith("Figura 1 · intento"), dl.value.suggested_filename
+    assert dl.value.suggested_filename.endswith(f' · {a["vid"]}.mp4'), "lleva el id del vídeo para poder recuperarlo"
     p.wait_for_timeout(200)
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert not errors, errors
@@ -3684,6 +3685,86 @@ def limpieza_automatica_no_actua_sin_figuras(browser):
     assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")["n"] == 2
     assert p.evaluate(_VID_KEYS) == []
     assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- copia completa con vídeos (fase 2)
+@test
+def nombre_de_video_con_id(browser):
+    """Cada vídeo exportado lleva su id en el nombre (D10), y el nombre se lee de vuelta."""
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidSaved="v1")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"])
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      return [B.vidFileName('Figura 1', 'v1', 'video/mp4'), B.vidFileName('a/b:c', 'x_9-Z', 'video/quicktime'),
+              B.vidIdFromName('Figura 1 · v1.mp4'), B.vidIdFromName('Ana · intento 3/11 · a-1_b.MOV'),
+              B.vidIdFromName('Figura 1 · v1 (1).mp4'), B.vidIdFromName('IMG_0001.MOV'), B.vidIdFromName('x · a b.mp4')]; }""")
+    assert r == ["Figura 1 · v1.mp4", "abc · x_9-Z.mov", "v1", "a-1_b", "v1", None, None], r
+    # Copia completa: primero el JSON (como siempre) y después todos los vídeos, aunque ya tuvieran copia.
+    p.click("#btn-settings")
+    with p.expect_download() as dl:
+        p.click('[data-act="export-full"]')
+    assert dl.value.suggested_filename.endswith(".json")
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_selector("text=Ahora tus vídeos: 1")
+    p.wait_for_timeout(300)
+    with p.expect_download() as dl:
+        p.click('[data-act="save-vids"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    assert dl.value.suggested_filename == "Figura 1 · v1.mp4", dl.value.suggested_filename
+    assert p.evaluate("() => window.__bachateca.vidIdFromName(%s)" % json.dumps(dl.value.suggested_filename)) == "v1"
+    p.wait_for_selector("text=Ahora tus vídeos: 0")
+    assert p.evaluate("() => +localStorage.getItem('bachateca.backup.at')") > 0, "cuenta como copia hecha"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def recuperar_videos_por_nombre(browser):
+    import shutil, tempfile
+    d = tempfile.mkdtemp()
+    names = ["Figura 1 · v1.mp4", "Figura 2 · intento 1 · a1.mp4", "Otra cosa · zz9.mp4"]
+    paths = [os.path.join(d, n) for n in names]
+    for q in paths:
+        shutil.copy(FIXTURE, q)
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", intentos=[att(1, "a1")])}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    assert stored_video_sizes(p) == {}
+    p.click("#btn-settings")
+    p.click('[data-setv="importar"]')
+    p.set_input_files("#vid-rec", paths)
+    p.wait_for_function("document.querySelector('.toast') && /recuperados/.test(document.querySelector('.toast').innerText)")
+    t = p.locator(".toast").inner_text()
+    assert "2 vídeos recuperados · 1 no corresponde a ninguna figura" in t, t
+    sizes = stored_video_sizes(p)
+    assert sizes == {"v1": os.path.getsize(FIXTURE), "a1": os.path.getsize(FIXTURE)}, sizes
+    # Otra vez los mismos: ya estaban, no se reescriben.
+    p.set_input_files("#vid-rec", paths[:2])
+    p.wait_for_function("/ya estaban/.test(document.querySelector('.toast').innerText)")
+    t = p.locator(".toast").inner_text()
+    assert "0 vídeos recuperados" in t and "2 ya estaban" in t, t
+    # La ficha reproduce el vídeo recuperado y se le hace portada.
+    p.keyboard.press("Escape")
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1")
+    p.wait_for_function("window.__bachateca.covers().includes('v1')", timeout=15000)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def recuperar_videos_modo_seguro(browser):
+    d = __import__("tempfile").mkdtemp()
+    q = os.path.join(d, "Figura 1 · v1.mp4")
+    __import__("shutil").copy(FIXTURE, q)
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, init=_parche_lectura(False))
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    p.click("#btn-settings")
+    p.click('[data-setv="importar"]')
+    p.set_input_files("#vid-rec", [q])
+    p.wait_for_selector(".toast:has-text('Modo seguro: no se pueden guardar vídeos.')")
+    assert stored_video_sizes(p) == {}
     ctx.close()
 
 

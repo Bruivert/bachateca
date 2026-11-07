@@ -3522,6 +3522,131 @@ def importar_valida_la_ejecucion(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- limpieza de vídeos sin figura (fase 2)
+_HACE = """(dias) => new Date(Date.now() - dias * 864e5).toISOString()"""
+_PUT_KV = """([v, k]) => new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
+  r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k);
+    t.oncomplete = () => { r.result.close(); res(); }; t.onerror = () => rej(t.error); }; })"""
+_PUT_VIDS = """(ids) => new Promise((res, rej) => { const r = indexedDB.open("bachateca", 1);
+  r.onsuccess = () => { const t = r.result.transaction("videos", "readwrite");
+    ids.forEach(id => t.objectStore("videos").put(new Blob([new Uint8Array(2048)], {type: "video/mp4"}), id));
+    t.oncomplete = () => { r.result.close(); res(); }; t.onerror = () => rej(t.error); }; })"""
+_VID_KEYS = """() => new Promise(res => { const q = indexedDB.open("bachateca", 1);
+  q.onsuccess = () => { const g = q.result.transaction("videos").objectStore("videos").getAllKeys();
+    g.onsuccess = () => { q.result.close(); res(g.result); }; }; })"""
+
+
+def _snap_con(vids):
+    """Instantánea con una figura que usa esos vídeos (como vídeo, parte e intento)."""
+    f = {"id": "s1", "nombre": "vieja", "entrada": "a", "salida": "b", "estado": "practica", "vid": vids[0],
+         "partes": [{"id": "p1", "vid": vids[1]}], "intentos": [{"id": "i1", "vid": vids[2]}]}
+    return {"at": 5000, "reason": "diaria", "nFig": 1, "nLog": 0, "schema": 6, "state": {"schema": 6, "figures": {"s1": f}, "logs": {}}}
+
+
+@test
+def limpieza_espera_7_dias(browser):
+    # v1 está en una figura aunque una versión anterior la apuntara como huérfana hace mucho: se quita de la lista y no se borra.
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b", vid="v1", intentos=[att(1, "v2")])}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1", "v2", "h1", "cover:h1", "cover:h2"],
+                              ls={"bachateca.huerfanos": {"v1": "2026-01-01T00:00:00.000Z"}})
+    p.wait_for_function("() => { const m = JSON.parse(localStorage.getItem('bachateca.huerfanos') || '{}'); return m.h1 && m['cover:h2'] && !m.v1; }")
+    # El primer día no se borra nada.
+    assert sorted(p.evaluate(_VID_KEYS)) == ["cover:h1", "cover:h2", "h1", "v1", "v2"]
+    o = p.evaluate("() => window.__bachateca.orphanVideos()")
+    assert sorted(x["id"] for x in o) == ["cover:h1", "cover:h2", "h1"] and all(x["bytes"] == 2048 for x in o), o
+    assert sorted(p.evaluate("async () => [...await window.__bachateca.videoRefs()]")) == ["v1", "v2"]
+    # Apuntado hace 8 días (el vídeo; su portada, hace 1): se borra con su portada al arrancar.
+    p.evaluate("""(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({h1: d[0], 'cover:h1': d[1], 'cover:h2': d[1]}))""",
+               [p.evaluate(_HACE, 8), p.evaluate(_HACE, 1)])
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
+    p.evaluate("() => window.__bachateca.cleanOrphans()")   # espera a que acabe la de arranque
+    assert sorted(p.evaluate(_VID_KEYS)) == ["cover:h2", "v1", "v2"]
+    assert list(p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.huerfanos'))")) == ["cover:h2"]
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_respeta_las_instantaneas(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.evaluate(_PUT_KV, [_snap_con(["sv", "sp", "si"]), "snap:5000:diaria"])
+    p.evaluate(_PUT_VIDS, ["sv", "sp", "si", "cover:sv", "h1"])
+    viejo = p.evaluate(_HACE, 30)
+    p.evaluate("(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({sv: d, sp: d, si: d, 'cover:sv': d, h1: d}))", viejo)
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
+    r = p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")
+    assert r == {"n": 0, "bytes": 0}, r
+    assert sorted(p.evaluate(_VID_KEYS)) == ["cover:sv", "si", "sp", "sv"]
+    assert p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.huerfanos'))") == {}
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_nunca_en_modo_seguro(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["h1"], init=_parche_lectura(False),
+                              ls={"bachateca.huerfanos": {"h1": "2026-01-01T00:00:00.000Z"}})
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})") is None
+    assert p.evaluate("() => window.__bachateca.orphanVideos()") == []
+    p.click("#btn-settings")
+    p.click('[data-setv="espacio"]')
+    p.wait_for_timeout(400)
+    assert p.locator('[data-act="orph-free"]').is_hidden() and p.locator("#orph-st").is_hidden()
+    assert p.evaluate(_VID_KEYS) == ["h1"]
+    assert p.evaluate("() => localStorage.getItem('bachateca.huerfanos')") == '{"h1":"2026-01-01T00:00:00.000Z"}'
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def limpieza_se_para_si_falla_una_instantanea(browser):
+    # Si una instantánea no se puede leer, podría ser la única que guarda el vídeo: no se borra nada.
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    init = """const g = IDBObjectStore.prototype.get;
+      IDBObjectStore.prototype.get = function (k) { if (typeof k === "string" && k.startsWith("snap:")) throw new DOMException("simulado", "UnknownError");
+        return g.apply(this, arguments); };"""
+    ctx, p, errors = open_app(browser, seed=seed, videos=["h1"], init=init,
+                              ls={"bachateca.huerfanos": {"h1": "2026-01-01T00:00:00.000Z"}})
+    p.evaluate(_PUT_KV, [_snap_con(["sv", "sp", "si"]), "snap:5000:diaria"])
+    assert p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})") is None
+    assert p.evaluate("() => window.__bachateca.orphanVideos().then(() => 'ok', () => 'falla')") == "falla"
+    assert p.evaluate(_VID_KEYS) == ["h1"]
+    p.click("#btn-settings")
+    p.click('[data-setv="espacio"]')
+    p.wait_for_timeout(400)
+    assert p.locator('[data-act="orph-free"]').is_hidden()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def liberar_ahora(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b", vid="v1")}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1", "h1", "h2", "cover:h1", "sv", "sp", "si"])
+    p.evaluate(_PUT_KV, [_snap_con(["sv", "sp", "si"]), "snap:5000:diaria"])
+    p.click("#btn-settings")
+    p.click('[data-setv="espacio"]')
+    p.wait_for_selector('[data-act="orph-free"]:not([hidden])')
+    assert p.inner_text("#orph-st") == "2 vídeos sin figura · 0,0 MB"
+    p.click('[data-act="orph-free"]')
+    assert p.inner_text("#cf-t") == "¿Borrar 2 vídeos sin figura?"
+    assert p.inner_text("#cf-m") == "No están en ninguna figura ni en ninguna instantánea. No se puede deshacer."
+    assert p.inner_text('#confirm-root [data-cf="ok"]') == "Borrar"
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
+    p.wait_for_selector('[data-act="orph-free"][hidden]', state="attached")
+    assert sorted(p.evaluate(_VID_KEYS)) == ["si", "sp", "sv", "v1"]
+    assert p.locator("#orph-st").is_hidden()
+    assert "vídeos borrados" in p.inner_text(".toast")
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

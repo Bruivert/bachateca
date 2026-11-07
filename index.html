@@ -372,6 +372,9 @@ button.card:active{background:var(--surface2)}
 .rc-media video{width:100%;height:46vh;object-fit:cover;display:block;background:#000}
 .rc-media video.mirror{transform:scaleX(-1)}
 .rc-rec{position:absolute;left:12px;top:10px;padding:4px 10px;border-radius:99px;background:rgba(0,0,0,.62);color:#ff6b6b;font-size:0.8824rem;font-weight:700;font-variant-numeric:tabular-nums}
+.sim-beat{font-size:3.4rem;font-weight:800;line-height:1.1;min-height:1.1em;text-align:center;font-variant-numeric:tabular-nums}
+.sim-ok{min-height:64px;font-size:1.1rem}
+.sim-n .chip{min-height:44px}
 .rc-beat{position:absolute;right:14px;bottom:10px;font-size:3.4rem;font-weight:800;line-height:1;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.7);font-variant-numeric:tabular-nums}
 .cmp-v figcaption{position:absolute;left:10px;top:8px;padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.62);color:#fff;font-size:0.8236rem;font-weight:600;font-variant-numeric:tabular-nums}
 .cmp-now{display:flex;align-items:baseline;gap:10px;margin-bottom:-6px}
@@ -697,9 +700,9 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .flash .big{font-size:2rem;line-height:1.08}
 .flash-tag{align-self:flex-start}
 .grade .btn{min-height:64px;border-radius:16px;font-weight:800}
-.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
-.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
-.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
+.grade [data-simg="no"],.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.grade [data-simg="dudas"],.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.grade [data-simg="fluida"],.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
 .progress{height:6px}
 
 /* Enlazar y Social: tarjetas sueltas con borde. */
@@ -970,6 +973,7 @@ const fieldDirty = el => {
 function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!carried}; }
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
+  if($("[data-sim]")) return false;   // cerrar el simulacro solo lo para: lo ya puntuado está guardado
   if(sheetBase.carried) return true;
   if(pk && pk.dirty && $("[data-pulso]")) return true;
   if(rc && rc.rec && $("[data-recc]")) return true;
@@ -1219,6 +1223,8 @@ new MutationObserver(ms=>{
     if(n.nodeType!==1) continue;
     // Si se sale de «Grabarme con conteo» por cualquier camino, la cámara y el micrófono se apagan.
     if(rc && !$("[data-recc]") && (n.matches("[data-recc]") || n.querySelector("[data-recc]"))) rcCleanup();
+    // Igual con el simulacro: sin su hoja no sigue sonando el conteo.
+    if(sim && !$("[data-sim]") && (n.matches("[data-sim]") || n.querySelector("[data-sim]"))) simStop();
     (n.tagName==="VIDEO" ? [n] : n.querySelectorAll("video")).forEach(v=>{ if(!v.isConnected && !v.dataset.aux) releaseVideo(v); });
   }
 }).observe(document.body, {childList:true, subtree:true});
@@ -1805,6 +1811,11 @@ function renderRepasar(){
           : figs().length ? `<p class="small muted">Las figuras en lista de espera no entran en el repaso. Cámbialas a «En práctica» cuando quieras trabajarlas.</p>`
           : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
       </div>
+      <div class="panel">
+        <h3>Simulacro de social</h3>
+        <p class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</p>
+        <button class="btn" data-act="sim-open">Simulacro</button>
+      </div>
       ${progressHTML()}
       <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
     return;
@@ -2069,6 +2080,7 @@ function renderSocial(){
     </div>
     <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> Incluir las que están en práctica</label>
     <button class="btn pri block-btn" data-act="block">Me he bloqueado</button>
+    <button class="btn wide" data-act="sim-open">Simulacro</button>
     <button class="btn wide" data-act="log-open">Registrar el social${pend?` · ${pend}`:(last?` · último ${fmtDate(last.fecha)}`:"")}</button>
     ${socialLive()?`<button class="btn ghost wide" data-act="night-off">Terminar el social</button>`:""}`;
   $("#soc-incl").onchange=e=>{socialIncl=e.target.checked; render();};
@@ -2477,6 +2489,158 @@ function rcStop(){
   clearTimeout(rc.stopT); cancelAnimationFrame(rc.raf);
   try{ rc.rec.stop(); }catch{}
   if(tab!=="social") releaseWake();
+}
+// ---------- simulacro de social ----------
+// Lo que se bloquea en el social es decidir a tiempo: la app dice dónde estás (posición y agarre) mientras suena
+// el conteo, y hay que tener una salida antes del siguiente 1 (8 tiempos). Luego ves tus salidas y te pones nota.
+// sim es null fuera de una ronda (también en la pantalla de elegir rondas); simCfg recuerda lo elegido.
+let sim = null;       // {rondas, i, bpm, voz, beat, t0, nodes, raf, timeout, cola:[{pos, hold}], res:[{pos, hold, beats|null, g}], fase:"decide"|"revela"|"fin"}
+let simCfg = {n:6, bpm:0, voz:true}, simForced = null;
+const simPick = a => a[Math.floor(Math.random()*a.length)];
+const simBloq = () => { const lg=lastLog(); return (salPending() && logBloq) || (lg && lg.bloqueo) || ""; };
+// Posiciones del baile elegido a las que llegas o desde las que sales. Pesan más la del último bloqueo,
+// las que tienen menos de dos salidas seguras y las que tienen una pregunta abierta para clase.
+function simPositions(){
+  const bloq = simBloq();
+  return allPositions().filter(p=>exitsFrom(p).length || arrivals(p).length).map(pos=>({pos,
+    hold: arrivals(pos).length ? (simPick(arrivals(pos)).agarreOut || "") : "",
+    w: 1 + (pos===bloq ? 2 : 0) + (exitsFrom(pos).filter(ready).length<2 ? 1 : 0) + (openQs().some(q=>q.pos===pos && qBaile(q)===baileSel) ? 1 : 0)}));
+}
+// Cola al azar por peso, sin repetir la misma posición dos rondas seguidas si hay otra.
+function simQueue(n){
+  const out=[];
+  for(let k=0; k<n; k++){
+    let ps = simPositions(); const prev = out[k-1];
+    if(prev && ps.length>1) ps = ps.filter(x=>x.pos!==prev.pos);
+    let r = Math.random()*ps.reduce((s,x)=>s+x.w, 0), x = ps[ps.length-1];
+    for(const y of ps){ r -= y.w; if(r<0){ x=y; break; } }
+    out.push({pos:x.pos, hold:x.hold});
+  }
+  return out;
+}
+// Para el audio de la ronda (lo que quede del conteo), el dibujo y la cuenta atrás.
+function simQuiet(){
+  if(!sim) return;
+  (sim.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} }); sim.nodes = [];
+  cancelAnimationFrame(sim.raf); clearTimeout(sim.timeout);
+}
+// Al cerrar la hoja, salir de la app o terminar: nada sigue sonando. keep: se queda el resumen en pantalla.
+function simStop(keep){
+  if(!sim) return;
+  simQuiet(); setAudioSession("auto");
+  if(tab!=="social" && !busy && !socialLive()) releaseWake();
+  if(!keep) sim = null;
+}
+// Tiempos desde el primer 1 de la ronda (con decimal).
+const simBeats = () => { const c=cntAudio(); return Math.max(0, (c.currentTime - sim.t0)/sim.beat); };
+const fmtBeats = b => (Math.round(b*10)/10).toLocaleString("es-ES");
+function openSim(note){
+  simStop();
+  if(!simCfg.bpm){
+    const bs = figs().filter(f=>baileOf(f)===baileSel && pulsoOk(f.pulso, f.vid)).map(f=>pulsoBpm(f.pulso)).filter(Boolean);
+    simCfg.bpm = bs.length ? Math.max(90, Math.min(150, Math.round(bs.reduce((a,b)=>a+b,0)/bs.length))) : 120;
+  }
+  const any = simPositions().length>0;
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-sim>
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Simulacro de social</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div id="sim-body">${!any ? `<p>Aún no tienes posiciones con salidas. Añade dónde empiezan y acaban tus figuras.</p>` : `
+      <p>Te digo dónde estás mientras suena el pulso. Decide una salida antes del siguiente 1.</p>
+      ${note ? `<p class="note">${esc(note)}</p>` : ""}
+      ${bailes().length>1 ? `<p class="small muted">Baile: ${esc(baileSel)}</p>` : ""}
+      <div class="chips sim-n" role="group" aria-label="Rondas">${[6,10].map(n=>`<button type="button" class="chip" data-simn="${n}" aria-pressed="${simCfg.n===n}">${n} rondas</button>`).join("")}</div>
+      <label class="f" for="sim-bpm">Golpes por minuto<input type="number" id="sim-bpm" min="90" max="150" step="1" value="${simCfg.bpm}" inputmode="numeric"></label>
+      <div class="seg neutral" role="group" aria-label="Sonido del conteo"><button type="button" data-simsnd="voz" aria-pressed="${simCfg.voz}">Voz</button><button type="button" data-simsnd="pitido" aria-pressed="${!simCfg.voz}">Pitidos</button></div>
+      <div class="row sheet-foot"><button type="button" class="btn pri" id="sim-go" style="flex:1">Empezar</button></div>`}</div>
+  </div></div>`;
+  if(any) cntLoad().catch(()=>{});   // la voz se carga ya; si no llega, suenan pitidos
+  $("[data-sim]").onclick = simClick;
+  const bi = $("#sim-bpm"); if(bi) bi.onchange = ()=>{ simCfg.bpm = Math.max(90, Math.min(150, Math.round(+bi.value)||120)); bi.value = simCfg.bpm; };
+}
+function simClick(e){
+  const b = e.target.closest("button"); if(!b) return;
+  const d = b.dataset;
+  if(d.simn){ simCfg.n = +d.simn; document.querySelectorAll("[data-simn]").forEach(x=>x.setAttribute("aria-pressed", x===b)); return; }
+  if(d.simsnd){ simCfg.voz = d.simsnd==="voz"; document.querySelectorAll("[data-simsnd]").forEach(x=>x.setAttribute("aria-pressed", x===b)); return; }
+  if(d.simg) return simGrade(d.simg);
+  if(b.id==="sim-go" || d.simact==="again") return simStart();
+  if(b.id==="sim-ok") return simDecide();
+}
+function simStart(){
+  const bi = $("#sim-bpm"); if(bi) bi.onchange();
+  simStop();
+  const c = cntAudio(); setAudioSession("playback"); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const cola = simForced ? simForced.map(x=>typeof x==="string" ? {pos:x, hold:""} : {pos:x.pos, hold:x.hold||""}) : simQueue(simCfg.n);
+  simForced = null;
+  sim = {rondas:cola.length, i:0, bpm:simCfg.bpm, voz:simCfg.voz, beat:60/simCfg.bpm, cola, res:[], nodes:[], fase:"decide"};
+  askWake();
+  simRound();
+}
+// Una ronda: el conteo 1–8 empieza en t0 y el siguiente 1 (t0 + 8 tiempos) es el límite para decidir.
+function simRound(){
+  const c = cntAudio(), q = sim.cola[sim.i];
+  sim.fase = "decide"; sim.t0 = c.currentTime + .3; sim.nodes = [];
+  for(let k=0; k<8; k++) sim.nodes.push(...cntPlay([c.destination], sim.t0 + k*sim.beat, k+1, sim.voz && !!cntVoz));
+  $("#sim-body").innerHTML = `<p class="small muted">Ronda ${sim.i+1} de ${sim.rondas}</p>
+    <div class="flash"><div class="route"><span>Estás en</span></div>
+      <div class="big">${esc(q.pos)}</div>
+      ${q.hold ? `<p>Con ${holdName(q.hold)}</p>` : ""}
+      <div class="sim-beat" id="sim-beat" aria-hidden="true"></div>
+      <button type="button" class="btn pri sim-ok" id="sim-ok">La tengo</button></div>`;
+  $("#sim-ok").focus({preventScroll:true});
+  announce(`Estás en ${q.pos}${q.hold ? `, ${holdSay(q.hold)}` : ""}`);
+  const end = sim.t0 + 8*sim.beat;
+  const tick = ()=>{
+    if(!sim || sim.fase!=="decide") return;
+    if(c.currentTime >= end) return simDecide(true);
+    const el = $("#sim-beat"), t = c.currentTime - sim.t0;
+    if(el) el.textContent = t<0 ? "" : String(Math.min(8, Math.floor(t/sim.beat)+1));
+    sim.raf = requestAnimationFrame(tick);
+  };
+  tick();
+  // Por si el reloj del audio se para (el sistema corta el sonido): la ronda acaba igual, un segundo más tarde.
+  sim.timeout = setTimeout(()=>{ if(sim && sim.fase==="decide") simDecide(true); }, (end - c.currentTime + 1)*1000);
+}
+// «La tengo» o se acabó el tiempo: se para el conteo y se enseñan las salidas.
+function simDecide(late){
+  if(!sim || sim.fase!=="decide") return;
+  const q = sim.cola[sim.i], beats = late ? null : Math.round(simBeats()*10)/10;
+  simQuiet();
+  sim.fase = "revela"; sim.res[sim.i] = {pos:q.pos, hold:q.hold, beats, g:null};
+  const ex = exitsFrom(q.pos, q.hold);
+  if(!ex.length) askFor(q.pos);
+  $("#sim-body").innerHTML = `<p class="small muted">Ronda ${sim.i+1} de ${sim.rondas}</p>
+    <div class="flash"><div class="route"><span>Estabas en</span></div>
+      <div class="big">${esc(q.pos)}</div>
+      ${q.hold ? `<p>Con ${holdName(q.hold)}</p>` : ""}
+      ${late ? `<p class="note" role="alert"><b>Se acabó el tiempo</b></p>` : `<p class="small muted">Decidiste en ${fmtBeats(beats)} tiempos.</p>`}
+      <div class="answer" id="sim-ans" tabindex="-1">
+        ${ex.length ? `<ul class="exits">${ex.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>` : `<div class="note">Desde aquí aún no tienes salida: básico y pide una en clase.</div>`}
+        <p class="small muted">¿Cómo te ha salido?</p>
+        <div class="grade"><button type="button" class="btn" data-simg="no">No me salió</button><button type="button" class="btn" data-simg="dudas">Dudé</button>${late ? "" : `<button type="button" class="btn" data-simg="fluida">La tenía</button>`}</div>
+      </div></div>`;
+  $("#sim-ans").focus({preventScroll:true});
+}
+function simGrade(g){
+  if(!sim || sim.fase!=="revela") return;
+  const r = sim.res[sim.i]; r.g = g;
+  S.linkRep[r.pos] = nextRep(S.linkRep[r.pos], g); persist({t:"lr"});
+  const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
+  sim.i++;
+  if(sim.i < sim.rondas) return simRound();
+  simEnd();
+}
+function simEnd(){
+  sim.fase = "fin"; simStop(true);
+  const res = sim.res, ok = res.filter(r=>r.g==="fluida").length, dec = res.filter(r=>r.beats!=null);
+  const avg = dec.length ? dec.reduce((s,r)=>s+r.beats, 0)/dec.length : null;
+  const dud = [...new Set(res.filter(r=>r.g!=="fluida" || r.beats==null).map(r=>r.pos))];
+  $("#sim-body").innerHTML = `<div class="panel"><h3 id="sim-fin" tabindex="-1">Simulacro terminado</h3>
+      <p>La tenías en <b>${ok} de ${sim.rondas}</b> ${sim.rondas===1?"ronda":"rondas"}.</p>
+      ${avg!=null ? `<p class="small muted">Tardaste de media ${fmtBeats(avg)} tiempos en decidir.</p>` : ""}</div>
+    ${dud.length ? `<div class="panel"><h3>Dónde dudaste</h3><ul class="exits">${dud.map(p=>`<li><span>${esc(p)}</span><button type="button" class="btn sm" data-act="goto-pos" data-p="${esc(p)}">Ver salidas</button></li>`).join("")}</ul></div>` : ""}
+    <div class="row sheet-foot"><button type="button" class="btn pri" data-simact="again" style="flex:1">Otra vez</button><button type="button" class="btn" data-act="close">Hecho</button></div>`;
+  $("#sim-fin").focus({preventScroll:true});
+  render();
 }
 // Hoja «Nuevo intento»: el vídeo ya elegido, con el mismo recorte que el vídeo de la clase.
 // Por defecto se guarda solo el fragmento en calidad media: los vídeos de la cámara ocupan mucho.
@@ -3184,7 +3348,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup();
+  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup(); simStop();
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -4215,7 +4379,8 @@ document.addEventListener("click", async e=>{
   if(a==="rev-one"){ if(!S.figures[d.id]) return; closeSheet(); training=null; session={kind:"fig", ids:[d.id], i:0, revealed:false, done:[], promote:[], weak:[]}; return go("repasar"); }
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
-  if(a==="goto-pos"){ linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
+  if(a==="sim-open") return openSim();
+  if(a==="goto-pos"){ if(t.closest("[data-sim]")) closeSheet(); linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
   if(a==="q-done" || a==="q-del"){
     const q = S.preguntas?.[d.id]; if(!q) return;
     const copy = clone(q);
@@ -4350,6 +4515,9 @@ $("#confirm-root").addEventListener("click", e=>{
   if(b.classList.contains("confirm-bg") && e.target!==b) return;
   confirmDone(b.dataset.cf==="ok");
 });
+// Al salir de la app a mitad de un simulacro se para (el conteo no puede seguir sonando de fondo) y la hoja
+// vuelve a la pantalla de empezar, con un aviso. Lo ya puntuado queda guardado.
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && sim && sim.fase!=="fin"){ simStop(); if($("[data-sim]")) openSim("Se paró al salir de la app. Empieza otra vez cuando quieras."); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy||socialLive()) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
@@ -4357,7 +4525,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
   SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

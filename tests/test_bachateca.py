@@ -2413,6 +2413,101 @@ def copia_en_memoria_solo_para_ese_video(browser):
     ctx.close()
 
 
+def sim_figs():
+    return {f["id"]: f for f in [fig(1, "Cerrada", "Sombra", estado="disponible"),
+                                 fig(2, "Sombra", "Abierta 2 manos"),
+                                 fig(3, "Abierta 2 manos", "Cerrada")]}
+
+
+@test
+def simulacro_completo(browser):
+    ctx, p, errors = open_app(browser, seed={"figures": sim_figs()})
+    st = lambda: p.evaluate("() => window.__bachateca.simState()")
+    p.evaluate("() => window.__bachateca.simForce(['Cerrada', 'Sombra'])")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('#v-social [data-act="sim-open"]')
+    assert "Decide una salida antes del siguiente 1." in p.inner_text("[data-sim]")
+    assert p.locator("[data-simn]").count() == 2
+    p.fill("#sim-bpm", "150")
+    p.click("#sim-go")
+    s = st()
+    assert s["fase"] == "decide" and s["i"] == 0 and s["rondas"] == 2 and s["pos"] == "Cerrada", s
+    assert "Cerrada" in p.inner_text("[data-sim] .big")
+    p.click("#sim-ok")
+    s = st()
+    assert s["fase"] == "revela" and isinstance(s["beats"], (int, float)), s
+    assert "Figura 1" in p.inner_text("[data-sim]")
+    p.click('[data-simg="fluida"]')
+    s = st()
+    assert s["fase"] == "decide" and s["i"] == 1 and s["pos"] == "Sombra", s
+    p.wait_for_function("window.__bachateca.simState().fase === 'revela'", timeout=8000)
+    t = p.inner_text("[data-sim]")
+    assert "Se acabó el tiempo" in t and "Figura 2" in t, t
+    assert st()["beats"] is None
+    assert p.locator('[data-simg="fluida"]').count() == 0
+    p.click('[data-simg="no"]')
+    assert st()["fase"] == "fin"
+    t = p.inner_text("[data-sim]")
+    assert "1 de 2" in t and "Dónde dudaste" in t, t
+    assert "Sombra" in t.split("Dónde dudaste")[1]
+    assert p.locator('[data-sim] [data-act="goto-pos"][data-p="Sombra"]').count() == 1
+    lr = p.evaluate("() => window.__bachateca.state().linkRep")
+    assert lr["Cerrada"]["step"] == 1 and lr["Sombra"]["fallos"] == 1, lr
+    hoy = p.evaluate("() => window.__bachateca.todayStr()")
+    assert p.evaluate("() => window.__bachateca.state().actividad")[hoy] == 2
+    p.click('[data-sim] [data-act="goto-pos"][data-p="Sombra"]')
+    assert p.locator("[data-sim]").count() == 0 and st() is None
+    assert p.evaluate("() => location.hash") == "#enlazar" or p.locator("#v-enlazar").is_visible()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def simulacro_posicion_sin_salida(browser):
+    ctx, p, errors = open_app(browser, seed={"figures": {"f1": fig(1, "Cerrada", "Sombra")}})
+    p.evaluate("() => window.__bachateca.simForce(['Sombra'])")
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert "Simulacro de social" in p.inner_text("#v-repasar")
+    p.click('#v-repasar [data-act="sim-open"]')
+    p.click("#sim-go")
+    p.click("#sim-ok")
+    assert "aún no tienes salida" in p.inner_text("[data-sim]")
+    qs = p.evaluate("() => Object.values(window.__bachateca.state().preguntas || {})")
+    assert any(q["pos"] == "Sombra" and not q.get("resuelta") for q in qs), qs
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def simulacro_cerrar_para_el_conteo(browser):
+    init = """(() => { window.__stops = 0; const o = AudioScheduledSourceNode.prototype.stop;
+      AudioScheduledSourceNode.prototype.stop = function(...a){ window.__stops++; return o.apply(this, a); }; })();"""
+    ctx, p, errors = open_app(browser, seed={"figures": sim_figs()}, init=init)
+    p.evaluate("() => window.__bachateca.simForce(['Cerrada'])")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('#v-social [data-act="sim-open"]')
+    p.click("#sim-go")
+    p.wait_for_function("window.__bachateca.simState() && window.__bachateca.simState().beats > 1", timeout=5000)
+    antes = p.evaluate("() => window.__stops")
+    p.click('[data-sim] [data-act="close"]')
+    assert p.locator("[data-sim]").count() == 0
+    assert p.evaluate("() => window.__bachateca.simState()") is None
+    assert p.evaluate("() => window.__stops") > antes
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def simulacro_sin_posiciones(browser):
+    ctx, p, errors = open_app(browser, seed={"figures": {"f1": fig(1, "", "")}})
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('#v-social [data-act="sim-open"]')
+    assert "Aún no tienes posiciones con salidas. Añade dónde empiezan y acaban tus figuras." in p.inner_text("[data-sim]")
+    assert p.locator("#sim-go").count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

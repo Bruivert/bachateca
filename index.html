@@ -226,6 +226,13 @@ button.card:active{background:var(--surface2)}
 .mrow{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:0 12px 0 16px;border:0;background:none;color:var(--fg);font-size:0.9412rem;text-align:left;position:relative}
 .mrow+.mrow::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
 .mrow:active{background:var(--fill)}
+.nx-row{display:flex;align-items:center;position:relative}
+.nx-row+.nx-row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+.nx-row .mrow{flex:1;min-width:0}
+.ln-tg{flex:none;min-height:44px;margin-right:8px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--fg);font-size:0.8235rem}
+.ln-tg.on{background:var(--fill);font-weight:600}
+.ln-ok{color:var(--muted);margin-top:4px}
+.ln-btn{min-height:44px;margin-top:6px}
 .mrow>span:first-child{flex:1}
 .mrow .mv{color:var(--muted);font-variant-numeric:tabular-nums}
 .mrow svg{flex:none;width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -804,7 +811,7 @@ const PROMOTE_DISP = 2;   // usos en socials para proponer «Disponible»
 const PROMOTE_CONS = 6;   // usos para proponer «Consolidada»
 
 // ---------- estado ----------
-let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOLDS], classes:[...DEFAULT_CLASSES], linkRep:{} };
+let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOLDS], classes:[...DEFAULT_CLASSES], linkRep:{}, enlaces:{} };
 let tab = "repertorio";
 let filt = { q:"", baile:"todos", estado:"todos", vista:"pos" };
 let linkPos = null, linkHold = "";
@@ -913,6 +920,22 @@ const isDue = f => active(f) && (!f.rep || !f.rep.due || f.rep.due <= todayStr()
 const dueFigs = () => figs().filter(isDue).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||"") || (a.rep?.step||0)-(b.rep?.step||0));
 const linkPositions = () => allPositions().filter(p=>exitsFrom(p).length);
 // El repaso de cada posición es por baile: «Cerrada» en bachata y en salsa se repasan por separado. Clave: baile␟posición.
+// Enlaces comprobados: pares de figuras que has bailado de verdad una detrás de otra.
+const linkKey = (a, b) => a + ">" + b;
+const linkDone = (a, b) => !!(S.enlaces && S.enlaces[a.id + ">" + b.id]);
+function markLink(aId, bId){
+  if(!S.figures[aId] || !S.figures[bId]) return;
+  const k = linkKey(aId, bId), e = (S.enlaces ||= {})[k];
+  S.enlaces[k] = e ? {...e, veces:(+e.veces||0)+1, fecha:todayStr()} : {a:aId, b:bId, fecha:todayStr(), veces:1};
+  persist({t:"meta"});
+}
+function unmarkLink(k){ if(S.enlaces) delete S.enlaces[k]; persist({t:"meta"}); }
+// «Lo he bailado»: en la cadena, «comprobado» si ya está marcado; en la ficha, un botón que alterna.
+function lnHTML(a, b, enCadena){
+  const on = linkDone(a, b), d = `data-act="ln-mark" data-a="${esc(a.id)}" data-b="${esc(b.id)}"`;
+  if(enCadena) return on ? `<div class="small ln-ok">✓ comprobado</div>` : `<div><button type="button" class="btn ghost ln-btn" ${d}>Lo he bailado</button></div>`;
+  return `<button type="button" class="ln-tg${on?" on":""}" ${d} aria-pressed="${on}" aria-label="Lo he bailado: ${esc(a.nombre)} y ${esc(b.nombre)}">${on?"✓ ":""}Lo he bailado</button>`;
+}
 const lrKey = (pos, baile = baileSel) => baile + "␟" + pos;
 const dueLinks = () => { const t=todayStr(); return linkPositions().filter(p=>{ const r=S.linkRep[lrKey(p)]; return !r || !r.due || r.due<=t; }); };
 let toastT, toastEl = null, toastEnd = null;
@@ -1060,7 +1083,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 8;
+const SCHEMA = 9;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1129,6 +1152,10 @@ const MIGRATIONS = [
       delete lr[k];
     });
     c.linkRep = lr;
+  },
+  // 8 → 9: enlaces comprobados ({"idA>idB": {a, b, fecha, veces}}): los que has bailado de verdad. Empieza vacío.
+  c => {
+    if(!(c.enlaces && typeof c.enlaces==="object" && !Array.isArray(c.enlaces))) c.enlaces = {};
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1147,6 +1174,7 @@ function applyData(c){
   S = { ...c, figures:c.figures||{}, logs:c.logs||{}, positions:arrOr(c.positions,DEFAULT_POS), holds:arrOr(c.holds,DEFAULT_HOLDS),
         classes:Array.isArray(c.classes)?[...c.classes]:[...DEFAULT_CLASSES], linkRep:(c.linkRep&&typeof c.linkRep==="object")?c.linkRep:{},
         actividad:(c.actividad&&typeof c.actividad==="object")?c.actividad:{},
+        enlaces:(c.enlaces&&typeof c.enlaces==="object"&&!Array.isArray(c.enlaces))?c.enlaces:{},
         preguntas:(c.preguntas&&typeof c.preguntas==="object"&&!Array.isArray(c.preguntas))?c.preguntas:{},
         schema: Number.isInteger(c.schema) ? c.schema : SCHEMA };
 }
@@ -2025,7 +2053,8 @@ function mapHTML(cov, gaps, incN){
 }
 const holdFits = (a,b,strict) => strict ? (!!a && !!b && a===b) : holdOk(a,b);
 // Pura: recibe la reserva ya filtrada (usables, con posiciones, del baile y, si toca, solo seguras) y no toca S ni el DOM.
-function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
+// prefer(prev, f) → 0..1 (prev es null en el primer paso): cada opción pesa 1 + 3·prefer; sin prefer todas pesan igual.
+function buildChain(pool, {start, hold="", strict=false, n=4, prefer}, rnd=Math.random){
   const steps=[]; const used=new Set(); let prev=null;
   let pos = start || (pool[Math.floor(rnd()*pool.length)]||{}).entrada;
   const fits = f => prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
@@ -2037,7 +2066,12 @@ function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
       const usedUp = pool.some(f=> used.has(f.id) && fits(f));
       steps.push({dead: prev?prev.salida:pos, hold: prev?prev.agarreOut:"", usedUp}); break;
     }
-    const f = opts[Math.floor(rnd()*opts.length)];
+    let f;
+    if(prefer){
+      const w = opts.map(o=>1+3*(+prefer(prev, o)||0)); let r = rnd()*w.reduce((a,b)=>a+b,0), j = 0;
+      while(j<opts.length-1 && r>=w[j]){ r-=w[j]; j++; }
+      f = opts[j];
+    } else f = opts[Math.floor(rnd()*opts.length)];
     // vago: el enlace se apoyó en un agarre sin indicar. En el primer paso solo cuenta si elegiste agarre («Cualquiera» no avisa).
     const vago = prev ? (!prev.agarreOut || !f.agarreIn) : (!!hold && !f.agarreIn);
     used.add(f.id); steps.push({f, vago}); prev=f;
@@ -2049,7 +2083,7 @@ const chainLS = lsGet(LS_CHAIN), chainV = chainLS && typeof chainLS==="object" ?
 let chainSafe = chainV.safe === true, chainStrict = chainV.strict === true;
 function makeChain(start){
   const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
-  return buildChain(pool, {start, hold: linkHold, strict: chainStrict});
+  return buildChain(pool, {start, hold: linkHold, strict: chainStrict, prefer: (p, f) => p && linkDone(p, f) ? 1 : 0});
 }
 function renderChain(){
   if(!chain.steps.length) return `<p class="muted small">Aún no hay figuras para encadenar.</p>`;
@@ -2060,11 +2094,11 @@ function renderChain(){
   let m=0;
   const bar = `<div class="chain-bar" aria-hidden="true">${chain.steps.map(s=>`<span class="${s.dead?"dead":""}" style="flex:${beats(s)}">${s.dead?"básico":++m}</span>`).join("")}</div>
     <p class="small muted">${total} tiempos: ${fr===1?"una frase de 8":`unas ${fr} frases de 8`} seguidas.</p>`;
-  return `${bar}<div class="chain">${chain.steps.map(s=> s.dead
+  return `${bar}<div class="chain">${chain.steps.map((s,i)=> s.dead
     ? `<div class="step"><span class="k">↺</span><div><b>Básico</b><div class="small muted">${s.usedUp
         ? `Las salidas desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} ya están en la cadena. Vuelve al básico y empieza otra vuelta.`
         : `Desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} aún no tienes salidas. Vuelve al básico: también es una transición.`}</div></div></div>`
-    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}${ready(s.f)?"":" · en práctica"}${s.vago?" · agarre sin indicar":""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
+    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b>${i>0 && chain.steps[i-1].f ? lnHTML(chain.steps[i-1].f, s.f, true) : ""}<div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}${ready(s.f)?"":" · en práctica"}${s.vago?" · agarre sin indicar":""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
 }
 
 // ---------- vista: social ----------
@@ -2276,6 +2310,10 @@ function saveLog(){
   if(backupInfo().stale) lsSet(LS_NUDGE, 1);
   render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
   const s=$(".sheet"); if(s) s.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); announce("Registro guardado");
+  // Si marcaste dos figuras que encajan una detrás de otra y ese enlace aún no está comprobado, se ofrece una vez (solo la primera pareja).
+  const fs = l.figs.map(id=>S.figures[id]).filter(x=>x && placed(x));
+  for(const A of fs){ const B = fs.find(x=>x!==A && canFollow(A,x) && !linkDone(A,x)); if(B){
+    toast(`¿Bailaste ${A.nombre} → ${B.nombre}?`, {label:"Sí", fn:()=>{ markLink(A.id, B.id); announce("Enlace comprobado"); }}); break; } }
 }
 function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
@@ -2344,7 +2382,7 @@ function openView(id){
     ${attCardHTML(f, CHEV)}
     ${f.estado!=="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
-      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${esc(x.id)}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
+      ? `<div class="menu">${nexts.map(x=>`<div class="nx-row"><button type="button" class="mrow" data-view="${esc(x.id)}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>${lnHTML(f, x)}</div>`).join("")}</div>`
       : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
   </div></div>`;
   hydrateVideos($("#sheet-root"));
@@ -4160,7 +4198,7 @@ function openSettings(){
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
   markClean();
 }
-function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{},preguntas:S.preguntas||{}},null,2); }
+function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{},preguntas:S.preguntas||{},enlaces:S.enlaces||{}},null,2); }
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const isObj = o => !!o && typeof o==="object" && !Array.isArray(o);
 // test() convierte a texto: sin comprobar el tipo, un id ausente pasaría como «undefined».
@@ -4213,7 +4251,13 @@ function sanitizeImport(d){
     if("baile" in r && !(typeof r.baile==="string" && r.baile.trim())) delete r.baile;
     preguntas[q.id] = r;
   });
-  return {figures, logs, preguntas, descartadas};
+  // Enlaces comprobados: la clave es «idA>idB» con los dos ids seguros, fecha ISO y veces entero ≥ 1.
+  const enlaces={}, es = isObj(d&&d.enlaces) ? Object.values(d.enlaces) : [];
+  es.forEach(e=>{
+    if(isObj(e) && okId(e.a) && okId(e.b) && typeof e.fecha==="string" && /^\d{4}-\d{2}-\d{2}$/.test(e.fecha) && Number.isInteger(e.veces) && e.veces>=1) enlaces[e.a+">"+e.b] = {a:e.a, b:e.b, fecha:e.fecha, veces:e.veces};
+    else descartadas++;
+  });
+  return {figures, logs, preguntas, enlaces, descartadas};
 }
 // Compara dos figuras sin intentos ni partes (esos se fusionan aparte); el orden de las claves no cuenta.
 const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : isObj(v) ? Object.fromEntries(Object.keys(v).sort().map(k=>[k, sortKeys(v[k])])) : v;
@@ -4240,7 +4284,7 @@ async function importData1(replace){
   const rawIds = o => new Set(isObj(o) ? Object.entries(o).flatMap(([k,v])=>[k, ...(isObj(v)&&typeof v.id==="string"?[v.id]:[])]) : []);
   const inFigs = rawIds(d.figures), inLogs = rawIds(d.logs), inQs = rawIds(d.preguntas);
   const san = sanitizeImport(d), desc = san.descartadas ? ` · ${san.descartadas} descartadas por estar mal formadas` : "";
-  d.figures = san.figures; d.logs = san.logs; d.preguntas = san.preguntas;
+  d.figures = san.figures; d.logs = san.logs; d.preguntas = san.preguntas; d.enlaces = san.enlaces;
   const inc=Object.values(d.figures), nIn=inc.length;
   if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."+desc); return; }
   if(!nIn && !Object.keys(d.logs).length){ toast("Esa copia no tiene figuras ni registros que añadir."+desc); return; }
@@ -4285,6 +4329,8 @@ async function importData1(replace){
       if(!replace && (S.preguntas[q.id] || (!q.resuelta && openQs().some(x=>x.pos===q.pos && qBaile(x)===qBaile(q))))) return;
       S.preguntas[q.id]=q;
     });
+    // Enlaces comprobados: «Reemplazar» deja los de la copia; «Añadir», los que faltan.
+    S.enlaces = replace ? {...d.enlaces} : {...d.enlaces, ...(S.enlaces||{})}; persist({t:"meta"});
     const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
     S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
     if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
@@ -4414,6 +4460,17 @@ document.addEventListener("click", async e=>{
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
   if(a==="sim-open") return openSim();
+  if(a==="ln-mark"){
+    const A=S.figures[d.a], B=S.figures[d.b]; if(!A || !B) return;
+    const k=linkKey(d.a, d.b), antes=S.enlaces?.[k] ? clone(S.enlaces[k]) : null;
+    if(antes) unmarkLink(k); else markLink(d.a, d.b);
+    // En la ficha se repinta conservando el scroll; en la cadena, la vista.
+    const enFicha = !!t.closest("[data-viewfig]"), sh = enFicha && $(".sheet"), y = sh ? sh.scrollTop : 0;
+    if(sh){ openView(d.a); const s2=$(".sheet"); if(s2) s2.scrollTop=y; } else render();
+    announce(antes ? "Enlace sin comprobar" : "Enlace comprobado");
+    if(antes) toast(`Quitado: ${A.nombre} → ${B.nombre}`, {label:"Deshacer", fn:()=>{ (S.enlaces ||= {})[k]=antes; persist({t:"meta"}); if(enFicha && S.figures[d.a]) openView(d.a); else render(); }});
+    return;
+  }
   if(a==="goto-pos"){ if(t.closest("[data-sim]")) closeSheet(); linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
   if(a==="q-done" || a==="q-del"){
     const q = S.preguntas?.[d.id]; if(!q) return;
@@ -4558,7 +4615,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
-  SCHEMA, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  SCHEMA, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 

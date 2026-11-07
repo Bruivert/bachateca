@@ -2269,7 +2269,7 @@ def migracion_7_preguntas(browser):
       const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 6});
       const sinPreg = B.migrate({schema: 6, figures: {}});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), n3: Object.keys(m3.preguntas).length, sinPreg: sinPreg.preguntas, t3: t(-3), S: B.SCHEMA}; }""")
-    assert r["S"] == 8 and r["m"]["schema"] == 8, r
+    assert r["S"] == 9 and r["m"]["schema"] == 9, r
     qs = list(r["m"]["preguntas"].values())
     assert len(qs) == 1 and qs[0]["pos"] == "Sombra" and qs[0]["creada"] == r["t3"] and qs[0]["baile"] == "Bachata" and not qs[0].get("resuelta"), qs
     assert r["same"] and r["n3"] == 1, "repetir la migración no duplica"
@@ -2588,7 +2588,7 @@ def migracion_8_repaso_por_baile(browser):
       const old = {schema: 7, figures: {}, linkRep: {Cerrada: {step: 2, due: t(3)}, "Salsa\u241fSombra": {step: 1, due: t(1)}}};
       const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 7});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), same3: JSON.stringify(m) === JSON.stringify(m3), S: B.SCHEMA}; }""")
-    assert r["S"] == 8 and r["m"]["schema"] == 8, r
+    assert r["S"] == 9 and r["m"]["schema"] == 9, r
     lr = r["m"]["linkRep"]
     assert sorted(lr) == ["Bachata\u241fCerrada", "Salsa\u241fSombra"] and lr["Bachata\u241fCerrada"]["step"] == 2, lr
     assert r["same"] and r["same3"], "repetir la migración no cambia nada"
@@ -2627,6 +2627,116 @@ def renombrar_posicion_mueve_su_repaso(browser):
     lr = p.evaluate("() => window.__bachateca.state().linkRep")
     assert sorted(lr) == ["Bachata\u241fPegados", "Salsa\u241fPegados", "Salsa\u241fSombra"], lr
     assert lr["Salsa\u241fPegados"]["step"] == 2 and lr["Bachata\u241fPegados"]["step"] == 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def marcar_enlace_desde_la_ficha(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos"), "f2": fig(2, "Abierta 2 manos", "Cerrada")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('#v-repertorio [data-view="f1"]')
+    b = p.locator('[data-act="ln-mark"]')
+    assert b.get_attribute("aria-pressed") == "false" and b.get_attribute("data-a") == "f1" and b.get_attribute("data-b") == "f2"
+    b.click()
+    e = p.evaluate("() => window.__bachateca.state().enlaces")
+    assert list(e) == ["f1>f2"] and e["f1>f2"]["veces"] == 1 and e["f1>f2"]["a"] == "f1", e
+    assert p.locator('[data-act="ln-mark"]').get_attribute("aria-pressed") == "true"
+    p.locator('[data-act="ln-mark"]').click()
+    assert p.evaluate("() => window.__bachateca.state().enlaces") == {}
+    p.click(".toast .undo")
+    assert list(p.evaluate("() => window.__bachateca.state().enlaces")) == ["f1>f2"]
+    assert p.locator('[data-act="ln-mark"]').get_attribute("aria-pressed") == "true"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_prefiere_enlaces_comprobados(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const mk = (i, e, s) => ({id: "f" + i, nombre: "F" + i, tipo: "figura", estado: "practica", entrada: e, salida: s, agarreIn: "", agarreOut: ""});
+      const pool = [mk(1, "Cerrada", "Sombra"), mk(2, "Sombra", "Cerrada"), mk(3, "Sombra", "Cerrada")];
+      const sig = (opt, rnd) => B.buildChain(pool, Object.assign({start: "Cerrada", n: 2}, opt), rnd).steps.map(s => s.f ? s.f.id : "dead").join();
+      const prefer = (p, f) => p && p.id === "f1" && f.id === "f3" ? 1 : 0;
+      // Dos opciones tras f1: pesos 1 y 4. rnd 0.5 de 5 → 2.5: sin preferencia elegiría f3 solo con rnd >= .5; aquí con .3 (1.5) ya cae en f3.
+      return {sin0: sig({}, () => 0.3), sinB: sig({}, () => 0.6), con: sig({prefer}, () => 0.3), con0: sig({prefer}, () => 0), calls: (() => { const a = []; B.buildChain(pool, {start: "Cerrada", n: 2, prefer: (p, f) => { a.push(p ? p.id : null); return 0; }}, () => 0); return a; })()}; }""")
+    assert r["sin0"] == "f1,f2" and r["sinB"] == "f1,f3", r
+    assert r["con"] == "f1,f3" and r["con0"] == "f1,f2", r
+    assert r["calls"][0] is None, "en el primer paso prev es null"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_muestra_comprobado(browser):
+    # Un solo camino: f1 → f2 → f3. El 2.º paso está comprobado; el 3.º, no.
+    figs = {"f1": fig(1, "Cerrada", "Sombra", estado="disponible"), "f2": fig(2, "Sombra", "Abierta 2 manos", estado="disponible"),
+            "f3": fig(3, "Abierta 2 manos", "Cerrada", estado="disponible")}
+    seed = {"figures": figs, "enlaces": {"f1>f2": {"a": "f1", "b": "f2", "fecha": "2030-01-01", "veces": 1}}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar [data-act="chain"]')
+    steps = p.locator("#v-enlazar .chain .step")
+    assert "comprobado" in steps.nth(1).inner_text() and steps.nth(1).locator('[data-act="ln-mark"]').count() == 0
+    assert steps.nth(0).locator('[data-act="ln-mark"]').count() == 0, "el primer paso no tiene anterior"
+    b = steps.nth(2).locator('[data-act="ln-mark"]')
+    assert b.inner_text() == "Lo he bailado" and b.get_attribute("data-a") == "f2" and b.get_attribute("data-b") == "f3"
+    b.click()
+    assert "f2>f3" in p.evaluate("() => window.__bachateca.state().enlaces")
+    assert "comprobado" in p.locator("#v-enlazar .chain .step").nth(2).inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_ofrece_comprobar_el_enlace(browser):
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.click('[data-logfig="f1"]'); p.click('[data-logfig="f2"]')
+    p.click('[data-act="log-save"]')
+    assert "¿Bailaste Figura 1 → Figura 2?" in p.inner_text(".toast")
+    p.click(".toast .undo")
+    assert list(p.evaluate("() => window.__bachateca.state().enlaces")) == ["f1>f2"]
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def migracion_9_enlaces(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const m = B.migrate({schema: 8, figures: {}}), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 8});
+      const k = B.migrate({schema: 8, figures: {}, enlaces: {"a>b": {a: "a", b: "b", fecha: "2030-01-01", veces: 2}}});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k: k.enlaces, S: B.SCHEMA}; }""")
+    assert r["S"] == 9 and r["m"]["schema"] == 9 and r["m"]["enlaces"] == {}, r
+    assert r["same"] and r["k"]["a>b"]["veces"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_enlaces(browser):
+    mio = {"a": "f1", "b": "f2", "fecha": "2030-01-01", "veces": 3}
+    seed = {"schema": 9, "figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")}, "enlaces": {"f1>f2": mio}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    copia = {"app": "bachateca", "schema": 9, "figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")},
+             "enlaces": {"f1>f2": {"a": "f1", "b": "f2", "fecha": "2031-01-01", "veces": 9}, "f2>f1": {"a": "f2", "b": "f1", "fecha": "2031-02-02", "veces": 1},
+                         "malo": {"a": "f2", "b": "f1", "fecha": "ayer", "veces": 1}, "malo2": {"a": "f1", "b": "x y", "fecha": "2031-02-02", "veces": 1},
+                         "malo3": {"a": "f1", "b": "f1", "fecha": "2031-02-02", "veces": 0}}}
+    import_text(p, json.dumps(copia))
+    e = p.evaluate("() => window.__bachateca.state().enlaces")
+    assert sorted(e) == ["f1>f2", "f2>f1"] and e["f1>f2"]["veces"] == 3 and e["f2>f1"]["veces"] == 1, e
+    assert json.loads(p.evaluate("() => window.__bachateca.exportData()"))["enlaces"].keys() == e.keys()
+    p.keyboard.press("Escape"); p.wait_for_timeout(200)
+    import_text(p, json.dumps({**copia, "enlaces": {"f2>f1": copia["enlaces"]["f2>f1"]}}), replace=True)
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_timeout(300)
+    assert list(p.evaluate("() => window.__bachateca.state().enlaces")) == ["f2>f1"]
     assert not errors, errors
     ctx.close()
 

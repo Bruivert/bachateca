@@ -3105,6 +3105,58 @@ def cadena_lee_opciones_guardadas_con_validacion(browser):
     ctx.close()
 
 
+# ---- fase 5
+@test
+def avance_fino_en_la_ficha(browser):
+    """«0,1 s ›» pausa y mueve el vídeo una décima, sin salirse del recorte."""
+    seed = {"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidTrim={"start": 0.5, "end": 0.8})}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.wait_for_function("(() => { const v = document.querySelector('.player video'); return v && v.readyState >= 1 && Math.abs(v.currentTime - 0.5) < 0.05; })()")
+    assert p.get_attribute('.player [data-step="0.1"]', "aria-label") == "Adelante 0,1 segundos"
+    assert p.get_attribute('.player [data-step="-0.1"]', "aria-label") == "Atrás 0,1 segundos"
+    cur = "() => document.querySelector('.player video').currentTime"
+    def seeked():
+        p.wait_for_function("!document.querySelector('.player video').seeking")
+    p.click('.player [data-step="0.1"]'); seeked(); p.click('.player [data-step="0.1"]'); seeked()
+    t = p.evaluate(cur)
+    assert abs(t - 0.7) < 0.03 and p.evaluate("() => document.querySelector('.player video').paused"), t
+    p.click('.player [data-step="0.1"]'); seeked(); p.click('.player [data-step="0.1"]'); seeked()
+    assert p.evaluate(cur) <= 0.8 + 0.01, "no pasa del final del recorte"
+    for _ in range(5):
+        p.click('.player [data-step="-0.1"]'); seeked()
+    assert p.evaluate(cur) >= 0.5 - 0.01, "no baja del inicio del recorte"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def avance_fino_en_comparar(browser):
+    """Los dos botones mueven la clase una décima y colocan el tuyo en el mismo tiempo de la música."""
+    ctx, p, errors = open_app(browser, seed=cmp_seed())
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]')
+    p.click('[data-act="cmp-open"]')
+    p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    wait_seeked(p)
+    assert p.get_attribute('[data-cmp] [data-cstep="0.1"]', "aria-label") == "Adelante 0,1 segundos"
+    assert p.get_attribute('[data-cmp] [data-cstep="-0.1"]', "aria-label") == "Atrás 0,1 segundos"
+    t0 = times(p)[0]
+    p.click('[data-cmp] [data-cstep="0.1"]'); wait_seeked(p)
+    p.click('[data-cmp] [data-cstep="0.1"]'); wait_seeked(p)
+    r = p.evaluate("""() => { const B = window.__bachateca, S = B.state().figures.f1, t = document.querySelector('#cmp-t').currentTime, m = document.querySelector('#cmp-m').currentTime;
+      const b = B.secToBeat(S.pulso, t); return {t, b, err: m - B.beatToSec(S.intentos[0].pulso, b), st: B.cmpState()}; }""")
+    assert abs(r["t"] - t0 - 0.2) < 0.03 and abs(r["err"]) < 0.03 and abs(r["st"]["b"] - r["b"]) < 0.01 and not r["st"]["playing"], r
+    p.click('[data-cmp] [data-cstep="-0.1"]'); wait_seeked(p)
+    t1 = times(p)[0]
+    assert abs(t1 - t0 - 0.1) < 0.03, (t0, t1)
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

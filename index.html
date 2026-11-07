@@ -3087,7 +3087,7 @@ async function openCompare(figId, attId){
     <div class="cmp-line" id="cmp-line" role="group" aria-label="Ir a un tiempo"></div>
     <p class="small muted" id="cmp-hint" aria-live="polite"></p>
     <div class="cmp-ctl"><button type="button" class="btn" id="cmp-prev" aria-label="Tiempo anterior">◀︎</button><button type="button" class="btn pri" id="cmp-play">Reproducir</button><button type="button" class="btn" id="cmp-next" aria-label="Tiempo siguiente">▶︎</button></div>
-    <div class="pctl" role="group" aria-label="Reproducción">${CMP_RATES.map(x=>`<button type="button" data-crate="${x}" aria-pressed="${x===1}">${String(x).replace(".",",")}×</button>`).join("")}<button type="button" id="cmp-mirror" aria-pressed="false">Espejo de la clase</button><button type="button" id="cmp-range" aria-pressed="false">Tramo: toda</button></div>
+    <div class="pctl" role="group" aria-label="Reproducción">${CMP_RATES.map(x=>`<button type="button" data-crate="${x}" aria-pressed="${x===1}">${String(x).replace(".",",")}×</button>`).join("")}<button type="button" data-cstep="-0.1" aria-label="Atrás 0,1 segundos">‹ 0,1 s</button><button type="button" data-cstep="0.1" aria-label="Adelante 0,1 segundos">0,1 s ›</button><button type="button" id="cmp-mirror" aria-pressed="false">Espejo de la clase</button><button type="button" id="cmp-range" aria-pressed="false">Tramo: toda</button></div>
     <p class="small muted" id="cmp-tempo">${esc(tempo)}</p>
     <section class="fv-card" aria-labelledby="fv-cm"><h3 id="fv-cm">Marcas</h3>
       <div class="fv-actions"><button type="button" class="btn" data-cmk="error">Error aquí</button><button type="button" class="btn" data-cmk="bien">Bien hecho aquí</button></div>
@@ -3105,6 +3105,13 @@ async function openCompare(figId, attId){
   $("#cmp-prev").onclick = ()=>{ cmpPause(); cmpSeek(Math.max(cmp.lo, Math.ceil(cmp.b-1e-3)-1)); };
   $("#cmp-next").onclick = ()=>{ cmpPause(); cmpSeek(Math.min(cmp.hi-1, Math.floor(cmp.b+1e-3)+1)); };
   document.querySelectorAll("[data-crate]").forEach(b=> b.onclick=()=>{ cmp.rate=+b.dataset.crate; document.querySelectorAll("[data-crate]").forEach(x=>x.setAttribute("aria-pressed", x===b)); if(cmp.playing) T.playbackRate=cmp.rate; });
+  // Avance fino: la clase se mueve una décima y el tuyo va al mismo tiempo de la música.
+  document.querySelectorAll("[data-cstep]").forEach(b=> b.onclick=()=>{
+    cmpPause();
+    const t=cmpClampT(T, T.currentTime + +b.dataset.cstep), bb=secToBeat(cmp.pT, t); if(bb==null) return;
+    cmp.b = bb;
+    try{ T.currentTime = t; M.currentTime = cmpClampT(M, beatToSec(cmp.pM, bb)); }catch{}
+    cmpPaint(); });
   $("#cmp-mirror").onclick = e=>{ const on=!T.classList.contains("mirror"); T.classList.toggle("mirror", on); e.currentTarget.setAttribute("aria-pressed", on); };
   $("#cmp-range").onclick = ()=>{
     if(cmp.pick || cmp.A!==cmp.lo || cmp.B!==cmp.hi){ cmp.pick=null; cmp.A=cmp.lo; cmp.B=cmp.hi; $("#cmp-hint").textContent=""; }
@@ -3704,7 +3711,7 @@ async function genMissingThumbs(){
 function playerHTML(f){
   const t=f.vidTrim||{};
   return `<div class="player" data-loop="1"><video data-vid="${esc(f.vid)}" data-s="${+t.start||0}" data-e="${+t.end||0}" ${f.thumb?`poster="${esc(f.thumb)}"`:""} controls playsinline preload="metadata"></video>
-    <div class="pctl" role="group" aria-label="Reproducción"><button type="button" data-speed="0.5" aria-pressed="false">0,5×</button><button type="button" data-speed="0.75" aria-pressed="false">0,75×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-mirror aria-pressed="false">Espejo</button><button type="button" data-loopbtn aria-pressed="true">Bucle</button></div></div>`;
+    <div class="pctl" role="group" aria-label="Reproducción"><button type="button" data-speed="0.5" aria-pressed="false">0,5×</button><button type="button" data-speed="0.75" aria-pressed="false">0,75×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-mirror aria-pressed="false">Espejo</button><button type="button" data-loopbtn aria-pressed="true">Bucle</button><button type="button" data-step="-0.1" aria-label="Atrás 0,1 segundos">‹ 0,1 s</button><button type="button" data-step="0.1" aria-label="Adelante 0,1 segundos">0,1 s ›</button></div></div>`;
 }
 function backfillThumb(vidId, v){
   const f=Object.values(S.figures).find(x=>x.vid===vidId && !x.thumb); if(!f) return;
@@ -4572,10 +4579,15 @@ document.addEventListener("change", e=>{
   focusAfter = `[data-chainsel="${k}"]`; render();
 });
 document.addEventListener("click", async e=>{
-  const pc = e.target.closest("[data-speed],[data-mirror],[data-loopbtn]");
+  const pc = e.target.closest("[data-speed],[data-mirror],[data-loopbtn],[data-step]");
   if(pc){
     const pl=pc.closest(".player"), v=pl && pl.querySelector("video"); if(!v) return;
-    if(pc.dataset.speed){ v.playbackRate=+pc.dataset.speed; pl.querySelectorAll("[data-speed]").forEach(b=>b.setAttribute("aria-pressed", b===pc)); }
+    if(pc.dataset.step){
+      // Avance fino: pausa y una décima, sin salirse del recorte (data-s/data-e) para no caer en el bucle ni fuera del tramo.
+      const s=+v.dataset.s||0, e=+v.dataset.e||0, hi=e>0 ? e : (isFinite(v.duration) ? v.duration : Infinity);
+      v.pause(); try{ v.currentTime = Math.max(s, Math.min(hi, v.currentTime + +pc.dataset.step)); }catch{}
+    }
+    else if(pc.dataset.speed){ v.playbackRate=+pc.dataset.speed; pl.querySelectorAll("[data-speed]").forEach(b=>b.setAttribute("aria-pressed", b===pc)); }
     else if(pc.hasAttribute("data-mirror")){ const on=!v.classList.contains("mirror"); v.classList.toggle("mirror",on); pc.setAttribute("aria-pressed",on); }
     else { const on=pl.dataset.loop!=="1"; pl.dataset.loop=on?"1":"0"; pc.setAttribute("aria-pressed",on); }
     return;

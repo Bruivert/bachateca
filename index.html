@@ -872,7 +872,7 @@ const fold = v => String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").
 const joinY = a => a.length>1 ? a.slice(0,-1).join(", ")+" y "+a[a.length-1] : a.join("");
 const arrOr = (a,d) => Array.isArray(a)&&a.length ? [...a] : [...d];
 const figs = () => Object.values(S.figures).sort((a,b)=> (b.creado||0)-(a.creado||0));
-const tipoOf = f => f.tipo || "figura";
+const tipoOf = f => TIPO[f.tipo] ? f.tipo : "figura";
 const moveTipo = t => t==="figura" || t==="transicion";
 const isMove = f => moveTipo(tipoOf(f));
 const placed = f => isMove(f) && !!f.entrada && !!f.salida;
@@ -983,6 +983,8 @@ function backupStatus(b){
   return {main:`Última copia: ${when}.`, since: parts.length ? `Desde entonces: ${parts.join(" y ")}.` : (b.ch ? "Desde entonces has hecho cambios." : "Sin cambios desde entonces.")};
 }
 async function exportBackup(){
+  // En modo seguro S no son tus datos (no se han podido leer): exportarlo daría una copia vacía o vieja por buena.
+  if(safeMode){ toast("Modo seguro: no se puede exportar."); return; }
   if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return;
   lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copia exportada"); render();
   if($('[aria-label="Ajustes"]')) openSettings(); else if($('[data-sheet="log"]')) openLog();
@@ -1196,6 +1198,8 @@ function persist(op){
 // Los guardados se encadenan: así dos llamadas seguidas (el retraso de 150 ms y un flush directo) nunca se solapan,
 // y cada uno copia S justo cuando le toca escribir, de modo que el último en escribir lleva siempre lo más reciente.
 let saveChain = Promise.resolve(), lastFigN = null;
+// true si al arrancar había otra copia en localStorage que no se pudo guardar aparte: entonces no se borra.
+let keepLs = false;
 function saveNow(){
   saveT=null; if(safeMode) return Promise.resolve();
   return saveChain = saveChain.then(doSave, doSave);
@@ -1212,7 +1216,7 @@ async function doSave(){
       let hecho = false;
       if(encoge){ try{ await kvSetWithSnap("antes-de-encoger", snap); hecho = true; pruneSnapshots().catch(()=>{}); }catch{} }
       if(!hecho) await kvSet("state", snap);
-      ok=true; try{ localStorage.removeItem(LS_FALLBACK); }catch{}
+      ok=true; if(!keepLs) try{ localStorage.removeItem(LS_FALLBACK); }catch{}
     } else ok=lsSet(LS_FALLBACK, snap);
   }
   catch{ ok=lsSet(LS_FALLBACK, snap); }
@@ -1348,6 +1352,9 @@ async function initStore(){
   if(!r.ok) safeMode = true;
   // Si hay dos copias, gana la guardada más tarde (ausente = 0); si empatan, la de IndexedDB.
   let c = r.idb && r.ls ? ((r.ls.guardado||0) > (r.idb.guardado||0) ? r.ls : r.idb) : (r.idb || r.ls);
+  // La que pierde en localStorage (p. ej. datos de 1.49, sin «guardado») pasa a una instantánea antes de que el
+  // primer guardado la borre; si no se puede, se deja donde está. Solo ocurre cuando hay dos copias.
+  if(r.idb && r.ls && c !== r.ls) keepLs = !(await takeSnapshot("copia-local", r.ls));
   if(c){
     const old = c.schema;
     c = migrate(c);
@@ -1422,7 +1429,7 @@ const holdName = h => holdSay(h)===h ? esc(h) : `<span aria-hidden="true">${esc(
 const holdTxt = h => h ? ` <span class="hold">(${holdName(h)})</span>` : "";
 // Ruta con una sola flecha: «Cerrada (Abrazo) → Sombra (Dos manos)». Sin el inicio cuando ya lo dice el contexto.
 const routeTxt = (f, from) => `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${holdName(f.agarreIn)} ` : "")}<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
-function pill(k){ return `<span class="pill st-${k}">${esc(EST[k]?.t||k)}</span>`; }
+function pill(k){ return `<span class="pill st-${esc(k)}">${esc(EST[k]?.t||k)}</span>`; }
 // Compás de 8 de una figura: qué tiempos de la frase ocupa y en cuál empieza.
 function compasTxt(f){
   const t=+f.tiempo||0, n=+f.tiempos||0;
@@ -1451,7 +1458,7 @@ function galCard(f, inGroup){
   else sub = `<span class="warnc">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
   return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${esc(f.id)}">${media}<span class="gshade" aria-hidden="true"></span>
     <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"?`<span class="tagx t-red">Olvidada</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
-    <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${f.usos?`<span class="gusos">salió ${f.usos}×</span>`:""}</span>
+    <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${+f.usos?`<span class="gusos">salió ${+f.usos}×</span>`:""}</span>
   </button>`;
 }
 function figCard(f, inGroup){
@@ -1472,7 +1479,7 @@ function figCard(f, inGroup){
       ${compas(f)}
       ${f.baile && f.baile!=="Bachata" ? `<span class="tag">${esc(f.baile)}</span>`:""}
       ${f.profesor?`<span>${esc(f.profesor)}</span>`:""}
-      ${f.usos?`<span>salió ${f.usos}×</span>`:""}
+      ${+f.usos?`<span>salió ${+f.usos}×</span>`:""}
       ${f.vid?`<span class="tag">▶ vídeo</span>`:""}
       ${f.ejemplo?`<span class="tag">ejemplo</span>`:""}
     </div>${th?`</div>`:""}
@@ -2096,7 +2103,7 @@ function openLog(fresh){
     ${done?`<p class="small muted tn-date">${fmtDate(done.fecha)}</p>`:""}
     ${done ? tonightHTML(done) : ""}
     ${sug.length?`<div class="panel"><h3>Según tus socials</h3>
-      ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${S.figures[s.id].usos}×</span></span><button class="btn sm" data-promote="${esc(s.id)}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
+      ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${+S.figures[s.id].usos||0}×</span></span><button class="btn sm" data-promote="${esc(s.id)}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
     ${done ? "" : `<div class="panel">
       <div class="f"><span>Figuras que te salieron</span>
         ${cand.length?`${logAll && cand.length>8?`<input type="search" id="lg-q" placeholder="Buscar figura" aria-label="Buscar figura">`:""}<div class="chips" id="lg-chips">${shown.map(f=>`<button type="button" class="chip sm" data-logfig="${esc(f.id)}" data-q="${esc(fold(f.nombre))}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>${shown.length<cand.length?`<button type="button" class="btn ghost sm" data-act="log-all">Ver todas (${cand.length})</button>`:""}`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
@@ -2131,7 +2138,7 @@ function saveLog(){
   logSuggest = [];
   l.figs.forEach(id=>{
     const f=S.figures[id]; if(!f) return;
-    f.usos=(f.usos||0)+1; f.ultimoUso=l.fecha; persist({t:"fig",id});
+    f.usos=(+f.usos||0)+1; f.ultimoUso=l.fecha; persist({t:"fig",id});
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
@@ -2148,7 +2155,7 @@ function deleteLog(id){
   delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
-    (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(f.usos||0)+1; persist({t:"fig",id:fid}); } });
+    (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
 }
@@ -2169,12 +2176,12 @@ function openView(id){
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
   // Puntos clave: la señal, una línea por idea (se separa por punto, punto y coma o salto de línea).
   const keys = String(f.senal||"").split(/\s*(?:[;\n]|\.(?:\s|$))\s*/).map(x=>x.trim()).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1));
-  const ms = memState(f), r = f.rep || {}, step = Math.min(r.step||0, LADDER.length-1);
+  const ms = memState(f), r = f.rep || {}, step = Math.max(0, Math.min(Math.floor(+r.step)||0, LADDER.length-1));
   const when = d => !d ? "" : d<=todayStr() ? "hoy" : d===todayStr(1) ? "mañana" : fmtDate(d);
   const mem = active(f) ? `<section class="fv-card fv-mem" aria-labelledby="fv-mem">
       <div class="ring sm">${ringSVG((step+1)/LADDER.length, 70, 8)}<b>${LADDER[step]} d</b></div>
       <div class="fv-mem-t"><div class="in-h"><h3 id="fv-mem">Memoria</h3><span class="tagx ${(MEM[ms]||MEM.nueva)[1]}">${(MEM[ms]||MEM.nueva)[0]}</span></div>
-        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${r.aciertos||r.fallos ? ` · ${pl(r.aciertos||0,"acierto","aciertos")}, ${pl(r.fallos||0,"fallo","fallos")}` : ""}${f.usos?` · salió ${f.usos}× en el social`:""}</p></div>
+        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p></div>
     </section>` : "";
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${esc(f.id)}">
     <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${esc(f.id)}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
@@ -2413,7 +2420,7 @@ async function attSaveVid(figId, attId){
   if(!attBlob || attBlob.vid!==a.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
   const b = attBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
   const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
-  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo");
+  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
 }
 // ---------- pulso: marcar los tiempos de la música en un vídeo ----------
@@ -2733,7 +2740,7 @@ function cmpMarks(){
   const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId);
   const ms=[...marcasOf(a)].sort((x,y)=>x.b-y.b);
   el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>e.marca===m.id);
-    return `<li><button type="button" class="btn sm" data-cgo="${m.b}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
+    return `<li><button type="button" class="btn sm" data-cgo="${esc(m.b)}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
       ${m.tipo==="error" ? (inErr ? `<span class="small muted">En tus errores</span>` : `<button type="button" class="btn ghost sm" data-cerr="${esc(m.id)}">A mis errores</button>`) : ""}
       <button type="button" class="icon-btn" data-cdel="${esc(m.id)}" aria-label="Borrar la marca del ${beatName(m.b)}">✕</button></li>`; }).join("")
     : `<li class="small muted">Pausa en el tiempo que quieras y toca «Error aquí» o «Bien hecho aquí».</li>`;
@@ -2852,7 +2859,7 @@ async function ptSaveVid(figId, ptId){
   if(!ptBlob || ptBlob.vid!==x.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
   const b = ptBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
   const name = parteName(f, x).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "parte";
-  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo");
+  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, x.vid); toast("Vídeo guardado"); if($(`[data-viewpt="${CSS.escape(ptId)}"]`)) openParteView(figId, ptId); }
 }
 async function ptDelete(figId, ptId){
@@ -2903,7 +2910,7 @@ function openFigure(id, opts={}){
   if(!quick && !id && f.estado==="espera" && !opts.keepState) f.estado="practica";
   if(opts.estado) f.estado=opts.estado;
   const optList=(list,sel,empty)=>`<option value="">${empty}</option>${[...new Set([...list, sel].filter(Boolean))].map(p=>`<option ${p===sel?"selected":""}>${esc(p)}</option>`).join("")}`;
-  let tipo = tipoOf(f), estado = f.estado, prof = f.profesor||"", baile = f.baile||"Bachata";
+  let tipo = tipoOf(f), estado = EST[f.estado] ? f.estado : "practica", prof = f.profesor||"", baile = f.baile||"Bachata";
   const hasCls = S.classes.length>0, otherCls = !quick && !!prof && !S.classes.includes(prof);
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="fig-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${quick?"Captura rápida":(id?"Editar figura":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
@@ -3134,7 +3141,7 @@ function renderVidbox(){
       const blob=vstate.curBlob; if(!blob){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
       const ty=blob.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
       const vidId = vstate.cur, figId = vstate.figId;
-      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(how=>confirmSaved(how, "el vídeo")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
+      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(how=>confirmSaved(how, "el vídeo", "Sí, está guardado")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
     }
     else if(k==="ai"){ prepareCapture(); }
   });
@@ -3253,10 +3260,10 @@ async function shareOrDownload(file){
   setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return "descargado";
 }
 // Una descarga no prueba que el archivo haya quedado guardado: se pregunta antes de darlo por hecho.
-async function confirmSaved(how, what){
+async function confirmSaved(how, what, ok="Sí, está guardada"){
   if(how==="compartido") return true;
   if(!how) return false;
-  return askConfirm({title:`¿Se ha guardado ${what}?`, msg:"Compruébalo en Archivos o en Descargas.", ok:"Sí, está guardada", cancel:"No", danger:false});
+  return askConfirm({title:`¿Se ha guardado ${what}?`, msg:"Compruébalo en Archivos o en Descargas.", ok, cancel:"No", danger:false});
 }
 // ---------- vídeos sin copia fuera de la app ----------
 // La copia de seguridad (JSON) no lleva vídeos. Se apunta qué vídeo se sacó con «Guardar en Fotos»
@@ -3314,7 +3321,7 @@ async function saveVidBatch(){
   }
   if(!ok){
     // Sin hoja de compartir con varios archivos: de uno en uno, como «Guardar en Fotos» en la ficha.
-    ok = await confirmSaved(await shareOrDownload(files[0]), "el vídeo"); ids = ok ? ids.slice(0,1) : [];
+    ok = await confirmSaved(await shareOrDownload(files[0]), "el vídeo", "Sí, está guardado"); ids = ok ? ids.slice(0,1) : [];
   }
   if(!ok) return;
   vidBatch = null;
@@ -3587,7 +3594,7 @@ function coachPrompt(){
   const cov = coverage().map(c=>`- ${c.p}: ${c.ready.length} salidas seguras (disponibles o consolidadas) de ${c.out.length}; llegas desde ${c.into.length} figuras`).join("\n");
   const blocks = {}; Object.values(S.logs).forEach(l=>{ if(l.bloqueo) blocks[l.bloqueo]=(blocks[l.bloqueo]||0)+1; });
   const bl = Object.entries(blocks).sort((a,b)=>b[1]-a[1]).map(([p,n])=>`- ${p}: ${n} veces`).join("\n") || "(sin registros)";
-  const act = figs().filter(active).slice(0,120).map(f=>`- ${f.nombre} [${TIPO[tipoOf(f)].t}, ${EST[f.estado].t}]${placed(f)?`: ${f.entrada}${f.agarreIn?` (${f.agarreIn})`:""} → ${f.salida}${f.agarreOut?` (${f.agarreOut})`:""}`:""}${f.usos?`, salió ${f.usos} veces`:""}`).join("\n") || "(ninguna)";
+  const act = figs().filter(active).slice(0,120).map(f=>`- ${f.nombre} [${TIPO[tipoOf(f)].t}, ${EST[f.estado]?.t||f.estado}]${placed(f)?`: ${f.entrada}${f.agarreIn?` (${f.agarreIn})`:""} → ${f.salida}${f.agarreOut?` (${f.agarreOut})`:""}`:""}${+f.usos?`, salió ${+f.usos} veces`:""}`).join("\n") || "(ninguna)";
   return `Eres profesor de bachata. Tu alumno baila como leader desde hace unos 6 meses y en los socials se bloquea al enlazar figuras.
 Con sus datos, dale en español y en menos de 140 palabras:
 1. Las 3 preguntas concretas que debería hacer a sus profesores esta semana (sobre las posiciones donde tiene menos salidas o donde más se bloquea).
@@ -3767,7 +3774,7 @@ function listHTML(kind, bare){
 let setView = null;
 const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas"};
 function setGo(v){ setView=v; confirmKey=null; editKey=null; openSettings(); const sh=$(".sheet"); if(sh) sh.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); }
-const SNAP_WHY = {diaria:"Copia del día", "antes-de-importar":"Antes de importar", "antes-de-reemplazar":"Antes de reemplazar todo", "antes-de-restaurar":"Antes de restaurar", "antes-de-encoger":"Antes de borrar muchas figuras"};
+const SNAP_WHY = {diaria:"Copia del día", "antes-de-importar":"Antes de importar", "antes-de-reemplazar":"Antes de reemplazar todo", "antes-de-restaurar":"Antes de restaurar", "antes-de-encoger":"Antes de borrar muchas figuras", "copia-local":"Copia guardada aparte"};
 const snapWhen = at => { try{ return new Date(at).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }catch{ return ""; } };
 let restoring = false;
 async function restoreSnapshot(key){
@@ -3787,10 +3794,11 @@ async function restoreSnapshot(key){
 }
 function openSettings(){
   const sc = $(".sheet")?.scrollTop || 0;
-  if(setView==="instantaneas" || !setView) listSnapshots().then(l=>{
-    const el=$("#snap-list"); if(el) el.innerHTML = l.length ? l.map(x=>`<div class="mrow"><span><b>${esc(snapWhen(x.at))}</b><span class="small muted">${esc(SNAP_WHY[x.reason]||x.reason)} · ${pl(x.nFig,"figura","figuras")} · ${pl(x.nLog,"registro","registros")}</span></span><button type="button" class="btn sm" data-act="snap-restore" data-key="${esc(x.key)}">Restaurar</button></div>`).join("") : `<p class="small muted">Aún no hay instantáneas.</p>`;
-    const mv=$("#snap-n"); if(mv) mv.textContent = l.length;
+  // En el menú basta con contar las claves; las instantáneas enteras solo se leen en su pantalla.
+  if(setView==="instantaneas") listSnapshots().then(l=>{
+    const el=$("#snap-list"); if(el) el.innerHTML = l.length ? l.map(x=>`<div class="mrow"><span><b>${esc(snapWhen(x.at))}</b><span class="small muted">${esc(SNAP_WHY[x.reason]||x.reason)} · ${pl(+x.nFig||0,"figura","figuras")} · ${pl(+x.nLog||0,"registro","registros")}</span></span><button type="button" class="btn sm" data-act="snap-restore" data-key="${esc(x.key)}">Restaurar</button></div>`).join("") : `<p class="small muted">Aún no hay instantáneas.</p>`;
   });
+  else if(!setView && idb) snapKeys().then(ks=>{ const mv=$("#snap-n"); if(mv) mv.textContent = ks.filter(k=>snapParse(k)).length; }).catch(()=>{});
   const exN = figs().filter(f=>f.ejemplo).length;
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
@@ -3850,12 +3858,39 @@ function openSettings(){
 function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{}},null,2); }
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const isObj = o => !!o && typeof o==="object" && !Array.isArray(o);
+// test() convierte a texto: sin comprobar el tipo, un id ausente pasaría como «undefined».
+const okId = v => typeof v==="string" && ID_RE.test(v);
 // Deja solo lo que la app sabe pintar: ids seguros, nombre en las figuras y fecha en los registros.
+// Dentro de cada figura: intentos, partes, errores y marcas con id seguro; contadores como números; estado y tipo conocidos.
+// Trabaja sobre copias: no cambia lo que recibe.
+const cuenta = v => { const n = typeof v==="number" ? v : typeof v==="string" && /^\s*\d+\s*$/.test(v) ? +v : NaN; return Number.isInteger(n) && n>=0 ? n : null; };
+function sanitizeFig(f0){
+  const f = {...f0}; let malas = 0;
+  const lista = (v, fix) => { if(!Array.isArray(v)){ if(v!=null) malas++; return []; }
+    return v.flatMap(x=>{ if(isObj(x) && okId(x.id)) return [fix ? fix(x) : {...x}]; malas++; return []; }); };
+  // Solo se tocan las listas que vienen: añadir una vacía haría que tu propia copia pareciera distinta.
+  const marcas = a => { const b={...a}; if("marcadores" in b) b.marcadores = lista(a.marcadores, m=>({...m})).filter(m=>{ if(Number.isFinite(m.b)) return true; malas++; return false; }); return b; };
+  if("intentos" in f) f.intentos = lista(f.intentos, marcas);
+  if("partes" in f) f.partes = lista(f.partes);
+  if("errores" in f) f.errores = lista(f.errores);
+  if(f.estado!==undefined && !EST[f.estado]) f.estado = "practica";
+  if(f.tipo!==undefined && !TIPO[f.tipo]) f.tipo = "figura";
+  if("usos" in f){ const n = cuenta(f.usos); if(n==null) delete f.usos; else f.usos = n; }
+  if("rep" in f){
+    if(!isObj(f.rep)) delete f.rep;
+    else { const r = f.rep = {...f.rep};
+      ["step","aciertos","fallos"].forEach(k=>{ if(k in r) r[k] = cuenta(r[k]) ?? 0; });
+      if("step" in r) r.step = Math.min(r.step, LADDER.length-1);
+      ["due","last"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; }); }
+  }
+  ["tiempo","tiempos"].forEach(k=>{ if(k in f && f[k]!=="" && cuenta(f[k])==null) delete f[k]; });
+  return {f, malas};
+}
 function sanitizeImport(d){
   const figures={}, logs={}; let descartadas=0;
   const fs = isObj(d&&d.figures) ? Object.values(d.figures) : [], ls = isObj(d&&d.logs) ? Object.values(d.logs) : [];
-  fs.forEach(f=>{ if(isObj(f) && ID_RE.test(f.id) && typeof f.nombre==="string" && f.nombre.trim()) figures[f.id]=f; else descartadas++; });
-  ls.forEach(l=>{ if(isObj(l) && ID_RE.test(l.id) && typeof l.fecha==="string") logs[l.id]={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []}; else descartadas++; });
+  fs.forEach(f=>{ if(isObj(f) && okId(f.id) && typeof f.nombre==="string" && f.nombre.trim()){ const r = sanitizeFig(f); figures[f.id]=r.f; descartadas += r.malas; } else descartadas++; });
+  ls.forEach(l=>{ if(isObj(l) && okId(l.id) && typeof l.fecha==="string") logs[l.id]={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []}; else descartadas++; });
   return {figures, logs, descartadas};
 }
 // Compara dos figuras sin intentos ni partes (esos se fusionan aparte); el orden de las claves no cuenta.
@@ -3864,7 +3899,14 @@ function figDiffers(a, b){
   const key = f => { const {intentos, partes, ...r} = f||{}; return JSON.stringify(sortKeys(r)); };
   return key(a) !== key(b);
 }
+// Solo una importación a la vez: dos toques seguidos no deben aplicar la copia dos veces.
+let importing = false, failImport = false;
 async function importData(replace){
+  if(importing) return;
+  importing = true;
+  try{ await importData1(replace); }finally{ importing = false; }
+}
+async function importData1(replace){
   if(safeMode){ toast("Modo seguro: no se puede importar."); return; }
   const raw=$("#imp-text").value.trim();
   if(!raw){ toast("Elige un archivo de copia o pega su texto primero."); return; }
@@ -3886,34 +3928,44 @@ async function importData(replace){
   if(!(await takeSnapshot(replace ? "antes-de-reemplazar" : "antes-de-importar"))){ toast("No se pudo guardar una copia de tus datos de ahora. No he cambiado nada."); return; }
   // Al añadir, las que ya tienes y son distintas solo se cambian si lo eliges; cerrar o cancelar las conserva.
   const usar = replace || (nD>0 && await askConfirm({title:`${nD} ${nD===1?"figura ya está y es distinta":"figuras ya están y son distintas"}`, msg:"La copia tiene otra versión de figuras que ya tienes (nombre, estado, repaso o notas).", ok:"Usar las de la copia", cancel:"Conservar las mías"}));
-  if(replace){
-    // Sin borrar sus vídeos: así la instantánea «antes de reemplazar» las recupera enteras.
-    Object.keys(S.figures).forEach(id=>{ if(!d.figures[id] && !inFigs.has(id)){ delete S.figures[id]; persist({t:"figdel",id}); } });
-    Object.keys(S.logs).forEach(id=>{ if(!d.logs[id] && !inLogs.has(id)){ delete S.logs[id]; persist({t:"logdel",id}); } });
+  // Si algo falla a mitad, se vuelve a lo de antes (lo mismo que guarda la instantánea): nunca queda medio importado.
+  const prev = clone(S);
+  try{
+    if(replace){
+      // Sin borrar sus vídeos: así la instantánea «antes de reemplazar» las recupera enteras.
+      Object.keys(S.figures).forEach(id=>{ if(!d.figures[id] && !inFigs.has(id)){ delete S.figures[id]; persist({t:"figdel",id}); } });
+      Object.keys(S.logs).forEach(id=>{ if(!d.logs[id] && !inLogs.has(id)){ delete S.logs[id]; persist({t:"logdel",id}); } });
+    }
+    // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
+    (replace ? inc : [...nuevas, ...(usar ? distintas : [])]).forEach(f=>{
+      const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
+      const keep = mine.filter(a=>!got.has(a.id));
+      if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
+      const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
+      if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
+      S.figures[f.id]=f; persist({t:"fig",id:f.id});
+      if(failImport){ failImport = false; throw new Error("fallo simulado"); }
+    });
+    // Las que se quedan como las tuyas reciben los intentos y partes que solo trae la copia; lo tuyo no cambia.
+    if(!replace) inc.filter(f=>S.figures[f.id] && S.figures[f.id]!==f).forEach(f=>{
+      const g = S.figures[f.id], add = (mine, got) => { const ids = new Set(mine.map(x=>x.id)), extra = got.filter(x=>!ids.has(x.id));
+        return extra.length ? [...mine, ...extra].sort((x,y)=>(x.creado||0)-(y.creado||0)) : null; };
+      const ni = add(intentosOf(g), intentosOf(f)), np = add(partesOf(g), partesOf(f));
+      if(ni) g.intentos = ni; if(np) g.partes = np;
+      if(ni || np) persist({t:"fig",id:f.id});
+    });
+    Object.values(d.logs).forEach(l=>{ if(replace || !S.logs[l.id]){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
+    const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
+    S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
+    if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
+    if(d.actividad && typeof d.actividad==="object"){ const a = replace ? {} : {...(S.actividad||{})}; Object.entries(d.actividad).forEach(([k,v])=>{ a[k]=Math.max(a[k]||0, +v||0); }); S.actividad=a; }
+    saveMeta();
+  }catch{
+    applyData(migrate(prev)); persist({t:"meta"}); render();
+    confirmKey=null; openSettings();
+    toast("No se pudo importar la copia. He dejado tus datos como estaban.");
+    return;
   }
-  // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
-  (replace ? inc : [...nuevas, ...(usar ? distintas : [])]).forEach(f=>{
-    const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
-    const keep = mine.filter(a=>!got.has(a.id));
-    if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
-    const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
-    if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
-    S.figures[f.id]=f; persist({t:"fig",id:f.id});
-  });
-  // Las que se quedan como las tuyas reciben los intentos y partes que solo trae la copia; lo tuyo no cambia.
-  if(!replace) inc.filter(f=>S.figures[f.id] && S.figures[f.id]!==f).forEach(f=>{
-    const g = S.figures[f.id], add = (mine, got) => { const ids = new Set(mine.map(x=>x.id)), extra = got.filter(x=>!ids.has(x.id));
-      return extra.length ? [...mine, ...extra].sort((x,y)=>(x.creado||0)-(y.creado||0)) : null; };
-    const ni = add(intentosOf(g), intentosOf(f)), np = add(partesOf(g), partesOf(f));
-    if(ni) g.intentos = ni; if(np) g.partes = np;
-    if(ni || np) persist({t:"fig",id:f.id});
-  });
-  Object.values(d.logs).forEach(l=>{ if(replace || !S.logs[l.id]){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
-  const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
-  S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
-  if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
-  if(d.actividad && typeof d.actividad==="object"){ const a = replace ? {} : {...(S.actividad||{})}; Object.entries(d.actividad).forEach(([k,v])=>{ a[k]=Math.max(a[k]||0, +v||0); }); S.actividad=a; }
-  saveMeta();
   confirmKey=null; openSettings();
   toast((replace ? `Repertorio restaurado: ${pl(nIn,"figura","figuras")}`
     : !nIn ? "Registros añadidos"
@@ -4091,6 +4143,7 @@ document.addEventListener("click", async e=>{
   if(a==="ai-share") return shareCapture();
   if(a==="ai-apply"){ const t=$("#ai-paste")?.value||""; if(!t.trim()){ toast("Pega primero la respuesta de Claude."); return; } return applySuggestion(cleanSug(parseReply(t))); }
   if(a==="copy"){
+    if(safeMode){ toast("Modo seguro: no se puede exportar."); return; }
     const txt=exportData();
     try{ await navigator.clipboard.writeText(txt); lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copiado. Pégalo en Notas o donde lo quieras guardar."); openSettings(); }
     catch{ const ta=$("#exp-text"); ta.hidden=false; ta.value=txt; ta.focus(); ta.select(); toast("No se pudo copiar solo. Mantén pulsado el recuadro y elige Copiar."); }
@@ -4163,7 +4216,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

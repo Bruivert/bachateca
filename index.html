@@ -722,9 +722,9 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .flash .big{font-size:2rem;line-height:1.08}
 .flash-tag{align-self:flex-start}
 .grade .btn{min-height:64px;border-radius:16px;font-weight:800}
-.grade [data-simg="no"],.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
-.grade [data-simg="dudas"],.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
-.grade [data-simg="fluida"],.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
+.grade [data-simg="no"],.grade [data-guiag="no"],.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.grade [data-simg="dudas"],.grade [data-guiag="dudas"],.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.grade [data-simg="fluida"],.grade [data-guiag="fluida"],.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
 .progress{height:6px}
 
 /* Enlazar y Social: tarjetas sueltas con borde. */
@@ -1013,7 +1013,7 @@ const fieldDirty = el => {
 function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!carried}; }
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
-  if($("[data-sim]")) return false;   // cerrar el simulacro solo lo para: lo ya puntuado está guardado
+  if($("[data-sim]") || $("[data-guia]")) return false;   // cerrar el simulacro o la práctica guiada solo los para: lo ya puntuado está guardado
   if(sheetBase.carried) return true;
   if(pk && pk.dirty && $("[data-pulso]")) return true;
   if(rc && rc.rec && $("[data-recc]")) return true;
@@ -1330,6 +1330,7 @@ new MutationObserver(ms=>{
     if(rc && !$("[data-recc]") && (n.matches("[data-recc]") || n.querySelector("[data-recc]"))) rcCleanup();
     // Igual con el simulacro: sin su hoja no sigue sonando el conteo.
     if(sim && !$("[data-sim]") && (n.matches("[data-sim]") || n.querySelector("[data-sim]"))) simStop();
+    if(guia && !$("[data-guia]") && (n.matches("[data-guia]") || n.querySelector("[data-guia]"))) guiaStop();
     (n.tagName==="VIDEO" ? [n] : n.querySelectorAll("video")).forEach(v=>{ if(!v.isConnected && !v.dataset.aux) releaseVideo(v); });
   }
 }).observe(document.body, {childList:true, subtree:true});
@@ -1925,6 +1926,12 @@ function renderRepasar(){
         <h3>Simulacro de social</h3>
         <p class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</p>
         <button class="btn" data-act="sim-open">Simulacro</button>
+      </div>
+      <div class="panel">
+        <h3>Práctica guiada</h3>
+        <p class="small muted">Te digo qué bailar y cuántas veces mientras suena el conteo: figuras pendientes, enlaces y una cadena.</p>
+        <div class="chips sim-n" role="group" aria-label="Duración de la práctica">${[10,20].map(m=>`<button type="button" class="chip" data-act="guia-mins" data-m="${m}" aria-pressed="${guiaCfg.mins===m}">${m} min</button>`).join("")}</div>
+        <button class="btn" data-act="guia-open">Empezar</button>
       </div>
       ${progressHTML()}
       <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
@@ -2852,6 +2859,175 @@ function simEnd(){
   $("#sim-fin").focus({preventScroll:true});
   render();
 }
+// ---------- práctica guiada ----------
+// Una sesión con el móvil delante: la app dice qué bailar (una figura pendiente, un enlace, una cadena) y cuántas
+// veces, y suena el conteo mientras lo haces. Luego te pones nota y eso cuenta como repaso (una subida al día).
+// Mismo ciclo de vida que el simulacro: al cerrar la hoja, salir de la app o terminar, nada sigue sonando.
+const GUIA = {10:{n:3, f:1, l:1}, 20:{n:6, f:3, l:2}};
+let guia = null;      // {plan, i, fase:"listo"|"cuenta"|"nota"|"fin", rep, bpmFix, beat, t0, end, nodes, raf, timeout, res:[g|null]}
+let guiaCfg = {mins:10, bpm:0, voz:true}, guiaForced = null;
+// Pulso por defecto: la media de tus figuras de este baile con el pulso marcado; si no hay ninguna, 110.
+function guiaBpm(){
+  const bs = figs().filter(f=>baileOf(f)===baileSel && pulsoOk(f.pulso, f.vid)).map(f=>pulsoBpm(f.pulso)).filter(Boolean);
+  return bs.length ? Math.max(90, Math.min(150, Math.round(bs.reduce((a,b)=>a+b,0)/bs.length))) : 110;
+}
+function guidedPlan(mins){
+  const c = GUIA[mins] || GUIA[10], bpm = guiaCfg.bpm || guiaBpm();
+  const mine = f => f && active(f) && baileOf(f)===baileSel;
+  const fs = figs().filter(f=>mine(f) && (isDue(f) || memState(f)==="olvidada"))
+    .sort((a,b)=> (erroresActivos(b).length>0) - (erroresActivos(a).length>0) || byMem(a,b) || (a.rep?.due||"").localeCompare(b.rep?.due||""));
+  // Enlaces: primero los comprobados que llevan a una figura pendiente (bailar la transición también la repasa),
+  // luego las posiciones con el repaso pendiente y, si aún hay sitio, el resto de comprobados.
+  const done = Object.values(S.enlaces||{}).filter(e=>e && mine(S.figures[e.a]) && mine(S.figures[e.b]))
+    .sort((x,y)=> isDue(S.figures[y.b]) - isDue(S.figures[x.b]) || String(x.fecha||"").localeCompare(String(y.fecha||"")));
+  const ls = [...done.filter(e=>isDue(S.figures[e.b])).map(e=>({a:e.a, b:e.b})), ...dueLinks().map(pos=>({pos, baile:baileSel})),
+    ...done.filter(e=>!isDue(S.figures[e.b])).map(e=>({a:e.a, b:e.b}))];
+  // La cadena empieza donde empieza la primera figura del plan (si tiene ruta) o en la primera posición con salidas.
+  const f0 = fs.find(placed), st = f0 ? f0.entrada : linkPositions()[0], ch = st ? makeChain(st) : null;
+  const cs = ch && !ch.noPath ? (ch.steps||[]).filter(s=>s.f) : [];
+  const cad = cs.length>=2 ? {pos: cs[0].f.entrada, ids: cs.map(s=>s.f.id)} : null;
+  const room = c.n - (cad ? 1 : 0);
+  let nf = Math.min(c.f, fs.length), nl = Math.min(c.l, ls.length);
+  // Si falta de un tipo, se rellena con el otro.
+  while(nf+nl < room && (nf<fs.length || nl<ls.length)){ if(nf<fs.length) nf++; else nl++; }
+  const out = [...fs.slice(0,nf).map(f=>({tipo:"figura", ref:f.id, reps:4, bpm})), ...ls.slice(0,nl).map(ref=>({tipo:"enlace", ref, reps:4, bpm}))];
+  // La cadena se baila una vez seguida: tantas frases de 8 como tiempos sumen sus figuras.
+  if(cad) out.push({tipo:"cadena", ref:cad, reps: Math.max(1, Math.round(cad.ids.reduce((s,id)=>s+(+S.figures[id].tiempos||8),0)/8)), bpm});
+  return out;
+}
+// Qué se enseña de un bloque (texto plano: se escapa al pintarlo). null si sus figuras ya no existen.
+function guiaInfo(b){
+  const F = S.figures, veces = pl(b.reps, "vez", "veces");
+  if(b.tipo==="figura"){ const f = F[b.ref]; return f && {name:f.nombre, title:`${f.nombre}, ${veces}`, senal:f.senal||"", errs:erroresActivos(f)}; }
+  if(b.tipo==="enlace" && b.ref.pos) return {name:`Salidas desde ${b.ref.pos}`, title:`Salidas desde ${b.ref.pos}, ${veces}`, sub:"Una salida distinta cada vez: " + exitsFrom(b.ref.pos).map(f=>f.nombre).join(", "), senal:"", errs:[]};
+  if(b.tipo==="enlace"){ const A = F[b.ref.a], B = F[b.ref.b]; return A && B && {name:`${A.nombre} → ${B.nombre}`, title:`${A.nombre} → ${B.nombre}, ${veces}`, senal:B.senal||"", errs:erroresActivos(B)}; }
+  const fs = b.ref.ids.map(id=>F[id]); if(fs.some(f=>!f)) return null;
+  return {name:"Cadena", title:"La cadena seguida, una vez", sub: fs.map(f=>f.nombre).join(" → "), senal:"", errs:[], cad:true};
+}
+function guiaQuiet(){
+  if(!guia) return;
+  (guia.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} }); guia.nodes = [];
+  cancelAnimationFrame(guia.raf); clearTimeout(guia.timeout);
+}
+function guiaStop(keep){
+  if(!guia) return;
+  guiaQuiet(); setAudioSession("auto");
+  if(tab!=="social" && !busy && !socialLive()) releaseWake();
+  if(!keep) guia = null;
+}
+function openGuia(){
+  guiaStop(); simStop();
+  if(!guiaCfg.bpm) guiaCfg.bpm = guiaBpm();
+  const plan = guidedPlan(guiaCfg.mins), fz = guiaForced; guiaForced = null;
+  if(fz && fz.reps) plan.forEach(b=>{ b.reps = fz.reps; });
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-guia>
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Práctica guiada</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div id="guia-body">${plan.length ? "" : `<p>Hoy no hay nada que practicar. Añade dónde empiezan y acaban tus figuras, o repasa al azar.</p>`}</div>
+  </div></div>`;
+  $("[data-guia]").onclick = guiaClick;
+  if(!plan.length) return;
+  cntLoad().catch(()=>{});   // la voz se carga ya; si no llega, suenan pitidos
+  guia = {plan, i:0, fase:"listo", rep:0, bpmFix: fz && fz.bpm || 0, nodes:[], res:[]};
+  guiaShow();
+}
+function guiaHead(b, inf){
+  return `<p class="small muted">Bloque ${guia.i+1} de ${guia.plan.length}${bailes().length>1 ? ` · ${esc(baileSel)}` : ""}</p>
+    <div class="flash"><div class="big">${esc(inf.title)}</div>${inf.sub ? `<p>${esc(inf.sub)}</p>` : ""}${inf.senal ? `<p class="small">Señal: ${esc(inf.senal)}</p>` : ""}
+      ${inf.errs.length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${inf.errs.map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}`;
+}
+// Bloque listo para empezar. Si sus figuras se han borrado, se salta solo.
+function guiaShow(note){
+  const b = guia.plan[guia.i], inf = guiaInfo(b);
+  if(!inf){ guia.res[guia.i] = null; return guiaNext(); }
+  guia.fase = "listo"; guia.rep = 0;
+  $("#guia-body").innerHTML = `${guiaHead(b, inf)}</div>
+    ${note ? `<p class="note">${esc(note)}</p>` : ""}
+    <label class="f" for="guia-bpm">Golpes por minuto<input type="number" id="guia-bpm" min="90" max="150" step="1" value="${guiaCfg.bpm}" inputmode="numeric"></label>
+    <div class="seg neutral" role="group" aria-label="Sonido del conteo"><button type="button" data-guiasnd="voz" aria-pressed="${guiaCfg.voz}">Voz</button><button type="button" data-guiasnd="pitido" aria-pressed="${!guiaCfg.voz}">Pitidos</button></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" id="guia-go" style="flex:1">Empezar</button><button type="button" class="btn" data-guiaact="skip">Saltar</button></div>`;
+  const bi = $("#guia-bpm"); bi.onchange = ()=>{ guiaCfg.bpm = Math.max(90, Math.min(150, Math.round(+bi.value)||110)); bi.value = guiaCfg.bpm; };
+  $("#guia-go").focus({preventScroll:true});
+  announce(`Bloque ${guia.i+1}: ${inf.title}`);
+}
+function guiaClick(e){
+  const b = e.target.closest("button"); if(!b || !guia) return;
+  const d = b.dataset;
+  if(d.guiasnd){ guiaCfg.voz = d.guiasnd==="voz"; document.querySelectorAll("[data-guiasnd]").forEach(x=>x.setAttribute("aria-pressed", x===b)); return; }
+  if(d.guiag) return guiaGrade(d.guiag);
+  if(d.guiaact==="skip"){ guiaQuiet(); guia.res[guia.i] = null; return guiaNext(); }
+  if(d.guiaact==="done"){ if(guia.fase==="cuenta") guiaEnd(); return; }
+  if(b.id==="guia-go") return guiaGo();
+}
+// Suena el conteo durante reps × 8 tiempos; en pantalla, el tiempo y la repetición (o la frase, en la cadena).
+function guiaGo(){
+  if(!guia || guia.fase!=="listo") return;
+  const bi = $("#guia-bpm"); if(bi) bi.onchange();
+  const c = cntAudio(); setAudioSession("playback"); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const b = guia.plan[guia.i], inf = guiaInfo(b), n = b.reps*8;
+  b.bpm = guia.bpmFix || guiaCfg.bpm;
+  guia.fase = "cuenta"; guia.rep = 1; guia.beat = 60/b.bpm; guia.t0 = c.currentTime + .3; guia.end = guia.t0 + n*guia.beat; guia.nodes = [];
+  for(let k=0; k<n; k++) guia.nodes.push(...cntPlay([c.destination], guia.t0 + k*guia.beat, k%8+1, guiaCfg.voz && !!cntVoz));
+  askWake();
+  const lbl = r => `${inf.cad ? "Frase" : "Vez"} ${r} de ${b.reps}`;
+  $("#guia-body").innerHTML = `${guiaHead(b, inf)}
+      <p id="guia-rep" aria-live="polite"><b>${lbl(1)}</b></p>
+      <div class="sim-beat" id="guia-beat" aria-hidden="true"></div></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" data-guiaact="done" style="flex:1">Ya está</button><button type="button" class="btn" data-guiaact="skip">Saltar</button></div>`;
+  const g0 = guia, end = guia.end;
+  const tick = ()=>{
+    if(guia!==g0 || guia.fase!=="cuenta") return;
+    if(c.currentTime >= end) return guiaEnd();
+    const t = c.currentTime - guia.t0, k = t<0 ? -1 : Math.floor(t/guia.beat);
+    const el = $("#guia-beat"); if(el) el.textContent = k<0 ? "" : String(k%8+1);
+    const r = Math.min(b.reps, Math.max(1, Math.floor(k/8)+1));
+    if(r!==guia.rep){ guia.rep = r; const re = $("#guia-rep"); if(re) re.innerHTML = `<b>${lbl(r)}</b>`; }
+    guia.raf = requestAnimationFrame(tick);
+  };
+  tick();
+  // Como en el simulacro: si el reloj del audio se para, el bloque acaba igual un segundo más tarde.
+  const arm = ()=>{ if(guia!==g0 || guia.fase!=="cuenta" || guia.end!==end) return; clearTimeout(guia.timeout);
+    guia.timeout = setTimeout(()=>{ if(guia===g0 && guia.fase==="cuenta") guiaEnd(); }, (end - c.currentTime + 1)*1000); };
+  if(c.state==="running") arm(); else Promise.resolve(c.resume()).then(arm, ()=>{});
+}
+function guiaEnd(){
+  if(!guia || guia.fase!=="cuenta") return;
+  guiaQuiet(); guia.fase = "nota";
+  const b = guia.plan[guia.i], inf = guiaInfo(b);
+  if(!inf){ guia.res[guia.i] = null; return guiaNext(); }
+  $("#guia-body").innerHTML = `${guiaHead(b, inf)}
+      <div class="answer" id="guia-ans" tabindex="-1"><p>¿Cómo ha ido?</p>
+        <div class="grade"><button type="button" class="btn" data-guiag="no">No</button><button type="button" class="btn" data-guiag="dudas">Con dudas</button><button type="button" class="btn" data-guiag="fluida">Bien</button></div></div></div>`;
+  $("#guia-ans").focus({preventScroll:true});
+}
+// La nota cuenta como repaso: la figura con reviewFig; el enlace comprobado, en la figura a la que llegas;
+// la posición pendiente, en su repaso de enlaces; la cadena, solo como actividad. «Bien» sube una vez al día.
+function guiaGrade(g){
+  if(!guia || guia.fase!=="nota") return;
+  const b = guia.plan[guia.i], hoy = todayStr(), F = b.tipo==="figura" ? S.figures[b.ref] : b.tipo==="enlace" && b.ref.b ? S.figures[b.ref.b] : null;
+  if(F) reviewFig(F, g);
+  else {
+    if(b.tipo==="enlace" && b.ref.pos){ const k = lrKey(b.ref.pos, b.ref.baile);
+      if(!(g==="fluida" && S.linkRep[k]?.last===hoy)){ S.linkRep[k] = nextRep(S.linkRep[k], g); persist({t:"lr"}); } }
+    S.actividad = S.actividad || {}; S.actividad[hoy] = (S.actividad[hoy]||0)+1; persist({t:"act"});
+  }
+  guia.res[guia.i] = g;
+  guiaNext();
+}
+function guiaNext(){
+  guia.i++;
+  if(guia.i < guia.plan.length) return guiaShow();
+  guiaFin();
+}
+function guiaFin(){
+  guia.fase = "fin"; guia.rep = 0; guiaStop(true);
+  const N = {no:"No", dudas:"Con dudas", fluida:"Bien"}, ok = guia.res.filter(g=>g==="fluida").length;
+  $("#guia-body").innerHTML = `<div class="panel"><h3 id="guia-fin" tabindex="-1">Práctica terminada</h3>
+      <p>Bien en <b>${ok} de ${guia.plan.length}</b> ${guia.plan.length===1?"bloque":"bloques"}.</p>
+      <ul class="exits">${guia.plan.map((b,i)=>{ const inf = guiaInfo(b); return `<li><span>${esc(inf ? inf.name : "Figura borrada")}</span><span class="small muted">${N[guia.res[i]] || "Saltado"}</span></li>`; }).join("")}</ul></div>
+    <div class="row sheet-foot"><button type="button" class="btn pri" data-act="close" style="flex:1">Hecho</button></div>`;
+  $("#guia-fin").focus({preventScroll:true});
+  render();
+}
 // Hoja «Nuevo intento»: el vídeo ya elegido, con el mismo recorte que el vídeo de la clase.
 // Por defecto se guarda solo el fragmento en calidad media: los vídeos de la cámara ocupan mucho.
 function openAttemptNew(figId, file, auto){
@@ -3667,7 +3843,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup(); simStop();
+  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup(); simStop(); guiaStop();
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -4742,6 +4918,8 @@ document.addEventListener("click", async e=>{
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
   if(a==="sim-open") return openSim();
+  if(a==="guia-mins"){ guiaCfg.mins = +d.m===20 ? 20 : 10; return render(); }
+  if(a==="guia-open") return openGuia();
   if(a==="ln-mark"){
     const A=S.figures[d.a], B=S.figures[d.b]; if(!A || !B) return;
     const k=linkKey(d.a, d.b), antes=S.enlaces?.[k] ? clone(S.enlaces[k]) : null;
@@ -4893,6 +5071,8 @@ $("#confirm-root").addEventListener("click", e=>{
 });
 // Al salir de la app a mitad de un simulacro se para (el conteo no puede seguir sonando de fondo) y la hoja
 // vuelve a la pantalla de empezar, con un aviso. Lo ya puntuado queda guardado.
+// La práctica guiada vuelve al principio del bloque: lo ya puntuado se queda.
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && guia && guia.fase==="cuenta"){ guiaQuiet(); setAudioSession("auto"); if($("[data-guia]")) guiaShow("Se paró al salir de la app. Empieza otra vez cuando quieras."); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && sim && sim.fase!=="fin"){ simStop(); if($("[data-sim]")) openSim("Se paró al salir de la app. Empieza otra vez cuando quieras."); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy||socialLive()) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
@@ -4901,7 +5081,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
   SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

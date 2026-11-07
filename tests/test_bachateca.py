@@ -3289,6 +3289,98 @@ def nota_pasa_a_la_parte_anterior(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- práctica guiada (fase 2)
+def guia_seed():
+    errs = [{"id": "e1", "nota": "me adelanto", "b": 4, "desde": "i1", "marca": "m1", "fecha": "2030-01-01", "veces": 2, "ultima": "2030-01-02"}]
+    lejos = {"step": 3, "due": "2999-01-01", "last": "2026-01-01", "aciertos": 3, "fallos": 0}
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Sombra", errores=errs, senal="mano en la espalda"),
+                                 fig(2, "Sombra", "Abierta"),
+                                 fig(3, "Abierta", "Cerrada", rep=lejos),
+                                 fig(4, "Salsa A", "Salsa B", baile="Salsa"),
+                                 fig(5, "Cerrada", "Abierta", estado="espera")]}
+    return {"figures": figs, "enlaces": {"f3>f1": {"a": "f3", "b": "f1", "fecha": "2026-01-01", "veces": 1}}}
+
+
+@test
+def practica_guiada_se_construye_con_tus_datos(browser):
+    ctx, p, errors = open_app(browser, seed=guia_seed())
+    plan = p.evaluate("() => window.__bachateca.guidedPlan(10)")
+    assert [b["tipo"] for b in plan] == ["figura", "enlace", "cadena"], plan
+    assert plan[0]["ref"] == "f1", "primero la figura con errores activos"
+    assert plan[1]["ref"] == {"a": "f3", "b": "f1"}, plan[1]
+    assert len(plan[2]["ref"]["ids"]) >= 2, plan[2]
+    assert all(b["bpm"] == 110 for b in plan) and plan[0]["reps"] == 4, plan
+    largo = p.evaluate("() => window.__bachateca.guidedPlan(20)")
+    assert len(largo) == 6 and largo[-1]["tipo"] == "cadena", largo
+    figuras = [b["ref"] for b in largo if b["tipo"] == "figura"]
+    assert figuras == ["f1", "f2"], "solo pendientes del baile elegido, fuera de la lista de espera"
+    enl = [b["ref"] for b in largo if b["tipo"] == "enlace"]
+    assert {"a": "f3", "b": "f1"} in enl and any("pos" in r for r in enl), enl
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert "Práctica guiada" in p.inner_text("#v-repasar")
+    assert p.locator('#v-repasar [data-act="guia-mins"]').count() == 2
+    p.click('#v-repasar [data-act="guia-open"]')
+    t = p.inner_text("[data-guia]")
+    assert "Bloque 1 de 3" in t and "Figura 1, 4 veces" in t and "mano en la espalda" in t and "me adelanto" in t, t
+    assert p.evaluate("() => window.__bachateca.guiaState()") == {"i": 0, "total": 3, "fase": "listo", "rep": 0}
+    p.click('[data-guia] [data-guiaact="skip"]')
+    t = p.inner_text("[data-guia]")
+    assert "Bloque 2 de 3" in t and "Figura 3 → Figura 1, 4 veces" in t, t
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def practica_guiada_completa(browser):
+    ctx, p, errors = open_app(browser, seed=guia_seed())
+    st = lambda: p.evaluate("() => window.__bachateca.guiaState()")
+    p.evaluate("() => window.__bachateca.guiaForce({reps: 1, bpm: 240})")
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('#v-repasar [data-act="guia-open"]')
+    notas = ["fluida", "fluida", "dudas"]
+    for i, g in enumerate(notas):
+        assert st()["fase"] == "listo" and st()["i"] == i, st()
+        p.click("#guia-go")
+        s = st()
+        assert s["fase"] == "cuenta" and s["rep"] == 1, s
+        assert "Vez 1 de 1" in p.inner_text("[data-guia]") or "Frase 1 de 1" in p.inner_text("[data-guia]")
+        p.wait_for_function("window.__bachateca.guiaState().fase === 'nota'", timeout=8000)
+        assert "¿Cómo ha ido?" in p.inner_text("[data-guia]")
+        assert [b.inner_text() for b in p.locator("[data-guia] .grade button").all()] == ["No", "Con dudas", "Bien"]
+        p.click(f'[data-guia] [data-guiag="{g}"]')
+    assert st()["fase"] == "fin"
+    t = p.inner_text("[data-guia]")
+    assert "Práctica terminada" in t and "Figura 3 → Figura 1" in t, t
+    S = p.evaluate("() => window.__bachateca.state()")
+    assert S["figures"]["f1"]["rep"]["step"] == 1, "el enlace hacia f1 no vuelve a subirla el mismo día"
+    assert S["figures"]["f3"]["rep"]["step"] == 3, "la cadena y el origen del enlace no cambian el repaso"
+    assert S["figures"]["f2"].get("rep") is None
+    assert S["actividad"][p.evaluate("() => window.__bachateca.todayStr()")] == 3
+    p.click('[data-guia] [data-act="close"]')
+    assert st() is None
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def practica_guiada_cerrar_para_el_conteo(browser):
+    init = """(() => { window.__stops = 0; const o = AudioScheduledSourceNode.prototype.stop;
+      AudioScheduledSourceNode.prototype.stop = function(...a){ window.__stops++; return o.apply(this, a); }; })();"""
+    ctx, p, errors = open_app(browser, seed=guia_seed(), init=init)
+    p.click('nav.tabs [data-tab="repasar"]')
+    p.click('#v-repasar [data-act="guia-open"]')
+    p.click("#guia-go")
+    p.wait_for_timeout(600)
+    assert p.evaluate("() => window.__bachateca.guiaState().fase") == "cuenta"
+    antes = p.evaluate("() => window.__stops")
+    p.click('[data-guia] [data-act="close"]')
+    assert p.locator("[data-guia]").count() == 0
+    assert p.evaluate("() => window.__bachateca.guiaState()") is None
+    assert p.evaluate("() => window.__stops") > antes
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

@@ -122,8 +122,8 @@ Cada fase tiene su propio plan de implementación, que se aprueba antes de empez
 
 | # | Decisión | Mi recomendación |
 |---|---|---|
-| D1 | «Añadir al repertorio» con figuras que ya tienes y son distintas: ¿se conservan las tuyas por defecto y se pregunta? Cambia la prueba `importar_conserva_intentos_locales`, que hoy exige que gane la copia | Sí: preguntar «Usar las de la copia» o «Conservar las mías»; las dos opciones siguen existiendo |
-| D2 | «Reemplazar todo» deja de borrar vídeos al momento (los borrará la limpieza de la fase 2, respetando las instantáneas), para que restaurar una instantánea los recupere | Sí |
-| D3 | Copia o vídeo descargado (sin hoja de compartir): preguntar «¿Se ha guardado?» antes de darlo por copiado. Cambia un paso de `aviso_videos_sin_copia` | Sí |
-| D4 | (Fase 3) ¿Una figura marcada en el social cuenta como un repaso «Fluida»? | Sí, como máximo una vez al día |
-| D5 | (Fase 3) ¿Las cadenas incluyen figuras «en práctica»? | Sí, señaladas, con un interruptor para «solo seguras» |
+| D1 | «Añadir al repertorio» con figuras que ya tienes y son distintas: ¿se conservan las tuyas por defecto y se pregunta? Cambia la prueba `importar_conserva_intentos_locales`, que hoy exige que gane la copia | Sí: preguntar «Usar las de la copia» o «Conservar las mías»; las dos opciones siguen existiendo · Aprobada |
+| D2 | «Reemplazar todo» deja de borrar vídeos al momento (los borrará la limpieza de la fase 2, respetando las instantáneas), para que restaurar una instantánea los recupere | Sí · Aprobada |
+| D3 | Copia o vídeo descargado (sin hoja de compartir): preguntar «¿Se ha guardado?» antes de darlo por copiado. Cambia un paso de `aviso_videos_sin_copia` | Sí · Aprobada |
+| D4 | (Fase 3) ¿Una figura marcada en el social cuenta como un repaso «Fluida»? | Sí, como máximo una vez al día · Aprobada |
+| D5 | (Fase 3) ¿Las cadenas incluyen figuras «en práctica»? | Sí, señaladas, con un interruptor para «solo seguras» · Aprobada |

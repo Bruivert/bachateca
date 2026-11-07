@@ -9,7 +9,7 @@ Cada prueba abre la app limpia (sin datos), así que no toca nada de tu iPhone n
 En WebKit: BROWSER=webkit python3 tests/test_bachateca.py (se saltan las pruebas de cámara y micrófono).
 Si tienes Chrome instalado y no quieres descargar Chromium: CHROME=/ruta/a/chrome python3 tests/test_bachateca.py
 """
-import functools, http.server, json, os, socketserver, sys, threading, traceback
+import functools, http.server, json, os, shutil, signal, socketserver, sys, tempfile, threading, traceback
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -251,7 +251,7 @@ def aviso_videos_sin_copia(browser):
     assert dl.value.suggested_filename.startswith("Figura")
     p.wait_for_timeout(300)
     # Figura 2 es la más reciente, va primero; Figura 1 ya tenía copia: no queda ninguno.
-    assert dl.value.suggested_filename == "Figura 2 · v2.mp4", dl.value.suggested_filename
+    assert dl.value.suggested_filename == nombre_descargado("Figura 2 · v2.mp4"), dl.value.suggested_filename
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert "todos tus vídeos" in p.locator(".toast").inner_text()
     p.evaluate("() => window.__bachateca.flush()")
@@ -361,7 +361,7 @@ def apariencia(browser):
     assert bg == "rgb(6, 12, 26)", bg
     p.click("#btn-settings"); p.click('[data-tema="claro"]')
     assert "theme-light" in p.evaluate("() => document.documentElement.className")
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     assert "theme-light" in p.evaluate("() => document.documentElement.className"), "se recuerda al volver a abrir"
     assert p.evaluate("() => getComputedStyle(document.body).backgroundColor") != "rgb(6, 12, 26)"
     ctx.close()
@@ -398,7 +398,7 @@ def portadas_desde_el_video(browser):
     p.evaluate("""async b64 => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       const db = await new Promise(r => { const q = indexedDB.open("bachateca", 1); q.onsuccess = () => r(q.result); });
       await new Promise(r => { const t = db.transaction("videos", "readwrite"); t.objectStore("videos").put(new Blob([bin], {type: "video/mp4"}), "v1"); t.oncomplete = r; }); db.close(); }""", data)
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.wait_for_function("window.__bachateca.covers().includes('v1')", timeout=20000)
     p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
     st = stored_state(p)
@@ -483,8 +483,9 @@ def intento_grabado(browser):
     with p.expect_download() as dl:
         p.click('[data-act="att-savevid"]')
     p.click('#confirm-root [data-cf="ok"]')
-    assert dl.value.suggested_filename.startswith("Figura 1 · intento"), dl.value.suggested_filename
-    assert dl.value.suggested_filename.endswith(f' · {a["vid"]}.mp4'), "lleva el id del vídeo para poder recuperarlo"
+    assert dl.value.suggested_filename.startswith(nombre_descargado("Figura 1 · intento")), dl.value.suggested_filename
+    assert dl.value.suggested_filename.endswith(nombre_descargado(f' · {a["vid"]}.mp4')), "lleva el id del vídeo para poder recuperarlo"
+    assert p.evaluate("n => window.__bachateca.vidIdFromName(n)", dl.value.suggested_filename) == a["vid"]
     p.wait_for_timeout(200)
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert not errors, errors
@@ -551,15 +552,23 @@ def importar_conserva_intentos_locales(browser):
 
 
 # ---------------------------------------------------------------- pulso de cada vídeo
+def nombre_descargado(nombre):
+    """El nombre con el que se descarga un archivo: WebKit cambia los espacios por «_»."""
+    return nombre.replace(" ", "_") if os.environ.get("BROWSER") == "webkit" else nombre
+
+
 def put_fixture(page, vid_ids):
-    """Guarda el vídeo de prueba real con esos ids (para reproducirlo en la app) y recarga."""
+    """Guarda el vídeo de prueba real con esos ids (para reproducirlo en la app) y recarga.
+
+    Las recargas esperan a que la app esté lista, no al evento «load»: en WebKit, un vídeo que se
+    está cargando puede retrasar «load» más de 30 s, y lo que importa a las pruebas es ready()."""
     import base64
     data = base64.b64encode(open(FIXTURE, "rb").read()).decode()
     page.evaluate("""async ([b64, ids]) => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       const db = await new Promise(r => { const q = indexedDB.open("bachateca", 1); q.onsuccess = () => r(q.result); });
       await new Promise(r => { const t = db.transaction("videos", "readwrite");
         ids.forEach(id => t.objectStore("videos").put(new Blob([bin], {type: "video/mp4"}), id)); t.oncomplete = r; }); db.close(); }""", [data, vid_ids])
-    page.reload(); page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    page.reload(wait_until="domcontentloaded"); page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
 
 
 def tap_at(page, sec):
@@ -741,7 +750,7 @@ def comparar_por_tiempos(browser):
     p.click('[data-act="att-open"][data-att="i1"]')
     p.click('[data-act="cmp-open"]')
     p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
-    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     wait_seeked(p)
     assert "200 bpm" in p.locator("#cmp-tempo").inner_text() and "120" in p.locator("#cmp-tempo").inner_text()
     assert "no un fallo" in p.locator("#cmp-tempo").inner_text(), "el pulso es un dato"
@@ -809,7 +818,7 @@ def marcas_y_errores_que_cometo(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     p.click('#cmp-line [data-cb="4"]')
     p.click('[data-cmk="error"]')
     assert "Error en el 4" in p.locator("#cmp-form").inner_text()
@@ -1131,7 +1140,7 @@ def videos_como_copia_en_memoria(browser):
     ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}})
     put_fixture(p, ["v1"])
     p.evaluate("() => localStorage.setItem('bachateca.vidmode', JSON.stringify('mem'))")
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
     v = ficha_video(p)
@@ -1161,7 +1170,7 @@ def videos_sin_coletilla(browser):
     ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1", vidTrim={"start": 0.8, "end": 0})}, "logs": {}})
     put_fixture(p, ["v1"])
     p.evaluate("() => localStorage.setItem('bachateca.vidmode', JSON.stringify('plain'))")
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
     v = ficha_video(p)
@@ -2402,7 +2411,7 @@ def copia_en_memoria_solo_para_ese_video(browser):
     seed = {"schema": 6, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", vid="v2")}, "logs": {}}
     ctx, p, errors = open_app(browser, seed=seed, ls={"bachateca.vidmem": ["v1"]})
     put_fixture(p, ["v1", "v2"])
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.click('nav.tabs [data-tab="repertorio"]')
     for f in ("f1", "f2"):
         p.click(f'#v-repertorio [data-view="{f}"]')
@@ -2854,7 +2863,7 @@ def marcar_otra_vez_el_mismo_error(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]')
     assert "¿Es uno de estos?" in p.locator("#cmp-form").inner_text()
     p.click('#cmp-form [data-esame="e1"]')
@@ -2953,7 +2962,7 @@ def repetir_error_no_desengancha_la_marca_anterior(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.fill("#cmp-nota", "me adelanto"); p.check("#cmp-toerr"); p.click("#cmp-fsave")
     p.click('#cmp-line [data-cb="2"]'); p.click('[data-cmk="error"]')
     p.click('#cmp-form [data-esame]')
@@ -3143,7 +3152,7 @@ def avance_fino_en_comparar(browser):
     p.click('[data-act="att-open"][data-att="i1"]')
     p.click('[data-act="cmp-open"]')
     p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
-    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     wait_seeked(p)
     assert p.get_attribute('[data-cmp] [data-cstep="0.1"]', "aria-label") == "Adelante 0,1 segundos"
     assert p.get_attribute('[data-cmp] [data-cstep="-0.1"]', "aria-label") == "Atrás 0,1 segundos"
@@ -3172,7 +3181,7 @@ def superponer_en_comparar(browser):
     p.click('[data-act="att-open"][data-att="i1"]')
     p.click('[data-act="cmp-open"]')
     p.wait_for_selector("[data-cmp] #cmp-line [data-cb]")
-    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     wait_seeked(p)
     box = "() => ['#cmp-t', '#cmp-m'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })"
     a, b = p.evaluate(box)
@@ -3463,7 +3472,7 @@ def ejecucion_sube_con_un_intento_sin_errores(browser):
     put_fixture(p, ["v1", "a1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
-    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1", timeout=60000)
     ej = lambda: p.evaluate("() => window.__bachateca.state().figures.f1.ejec || null")
     p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.click("#cmp-fsave")
     assert ej() is None
@@ -3559,7 +3568,7 @@ def limpieza_espera_7_dias(browser):
     # Apuntado hace 8 días (el vídeo; su portada, hace 1): se borra con su portada al arrancar.
     p.evaluate("""(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({h1: d[0], 'cover:h1': d[1], 'cover:h2': d[1]}))""",
                [p.evaluate(_HACE, 8), p.evaluate(_HACE, 1)])
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
     p.evaluate("() => window.__bachateca.cleanOrphans()")   # espera a que acabe la de arranque
     assert sorted(p.evaluate(_VID_KEYS)) == ["cover:h2", "v1", "v2"]
@@ -3576,7 +3585,7 @@ def limpieza_respeta_las_instantaneas(browser):
     p.evaluate(_PUT_VIDS, ["sv", "sp", "si", "cover:sv", "h1"])
     viejo = p.evaluate(_HACE, 30)
     p.evaluate("(d) => localStorage.setItem('bachateca.huerfanos', JSON.stringify({sv: d, sp: d, si: d, 'cover:sv': d, h1: d}))", viejo)
-    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.reload(wait_until="domcontentloaded"); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     p.wait_for_function(f"async () => !(await ({_VID_KEYS})()).includes('h1')")
     r = p.evaluate("() => window.__bachateca.cleanOrphans({ahora: true})")
     assert r == {"n": 0, "bytes": 0}, r
@@ -3697,8 +3706,10 @@ def nombre_de_video_con_id(browser):
     r = p.evaluate("""() => { const B = window.__bachateca;
       return [B.vidFileName('Figura 1', 'v1', 'video/mp4'), B.vidFileName('a/b:c', 'x_9-Z', 'video/quicktime'),
               B.vidIdFromName('Figura 1 · v1.mp4'), B.vidIdFromName('Ana · intento 3/11 · a-1_b.MOV'),
-              B.vidIdFromName('Figura 1 · v1 (1).mp4'), B.vidIdFromName('IMG_0001.MOV'), B.vidIdFromName('x · a b.mp4')]; }""")
-    assert r == ["Figura 1 · v1.mp4", "abc · x_9-Z.mov", "v1", "a-1_b", "v1", None, None], r
+              B.vidIdFromName('Figura 1 · v1 (1).mp4'), B.vidIdFromName('IMG_0001.MOV'), B.vidIdFromName('x · a b.mp4'),
+              B.vidIdFromName('Figura_1_·_v1.mp4'), B.vidIdFromName('Ana_·_intento_3_11_·_a-1_b_(1).MOV')]; }""")
+    # Las dos últimas: Safari cambia los espacios por «_» al descargar; el id se sigue leyendo.
+    assert r == ["Figura 1 · v1.mp4", "abc · x_9-Z.mov", "v1", "a-1_b", "v1", None, None, "v1", "a-1_b"], r
     # Copia completa: primero el JSON (como siempre) y después todos los vídeos, aunque ya tuvieran copia.
     p.click("#btn-settings")
     with p.expect_download() as dl:
@@ -3710,7 +3721,7 @@ def nombre_de_video_con_id(browser):
     with p.expect_download() as dl:
         p.click('[data-act="save-vids"]')
     p.click('#confirm-root [data-cf="ok"]')
-    assert dl.value.suggested_filename == "Figura 1 · v1.mp4", dl.value.suggested_filename
+    assert dl.value.suggested_filename == nombre_descargado("Figura 1 · v1.mp4"), dl.value.suggested_filename
     assert p.evaluate("() => window.__bachateca.vidIdFromName(%s)" % json.dumps(dl.value.suggested_filename)) == "v1"
     p.wait_for_selector("text=Ahora tus vídeos: 0")
     assert p.evaluate("() => +localStorage.getItem('bachateca.backup.at')") > 0, "cuenta como copia hecha"
@@ -3917,7 +3928,7 @@ def copia_completa_cuenta_solo_los_que_estan(browser):
     with p.expect_download() as dl:
         p.click('[data-act="save-vids"]')
     p.click('#confirm-root [data-cf="ok"]')
-    assert dl.value.suggested_filename == "Figura 1 · v1.mp4"
+    assert dl.value.suggested_filename == nombre_descargado("Figura 1 · v1.mp4")
     p.wait_for_selector("text=Ahora tus vídeos: 0")
     assert "1 no está en este dispositivo" in p.inner_text(".sheet")
     assert p.locator('[data-act="save-vids"]').count() == 0
@@ -3977,32 +3988,113 @@ def practica_guiada_ignora_las_opciones_de_enlazar(browser):
     ctx.close()
 
 
+# Una prueba que se cuelga (por ejemplo, una promesa que en un motor nunca se resuelve) no debe
+# bloquear la batería horas: pasado el límite se mata el navegador, la prueba cuenta como fallida
+# y la batería sigue con un navegador nuevo.
+LIMITE_PRUEBA = int(os.environ.get("LIMITE_PRUEBA", "90"))
+
+
+class WebkitConDisco:
+    """WebKit con un perfil en disco nuevo para cada contexto.
+
+    Playwright abre WebKit como una ventana privada, y así WebKit no guarda vídeos (Blobs) en
+    IndexedDB: la siembra falla con «Page.evaluate: null» y las pruebas que guardan un vídeo real se
+    quedan esperando para siempre. La app instalada en el iPhone sí guarda en disco, así que cada
+    contexto se abre con launch_persistent_context en su propia carpeta temporal; todas se borran al cerrar.
+    Imita lo que las pruebas usan de un Browser: new_context, contexts, is_connected y close."""
+
+    def __init__(self, pw):
+        self.pw = pw
+        self.contexts = []
+        self.raiz = tempfile.mkdtemp(prefix="bachateca-webkit-")
+
+    def new_context(self, **kw):
+        ctx = self.pw.webkit.launch_persistent_context(tempfile.mkdtemp(dir=self.raiz), **kw)
+        # La página en blanco que abre sola el perfil se deja abierta: en WebKit, cerrar la última
+        # página de un perfil cierra el navegador. Las pruebas abren la suya con new_page().
+        self.contexts.append(ctx)
+        ctx.on("close", lambda _: ctx in self.contexts and self.contexts.remove(ctx))
+        return ctx
+
+    def is_connected(self):
+        return True
+
+    def close(self):
+        for ctx in list(self.contexts):
+            try:
+                ctx.close()
+            except Exception:
+                pass
+        shutil.rmtree(self.raiz, ignore_errors=True)
+
+
+def matar_navegador():
+    """Mata los procesos del navegador (descendientes del controlador de Playwright, no el controlador)."""
+    hijos = {}
+    for d in os.listdir("/proc"):
+        if d.isdigit():
+            try:
+                with open(f"/proc/{d}/stat") as f:
+                    ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+                hijos.setdefault(ppid, []).append(int(d))
+            except (OSError, ValueError, IndexError):
+                pass
+    for controlador in hijos.get(os.getpid(), []):
+        pendientes = list(hijos.get(controlador, []))
+        while pendientes:
+            pid = pendientes.pop()
+            pendientes += hijos.get(pid, [])
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):
         sys.exit(f"BROWSER debe ser «chromium» o «webkit», no «{nombre}»")
+    sys.stdout.reconfigure(line_buffering=True)   # en CI, cada línea sale al momento
     srv = serve()
     failed = skipped = 0
     with sync_playwright() as pw:
-        if nombre == "chromium":
-            exe = os.environ.get("CHROME")
-            # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
-            args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
-            browser = pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
-        else:
-            browser = pw.webkit.launch()
+        def lanzar():
+            if nombre == "chromium":
+                exe = os.environ.get("CHROME")
+                # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
+                args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+                return pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
+            return WebkitConDisco(pw)
+        browser = lanzar()
         for fn in results:
             if nombre == "webkit" and fn.solo_chromium:
                 skipped += 1
                 print(f"  salta {fn.__name__} ({fn.solo_chromium})")
                 continue
+            colgada = threading.Event()
+            vigia = threading.Timer(LIMITE_PRUEBA, lambda: (colgada.set(), matar_navegador()))
+            vigia.start()
             try:
                 fn(browser)
                 print(f"  ok   {fn.__name__}")
             except Exception:
                 failed += 1
-                print(f"  FALLA {fn.__name__}")
-                traceback.print_exc(limit=3)
+                if colgada.is_set():
+                    print(f"  FALLA {fn.__name__} (colgada: más de {LIMITE_PRUEBA} s; se reinicia el navegador)")
+                else:
+                    print(f"  FALLA {fn.__name__}")
+                    traceback.print_exc(limit=3)
+            finally:
+                vigia.cancel()
+            if colgada.is_set() or not browser.is_connected():
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+                browser = lanzar()
+            else:
+                for c in list(browser.contexts):   # lo que una prueba fallida dejó abierto
+                    c.close()
         browser.close()
     srv.shutdown()
     total = len(results) - skipped

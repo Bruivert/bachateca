@@ -314,7 +314,8 @@ def inicio_con_datos(browser):
     assert "Salidas desde Sombra" in txt and "te bloqueaste" in txt.lower(), "prioriza el bloqueo del último social"
     assert "Figuras que recuerdas" in txt
     ring = v.locator(".in-mem .in-big").inner_text()
-    assert ring.startswith("2") and "de 4" in ring, ring      # 4 activas; olvidadas: la 2 (último repaso fallado) y la 3 (6 días pendiente)
+    assert ring.startswith("3") and "de 4" in ring, ring      # 4 activas; olvidada solo la 2 (último repaso fallado); la 3 (6 días pendiente) está atrasada, no olvidada
+    assert "1 atrasada" in v.locator(".in-mem").inner_text()
     assert "Olvidada" in v.locator(".carr").inner_text()
     assert v.locator("video[data-hvid]").count() == 1, "portada con el vídeo de la figura"
     st = stored_state(p)
@@ -2149,6 +2150,78 @@ def buildChain_es_pura(browser):
       const ids = () => B.buildChain(pool, {start: "Cerrada"}, () => 0).steps.map(s => s.f ? s.f.id : "dead");
       return [ids(), ids()]; }""")
     assert r[0] == r[1] and len(r[0]) == 4, r
+    assert not errors, errors
+    ctx.close()
+
+def _social_marca(p, fid, nombre):
+    p.click('[data-act="log-open"]') if p.locator('[data-act="log-open"]').count() else None
+    p.click(f'[data-logfig="{fid}"]')
+    p.click('[data-act="log-save"]')
+
+
+@test
+def social_cuenta_como_repaso(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", rep={"step": 1, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 0}),
+                        "f2": fig(2, "Abierta 2 manos", "Cerrada", estado="incompleta", rep={"step": 1, "due": d(0), "last": d(-1)})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.click('[data-logfig="f1"]'); p.click('[data-logfig="f2"]')
+    p.click('[data-act="log-save"]')
+    r = p.evaluate("() => { const S = window.__bachateca.state(); return [S.figures.f1.rep, S.figures.f2.rep, Object.values(S.logs)[0], S.actividad] }")
+    assert r[0]["step"] == 2 and r[0]["last"] == r[2]["fecha"] and r[0]["due"] == d(7), r
+    assert r[1]["step"] == 1 and r[1]["due"] == d(0), "la incompleta no cambia su repaso"
+    assert r[2]["repAntes"]["f1"]["step"] == 1 and "f2" not in r[2]["repAntes"], r[2]
+    p.click('[data-act="log-again"]')
+    p.click('[data-logfig="f1"]')
+    p.click('[data-act="log-save"]')
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep.step")
+    assert r == 2, "como máximo un repaso por día y figura"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def borrar_social_deshace_el_repaso(browser):
+    import datetime
+    d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", rep={"step": 1, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 0})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.click('[data-logfig="f1"]')
+    p.click('[data-act="log-save"]')
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.step") == 2
+    p.click('[data-act="close"]') if p.locator('[data-act="close"]').count() else None
+    p.click('[data-act="log-open"]') if p.locator('[data-dellog]').count() == 0 else None
+    p.click('[data-dellog]')
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep")
+    assert r["step"] == 1 and r["due"] == d(0), r
+    p.click(".toast .undo")
+    r = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert r["rep"]["step"] == 2 and r["usos"] == 1, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def atrasada_no_es_olvidada(browser):
+    import datetime
+    d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
+    seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", nombre="Retrasada", rep={"step": 3, "due": d(-5), "last": d(-20), "aciertos": 3, "fallos": 0}),
+                        "f2": fig(2, "Abierta 2 manos", "Cerrada", nombre="Fallada", rep={"step": 0, "due": d(0), "last": d(-1), "aciertos": 0, "fallos": 1})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    ms = p.evaluate("() => [window.__bachateca.memState(window.__bachateca.state().figures.f1), window.__bachateca.memState(window.__bachateca.state().figures.f2)]")
+    assert ms == ["atrasada", "olvidada"], ms
+    p.click('nav.tabs [data-tab="repertorio"]')
+    assert "Atrasada" in p.locator('#v-repertorio [data-view="f1"]').inner_text()
+    assert "Olvidada" not in p.locator('#v-repertorio [data-view="f1"]').inner_text()
+    assert "Olvidada" in p.locator('#v-repertorio [data-view="f2"]').inner_text()
+    p.click('nav.tabs [data-tab="inicio"]')
+    txt = p.locator("#v-inicio .in-mem").inner_text()
+    assert "1 atrasada" in txt and "1 olvidada" in txt and p.locator("#v-inicio .in-mem .in-big").inner_text().startswith("1"), txt
     assert not errors, errors
     ctx.close()
 

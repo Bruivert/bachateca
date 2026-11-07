@@ -557,6 +557,7 @@ details.info summary::after{inset:-10px -4px}
 .t-blue{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
 .t-red{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
 .t-grey{background:var(--fill);color:var(--muted)}
+.t-amber{background:color-mix(in srgb,var(--st-incompleta) 16%,transparent);color:var(--st-incompleta)}
 .t-hero{background:rgba(196,248,56,.18);color:#c4f838}
 .hero{position:relative;border-radius:24px;overflow:hidden;background:#0b1428;color:#fff;border:1px solid var(--edge)}
 .hero-media{position:absolute;right:0;top:0;width:62%;height:100%;object-fit:cover;pointer-events:none}
@@ -727,6 +728,7 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .gtop .st-tag.st-espera{color:#c3cce0}
 .gtop .st-tag.st-incompleta{color:#ffb35c}
 .gtop .t-red{color:#ff8f9b}
+.gtop .t-amber{color:#ffb35c}
 .gplay{margin-left:auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .gbody{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px}
 .gname{font-family:var(--f-display);font-size:1.0588rem;font-weight:800;line-height:1.15;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 8px rgba(0,0,0,.35)}
@@ -1469,14 +1471,14 @@ function galCard(f, inGroup){
   else if(f.estado==="incompleta") sub = esc(parteTxt(f));
   else sub = `<span class="warnc">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
   return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${esc(f.id)}">${media}<span class="gshade" aria-hidden="true"></span>
-    <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"?`<span class="tagx t-red">Olvidada</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
+    <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"||ms==="atrasada"?`<span class="tagx ${MEM[ms][1]}">${MEM[ms][0]}</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
     <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${+f.usos?`<span class="gusos">salió ${+f.usos}×</span>`:""}</span>
   </button>`;
 }
 function figCard(f, inGroup){
   // Siempre con miniatura: la del vídeo o, si no tiene, el compás de la figura sobre fondo azul.
   const th = f.thumb ? `<img class="thumb" src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="thumb thumb-ph" aria-hidden="true">${f.vid?"▶":compas(f)||ico("music")}</span>`;
-  const ms = memState(f), mtag = ms==="olvidada" ? `<span class="tagx t-red">Olvidada</span>` : "";
+  const ms = memState(f), mtag = ms==="olvidada"||ms==="atrasada" ? `<span class="tagx ${MEM[ms][1]}">${MEM[ms][0]}</span>` : "";
   let sub;
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = routeTxt(f, !inGroup);
@@ -1514,17 +1516,19 @@ let trainMins = [5,10,20].includes(+lsGet(LS_MINS)) ? +lsGet(LS_MINS) : 10;
 let training = null;
 const TRAIN = {5:{f:2,l:1,chain:false}, 10:{f:3,l:2,chain:true}, 20:{f:5,l:3,chain:true}};
 // Estado de memoria de una figura, a partir de su repaso:
-// olvidada = la última vez no la recordaste o lleva más de 3 días pendiente; dominada = intervalo de 14 días o más.
+// olvidada = la última vez no la recordaste; atrasada = lleva más de 3 días pendiente (no es lo mismo que olvidarla);
+// dominada = intervalo de 14 días o más.
 function memState(f){
   if(!active(f)) return null;
   const r=f.rep||{};
   if(!r.last) return "nueva";
-  if(((r.step||0)===0 && (r.fallos||0)>0) || (r.due && r.due < todayStr(-3))) return "olvidada";
+  if((r.step||0)===0 && (r.fallos||0)>0) return "olvidada";
+  if(r.due && r.due < todayStr(-3)) return "atrasada";
   if((r.step||0) >= 3) return "dominada";
   return "inestable";
 }
-const MEM = {nueva:["Nueva","t-grey"], olvidada:["Olvidada","t-red"], inestable:["Inestable","t-blue"], dominada:["Dominada","t-lime"]};
-const MEM_ORDER = {olvidada:0, inestable:1, nueva:2, dominada:3};
+const MEM = {nueva:["Nueva","t-grey"], olvidada:["Olvidada","t-red"], atrasada:["Atrasada","t-amber"], inestable:["Inestable","t-blue"], dominada:["Dominada","t-lime"]};
+const MEM_ORDER = {olvidada:0, atrasada:1, inestable:2, nueva:3, dominada:4};
 const byMem = (a,b) => (MEM_ORDER[memState(a)]??9) - (MEM_ORDER[memState(b)]??9);
 function lastLog(){ return Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"") || (b.creado||0)-(a.creado||0))[0]; }
 function trainPlan(m){
@@ -1586,7 +1590,7 @@ function renderInicio(){
       <div class="row"><button class="btn pri" data-act="quick">Captura rápida</button><button class="btn ghost" data-act="examples">Ver con ejemplos</button></div></div>`;
     return;
   }
-  const act=all.filter(active), st={nueva:0, olvidada:0, inestable:0, dominada:0};
+  const act=all.filter(active), st={nueva:0, olvidada:0, atrasada:0, inestable:0, dominada:0};
   act.forEach(f=>{ st[memState(f)]++; });
   const rec = act.length ? Math.round((act.length-st.olvidada)/act.length*100) : 0;
   const plan = trainPlan(trainMins), fStep=plan.steps.find(x=>x.kind==="fig"), lStep=plan.steps.find(x=>x.kind==="link"), cStep=plan.steps.find(x=>x.kind==="chain");
@@ -1633,7 +1637,7 @@ function renderInicio(){
       <div class="ring">${ringSVG(rec/100, 92, 10)}<b>${rec}%</b></div>
       <div class="in-mem-t"><span class="muted small" id="in-mem">Figuras que recuerdas</span>
         <b class="in-big">${act.length-st.olvidada} <span>de ${act.length}</span></b>
-        <span class="tags">${st.dominada?`<span class="tagx t-lime">${st.dominada} ${st.dominada===1?"dominada":"dominadas"}</span>`:""}${st.inestable+st.nueva?`<span class="tagx t-blue">${st.inestable+st.nueva} en marcha</span>`:""}${st.olvidada?`<span class="tagx t-red">${st.olvidada} ${st.olvidada===1?"olvidada":"olvidadas"}</span>`:""}</span>
+        <span class="tags">${st.dominada?`<span class="tagx t-lime">${st.dominada} ${st.dominada===1?"dominada":"dominadas"}</span>`:""}${st.inestable+st.nueva?`<span class="tagx t-blue">${st.inestable+st.nueva} en marcha</span>`:""}${st.atrasada?`<span class="tagx t-amber">${st.atrasada} ${st.atrasada===1?"atrasada":"atrasadas"}</span>`:""}${st.olvidada?`<span class="tagx t-red">${st.olvidada} ${st.olvidada===1?"olvidada":"olvidadas"}</span>`:""}</span>
       </div>
     </section>` : ""}
     ${carr.length ? `<section aria-labelledby="in-due" class="in-sec">
@@ -2165,13 +2169,19 @@ function openLog(fresh){
 function saveLog(){
   const l={id:uid(), fecha:salD || socDay(), creado:Date.now(), figs:[...logSel].filter(id=>S.figures[id]), salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
   if(!l.figs.length && !l.salio && !l.bloqueo && !l.proximo){ toast("Marca una figura o rellena algún campo."); return; }
-  logSuggest = [];
+  logSuggest = []; let counted = false;
   l.figs.forEach(id=>{
     const f=S.figures[id]; if(!f) return;
     f.usos=(+f.usos||0)+1; f.ultimoUso=l.fecha; persist({t:"fig",id});
+    // Bailarla en un social es un repaso «Fluida», una vez al día por figura. Las incompletas no entran en los repasos.
+    if(usable(f) && (f.rep||{}).last!==l.fecha){
+      (l.repAntes ||= {})[id] = clone(f.rep || null);
+      f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; counted = true;
+    }
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
+  if(counted){ S.actividad ||= {}; S.actividad[l.fecha] = (+S.actividad[l.fecha]||0) + 1; persist({t:"act"}); }
   S.logs[l.id]=l; persist({t:"log",id:l.id});
   logSel = new Set(); logBloq = ""; saveSel(); setNight(false);
   if(backupInfo().stale) lsSet(LS_NUDGE, 1);
@@ -2182,10 +2192,16 @@ function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
   const copy=clone(l);
   (l.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f && f.usos){ f.usos--; persist({t:"fig",id:fid}); } });
+  // Quita el repaso que dio el social, salvo que la figura se haya repasado después (entonces su repaso ya no es de este registro).
+  const quitados = {};
+  Object.entries(l.repAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
+    if(f && f.rep && f.rep.last===l.fecha){ quitados[fid]=clone(f.rep); if(antes) f.rep=antes; else delete f.rep; persist({t:"fig",id:fid}); } });
   delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
+    // Vuelve a poner los repasos que quitó el borrado, solo si la figura no se repasó mientras tanto.
+    Object.entries(quitados).forEach(([fid,r])=>{ const f=S.figures[fid]; if(f && (f.rep||{}).last!==copy.fecha){ f.rep=r; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
 }
@@ -4247,7 +4263,7 @@ $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
-if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
+if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
   SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };

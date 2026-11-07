@@ -18,3 +18,21 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Ejecutar la batería
         run: python3 tests/test_bachateca.py
+
+  # Provisional: hasta clasificar los fallos de la primera ejecución en WebKit no bloquea.
+  # Cada fallo se resuelve así: limitación del motor de pruebas -> @test(solo_chromium="motivo");
+  # fallo de la app -> se corrige o se avisa, nunca se marca. Después se quita continue-on-error.
+  webkit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar Playwright y WebKit
+        run: |
+          pip install playwright==1.64.1
+          python -m playwright install --with-deps webkit
+      - name: Ejecutar la batería en WebKit
+        run: BROWSER=webkit python3 tests/test_bachateca.py

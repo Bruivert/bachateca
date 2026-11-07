@@ -6,6 +6,7 @@ Uso, desde la carpeta del repositorio:
     python3 tests/test_bachateca.py
 
 Cada prueba abre la app limpia (sin datos), así que no toca nada de tu iPhone ni de tu navegador.
+En WebKit: BROWSER=webkit python3 tests/test_bachateca.py (se saltan las pruebas de cámara y micrófono).
 Si tienes Chrome instalado y no quieres descargar Chromium: CHROME=/ruta/a/chrome python3 tests/test_bachateca.py
 """
 import functools, http.server, json, os, socketserver, sys, threading, traceback
@@ -30,9 +31,13 @@ def serve():
     return srv
 
 
-def test(fn):
-    results.append(fn)
-    return fn
+def test(fn=None, *, solo_chromium=None):
+    """@test o @test(solo_chromium="motivo"): con motivo, la prueba se salta en WebKit."""
+    def reg(f):
+        f.solo_chromium = solo_chromium
+        results.append(f)
+        return f
+    return reg(fn) if fn is not None else reg
 
 
 def open_app(browser, seed=None, videos=None):
@@ -977,7 +982,7 @@ def log_has(p, text, timeout=15000):
     p.wait_for_function("t => window.__conteo.lines.some(l => l.includes(t))", arg=text, timeout=timeout)
 
 
-@test
+@test(solo_chromium="cámara y micrófono simulados")
 def conteo_carga_la_voz_y_el_ritmo_de_las_figuras(browser):
     f = fig(1, "Cerrada", "Sombra", vid="v1", nombre="Entrada a sombra",
             pulso={"vid": "v1", "modo": "extremos", "marcas": [{"b": 1, "s": 0}, {"b": 8, "s": 3.5}]})
@@ -998,7 +1003,7 @@ def conteo_carga_la_voz_y_el_ritmo_de_las_figuras(browser):
     ctx.close()
 
 
-@test
+@test(solo_chromium="cámara y micrófono simulados")
 def conteo_suena_con_los_dos_motores(browser):
     ctx, p, errors = open_conteo(browser)
     p.click("#c-try")
@@ -1017,7 +1022,7 @@ def conteo_suena_con_los_dos_motores(browser):
     ctx.close()
 
 
-@test
+@test(solo_chromium="cámara y micrófono simulados")
 def conteo_grabar_dentro_de_la_app_saca_el_pulso(browser):
     ctx, p, errors = open_conteo(browser)
     p.click("#c-cam")
@@ -1172,7 +1177,7 @@ def pulso_automatico_del_conteo(browser):
     ctx.close()
 
 
-@test
+@test(solo_chromium="cámara y micrófono simulados")
 def grabarme_con_conteo(browser):
     seed = cmp_seed(intentos=[])
     ctx, p, errors = open_app(browser, seed=seed)
@@ -1206,7 +1211,7 @@ def grabarme_con_conteo(browser):
     ctx.close()
 
 
-@test
+@test(solo_chromium="cámara y micrófono simulados")
 def salir_de_grabar_apaga_la_camara(browser):
     ctx, p, errors = open_app(browser, seed=cmp_seed(intentos=[]))
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
@@ -1231,14 +1236,24 @@ def salir_de_grabar_apaga_la_camara(browser):
 
 
 def main():
+    nombre = os.environ.get("BROWSER", "chromium")
+    if nombre not in ("chromium", "webkit"):
+        sys.exit(f"BROWSER debe ser «chromium» o «webkit», no «{nombre}»")
     srv = serve()
-    failed = 0
+    failed = skipped = 0
     with sync_playwright() as pw:
-        exe = os.environ.get("CHROME")
-        # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
-        args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
-        browser = pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
+        if nombre == "chromium":
+            exe = os.environ.get("CHROME")
+            # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
+            args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+            browser = pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
+        else:
+            browser = pw.webkit.launch()
         for fn in results:
+            if nombre == "webkit" and fn.solo_chromium:
+                skipped += 1
+                print(f"  salta {fn.__name__} ({fn.solo_chromium})")
+                continue
             try:
                 fn(browser)
                 print(f"  ok   {fn.__name__}")
@@ -1248,7 +1263,9 @@ def main():
                 traceback.print_exc(limit=3)
         browser.close()
     srv.shutdown()
-    print(f"\n{len(results) - failed} de {len(results)} pruebas correctas")
+    total = len(results) - skipped
+    extra = f" ({skipped} saltadas)" if skipped else ""
+    print(f"\n{total - failed} de {total} pruebas correctas{extra}")
     sys.exit(1 if failed else 0)
 
 

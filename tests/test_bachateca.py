@@ -2865,7 +2865,7 @@ def marcar_otra_vez_el_mismo_error(browser):
     e = f["errores"][0]
     assert e["veces"] == 2 and e["ultima"] == t, e
     m = f["intentos"][0]["marcadores"][0]
-    assert e["marca"] == m["id"] and e["desde"] == "i1", (e, m)
+    assert e["marca"] == "m1" and e["marcas"] == [m["id"]] and e["desde"] == "i1", (e, m)  # la primera vez no se mueve; la repetición se anota
     assert not errors, errors
     ctx.close()
 
@@ -2941,6 +2941,43 @@ def social_con_errores_activos_limita_el_intervalo(browser):
     rep = S["figures"]["f1"]["rep"]; l = list(S["logs"].values())[0]
     assert rep["step"] == 2 and rep["due"] == d(7), rep
     assert l["repDespues"]["f1"] == rep, "el registro guarda el repaso ya limitado"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def repetir_error_no_desengancha_la_marca_anterior(browser):
+    seed = cmp_seed(); seed["schema"] = 9
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]'); p.fill("#cmp-nota", "me adelanto"); p.check("#cmp-toerr"); p.click("#cmp-fsave")
+    p.click('#cmp-line [data-cb="2"]'); p.click('[data-cmk="error"]')
+    p.click('#cmp-form [data-esame]')
+    assert p.locator("#cmp-toerr").count() == 0, "con un error elegido no se ofrece añadir otro"
+    p.click("#cmp-fsave")
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert len(f["errores"]) == 1 and f["errores"][0]["veces"] == 2 and len(f["errores"][0]["marcas"]) == 1, f["errores"]
+    items = p.locator("#cmp-marks li").all_inner_texts()
+    assert len(items) == 2 and all("En tus errores" in t and "A mis errores" not in t for t in items), items
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def anadir_o_reabrir_error_limita_el_repaso_al_instante(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    seed = err_seed(rep={"step": 4, "due": d(30), "aciertos": 4, "fallos": 0})
+    seed["figures"]["f1"]["errores"][0]["resuelto"] = d(-1); seed["figures"]["f1"]["errores"].pop()
+    ctx, p, errors = open_app(browser, seed=seed)
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.due") == d(30)
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click("section:has(#fv-e) details summary"); p.click('[data-act="err-reopen"]')
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep")
+    assert r["step"] == 2 and r["due"] <= d(7), r
     assert not errors, errors
     ctx.close()
 

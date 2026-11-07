@@ -3003,7 +3003,7 @@ function errDelete(figId, errId){
 function errSet(figId, errId, antes, despues, msg){
   const put = v => { const g=S.figures[figId]; if(!g) return false; const k=erroresOf(g).findIndex(e=>e.id===errId); if(k<0) return false;
     g.errores = erroresOf(g).map((e,j)=>{ if(j!==k) return e; const n={...e}; ["veces","ultima","resuelto"].forEach(c=>{ if(v[c]===undefined) delete n[c]; else n[c]=v[c]; }); return n; });
-    persist({t:"fig", id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); return true; };
+    capByErrors(g); persist({t:"fig", id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); return true; };
   if(!put(despues)) return; announce(msg);
   toast(msg, {label:"Deshacer", fn:()=>put(antes)});
 }
@@ -3158,7 +3158,7 @@ function cmpForm(){
   el.innerHTML = `<div class="cmp-fm"><p class="small"><b>${er?"Error":"Bien hecho"} en el ${beatName(cmp.form.b)}</b></p>
     <label class="f" for="cmp-nota">Nota (opcional)<input type="text" id="cmp-nota" placeholder="${er?"Ej.: el brazo izquierdo se queda bajo":"Ej.: buena preparación en el 4"}"></label>
     ${er && activos.length ? `<div role="group" aria-labelledby="cmp-same-t"><p class="small" id="cmp-same-t">¿Es uno de estos?</p><div class="row" style="flex-wrap:wrap;gap:8px">${activos.map(e=>`<button type="button" class="btn ghost sm" data-esame="${esc(e.id)}" aria-pressed="${cmp.form.same===e.id}">${esc(e.nota)} <span class="small muted">×${e.veces||1}</span></button>`).join("")}</div></div>` : ""}
-    ${er?`<label class="small row" for="cmp-toerr" style="gap:10px;min-height:44px"><input type="checkbox" id="cmp-toerr"> Añadir a «Errores que cometo» para verlo al repasarla</label>`:""}
+    ${er && !cmp.form.same?`<label class="small row" for="cmp-toerr" style="gap:10px;min-height:44px"><input type="checkbox" id="cmp-toerr"> Añadir a «Errores que cometo» para verlo al repasarla</label>`:""}
     <div class="row"><button type="button" class="btn pri sm" id="cmp-fsave">Guardar marca</button><button type="button" class="btn ghost sm" id="cmp-fcancel">Cancelar</button></div></div>`;
   // Elegir «uno de estos» no guarda nada todavía: al guardar la marca, ese error suma una vez en vez de crear otro.
   el.querySelectorAll("[data-esame]").forEach(b=> b.onclick=()=>{ const nota=$("#cmp-nota").value; cmp.form.same = cmp.form.same===b.dataset.esame ? null : b.dataset.esame; cmpForm(); $("#cmp-nota").value=nota; });
@@ -3168,27 +3168,32 @@ function cmpForm(){
     const nota=$("#cmp-nota").value.trim(), m={id:uid(), b:cmp.form.b, tipo:cmp.form.tipo, nota};
     a.marcadores = [...marcasOf(a), m];
     const mismo = m.tipo==="error" && cmp.form.same && erroresActivos(f).find(e=>e.id===cmp.form.same);
-    if(mismo) repeatError(f, a, m, mismo);
-    else if($("#cmp-toerr")?.checked) addError(f, a, m);
+    const veces = mismo ? repeatError(f, a, m, mismo) : 0;
+    if(!mismo && $("#cmp-toerr")?.checked) addError(f, a, m);
     persist({t:"fig", id:f.id}); cmp.form=null; cmpForm(); cmpLine(); cmpMarks();
-    toast(m.tipo==="error" ? (mismo ? "Error guardado: ya van ×"+(mismo.veces||1) : S.figures[f.id] && erroresOf(f).some(e=>e.marca===m.id) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
+    toast(m.tipo==="error" ? (mismo ? "Error guardado: ya van ×"+veces : S.figures[f.id] && erroresOf(f).some(e=>errLinked(e, m.id)) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
   };
   setTimeout(()=>$("#cmp-nota")?.focus(), 50);
 }
+// Un error queda enlazado a su primera marca (`marca`) y a las repeticiones (`marcas`).
+const errLinked = (e, mid) => e.marca===mid || (e.marcas||[]).includes(mid);
 function addError(f, a, m){
-  if(erroresOf(f).some(e=>e.marca===m.id)) return;
+  if(erroresOf(f).some(e=>errLinked(e, m.id))) return;
   f.errores = [...erroresOf(f), {id:uid(), nota: m.nota || `Error en el ${beatName(m.b)}`, b:m.b, desde:a.id, marca:m.id, fecha:todayStr(), veces:1, ultima:todayStr()}];
+  capByErrors(f);   // D8: con un error activo nuevo, el repaso ya no puede quedar a más de 7 días
 }
-// El mismo error otra vez: suma una vez, anota cuándo y lo enlaza a la marca nueva (y al intento donde acaba de pasar).
+// El mismo error otra vez: suma una vez, anota cuándo y enlaza la marca nueva en `marcas`; `marca` y `desde` siguen en la primera vez.
+// Devuelve las veces que lleva.
 function repeatError(f, a, m, e){
-  f.errores = erroresOf(f).map(x=> x.id===e.id ? {...x, veces:(x.veces||1)+1, ultima:todayStr(), marca:m.id, desde:a.id} : x);
-  e.veces = (e.veces||1)+1;
+  const veces = (e.veces||1)+1;
+  f.errores = erroresOf(f).map(x=> x.id===e.id ? {...x, veces, ultima:todayStr(), marcas:[...(x.marcas||[]), m.id]} : x);
+  capByErrors(f); return veces;
 }
 function cmpMarks(){
   const el=$("#cmp-marks"); if(!el || !cmp) return;
   const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId);
   const ms=[...marcasOf(a)].sort((x,y)=>x.b-y.b);
-  el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>e.marca===m.id);
+  el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>errLinked(e, m.id));
     return `<li><button type="button" class="btn sm" data-cgo="${esc(m.b)}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
       ${m.tipo==="error" ? (inErr ? `<span class="small muted">En tus errores</span>` : `<button type="button" class="btn ghost sm" data-cerr="${esc(m.id)}">A mis errores</button>`) : ""}
       <button type="button" class="icon-btn" data-cdel="${esc(m.id)}" aria-label="Borrar la marca del ${beatName(m.b)}">✕</button></li>`; }).join("")
@@ -4336,6 +4341,7 @@ function sanitizeFig(f0){
   const err = e => { const o={...e};
     if("veces" in o){ const n=cuenta(o.veces); o.veces = n!=null && n>=1 ? n : 1; }
     ["ultima","resuelto"].forEach(k=>{ if(k in o && !iso(o[k])) delete o[k]; });
+    if("marcas" in o && !(Array.isArray(o.marcas) && o.marcas.every(x=>typeof x==="string"))) delete o.marcas;
     return o; };
   if("errores" in f) f.errores = lista(f.errores, err);
   if(f.estado!==undefined && !EST[f.estado]) f.estado = "practica";

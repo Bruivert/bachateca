@@ -3760,10 +3760,31 @@ function listHTML(kind, bare){
 }
 // Pantalla de Ajustes abierta: null es el menú; si no, una de SET_VIEWS.
 let setView = null;
-const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos"};
+const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas"};
 function setGo(v){ setView=v; confirmKey=null; editKey=null; openSettings(); const sh=$(".sheet"); if(sh) sh.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); }
+const SNAP_WHY = {diaria:"Copia del día", "antes-de-importar":"Antes de importar", "antes-de-reemplazar":"Antes de reemplazar todo", "antes-de-restaurar":"Antes de restaurar", "antes-de-encoger":"Antes de borrar muchas figuras"};
+const snapWhen = at => { try{ return new Date(at).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }catch{ return ""; } };
+let restoring = false;
+async function restoreSnapshot(key){
+  if(restoring) return false;
+  restoring = true;
+  try{
+    if(!(await askConfirm({title:"¿Volver a esta instantánea?", msg:"Antes se guarda otra instantánea con tus datos de ahora, por si quieres deshacerlo. Los vídeos no cambian.", ok:"Restaurar"}))) return false;
+    let v = null; try{ v = await kvGet(key); }catch{}
+    if(!v || !v.state || typeof v.state!=="object"){ toast("No se pudo leer esa instantánea. No he cambiado nada."); return false; }
+    await takeSnapshot("antes-de-restaurar");
+    applyData(migrate(clone(v.state)));
+    persist({t:"meta"}); render(); openSettings();
+    toast(`Restaurado: ${pl(figs().length,"figura","figuras")}`);
+    return true;
+  }finally{ restoring = false; }
+}
 function openSettings(){
   const sc = $(".sheet")?.scrollTop || 0;
+  if(setView==="instantaneas" || !setView) listSnapshots().then(l=>{
+    const el=$("#snap-list"); if(el) el.innerHTML = l.length ? l.map(x=>`<div class="mrow"><span><b>${esc(snapWhen(x.at))}</b><span class="small muted">${esc(SNAP_WHY[x.reason]||x.reason)} · ${pl(x.nFig,"figura","figuras")} · ${pl(x.nLog,"registro","registros")}</span></span><button type="button" class="btn sm" data-act="snap-restore" data-key="${esc(x.key)}">Restaurar</button></div>`).join("") : `<p class="small muted">Aún no hay instantáneas.</p>`;
+    const mv=$("#snap-n"); if(mv) mv.textContent = l.length;
+  });
   const exN = figs().filter(f=>f.ejemplo).length;
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
@@ -3788,6 +3809,10 @@ function openSettings(){
       <p class="small muted" id="persist-st"></p>
       <button class="btn sm" data-act="persist">Proteger mis datos</button>
     </div>`;
+  else if(setView==="instantaneas") body = `<div class="panel">
+      <p class="small muted">Bachateca guarda copias de tus datos en este dispositivo: una al día y otra antes de cambios grandes. Se conservan las más recientes.</p>
+    </div>
+    <div class="menu" id="snap-list"><p class="small muted">Cargando…</p></div>`;
   else if(setView==="ejemplos") body = `<div class="panel">
       <p class="small muted">${exN?"Las figuras de muestra llevan la etiqueta «ejemplo». Quítalas cuando ya tengas las tuyas.":"Figuras de muestra para ver cómo funciona la app. Llevan la etiqueta «ejemplo»."}</p>
       <div class="row">${exN?`<button class="btn danger" data-act="clear-examples">Quitar ${exN} ejemplos</button>`:`<button class="btn" data-act="examples">Cargar ejemplos</button>`}</div>
@@ -3805,7 +3830,7 @@ function openSettings(){
     <p class="menu-h">Apariencia</p>
     <div class="seg2 seg3" role="group" aria-label="Apariencia">${[["oscuro","Oscuro"],["auto","Como el sistema"],["claro","Claro"]].map(([k,t])=>`<button type="button" data-tema="${k}" aria-pressed="${temaActual()===k}">${t}</button>`).join("")}</div>
     <p class="menu-h">Datos</p>
-    <div class="menu">${row("importar","Restaurar o importar","")}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
+    <div class="menu">${row("importar","Restaurar o importar","")}${row("instantaneas","Instantáneas",`<span id="snap-n"></span>`)}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
     <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)} · vídeos: ${esc({frag:"normal", plain:"sin #t", mem:"copia en memoria"}[vidMode()])}</span><a class="lnk" href="conteo.html">Prueba del conteo al grabar</a></details>`;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     ${head}
@@ -3972,6 +3997,7 @@ document.addEventListener("click", async e=>{
   }
   if(a==="bk-tap") return bkTap();
   if(a==="unblock") return closeBlock();
+  if(a==="snap-restore") return restoreSnapshot(t.dataset.key);
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
   if(a==="night-off"){
     setNight(false); releaseWake();
@@ -4094,7 +4120,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), takeSnapshot, listSnapshots, setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), takeSnapshot, listSnapshots, restoreSnapshot, setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

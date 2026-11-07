@@ -1406,6 +1406,64 @@ def instantanea_que_falla_no_impide_guardar(browser):
     ctx.close()
 
 
+@test
+def restaurar_instantanea(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {f"f{i}": fig(i, "a", "b") for i in range(3)}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
+    key = p.evaluate("() => window.__bachateca.takeSnapshot('antes-de-importar')")
+    p.evaluate("() => { for (const id of ['f0', 'f1', 'f2']) window.__bachateca.deleteFigure(id); }")
+    assert len(p.evaluate("() => window.__bachateca.state().figures")) == 0
+    p.click("#btn-settings")
+    p.click('[data-setv="instantaneas"]')
+    p.click(f'[data-act="snap-restore"][data-key="{key}"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_function("Object.keys(window.__bachateca.state().figures).length === 3")
+    assert "Restaurado: 3 figuras" in p.inner_text(".toast")
+    sn = p.evaluate("() => window.__bachateca.listSnapshots()")
+    antes = [x for x in sn if x["reason"] == "antes-de-restaurar"]
+    assert len(antes) == 1 and antes[0]["nFig"] == 0, sn
+    assert p.is_visible("#sheet-t") and "Instantáneas" in p.inner_text("#sheet-t")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def restaurar_instantanea_antigua_migra(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
+    p.evaluate("""() => new Promise((res, rej) => {
+      const r = indexedDB.open("bachateca", 1);
+      r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite");
+        t.objectStore("kv").put({at: 5000, reason: "diaria", nFig: 1, nLog: 0, schema: 5,
+          state: {schema: 5, figures: {v1: {id: "v1", nombre: "vieja", entrada: "a", salida: "b", estado: "practica"}}, logs: {}}}, "snap:5000:diaria");
+        t.oncomplete = () => res(); t.onerror = () => rej(t.error); };
+      r.onerror = () => rej(r.error); })""")
+    p.evaluate("() => { window.__t = window.__bachateca.restoreSnapshot('snap:5000:diaria'); }")
+    p.click('#confirm-root [data-cf="ok"]')
+    assert p.evaluate("() => window.__t") is True
+    p.wait_for_function("window.__bachateca.state().figures.v1")
+    r = p.evaluate("() => { const s = window.__bachateca.state(); return {partes: s.figures.v1.partes, schema: s.schema, S: window.__bachateca.SCHEMA}; }")
+    assert r["partes"] == [] and r["schema"] == r["S"], r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def exportar_no_incluye_instantaneas(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.evaluate("""async () => { await window.__bachateca.takeSnapshot("antes-de-importar");
+      await window.__bachateca.takeSnapshot("antes-de-importar"); }""")
+    assert len(p.evaluate("() => window.__bachateca.listSnapshots()")) >= 2
+    ex = p.evaluate("() => window.__bachateca.exportData()")
+    assert "snap:" not in ex and "snapshots" not in ex
+    assert not [k for k in p.evaluate("() => Object.keys(window.__bachateca.state())") if k.startswith("snap")]
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

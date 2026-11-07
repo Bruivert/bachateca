@@ -40,8 +40,9 @@ def test(fn=None, *, solo_chromium=None):
     return reg(fn) if fn is not None else reg
 
 
-def open_app(browser, seed=None, videos=None):
-    """App limpia. seed: estado guardado antes de abrirla (como si viniera de una versión anterior)."""
+def open_app(browser, seed=None, videos=None, init=None):
+    """App limpia. seed: estado guardado antes de abrirla (como si viniera de una versión anterior).
+    init: script que se añade después de sembrar, para que no afecte a la siembra."""
     ctx = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
     # Sin hoja de compartir: así «Guardar en Fotos» y «Exportar» descargan el archivo y se puede comprobar.
     # (Chromium reciente la tiene y, sin ventana, se queda esperando.)
@@ -63,6 +64,8 @@ def open_app(browser, seed=None, videos=None):
             t.oncomplete = res; t.onerror = () => rej(t.error); });
           db.close();
         }""", [seed, videos or []])
+    if init:
+        ctx.add_init_script(init)
     page.goto(URL)
     page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     return ctx, page, errors
@@ -1232,6 +1235,54 @@ def salir_de_grabar_apaga_la_camara(browser):
     p.click('#confirm-root [data-cf="ok"]')
     assert p.evaluate("() => window.__bachateca.rcState()") is None
     assert not errors, errors
+    ctx.close()
+
+
+# ---- integridad de datos
+
+def _parche_lectura(solo_primera):
+    # Hace fallar la lectura de «state»; con __sinParche deja de fallar para poder leer desde la misma página.
+    cond = "!globalThis.__veces++" if solo_primera else "!globalThis.__sinParche"
+    return f"""globalThis.__veces = 0; const g = IDBObjectStore.prototype.get;
+      IDBObjectStore.prototype.get = function (k) {{
+        if (k === "state" && {cond}) throw new DOMException("simulado", "UnknownError");
+        return g.apply(this, arguments); }};"""
+
+
+@test
+def lectura_fallida_no_pisa_los_datos(browser):
+    seed = {"schema": 6, "figures": {f"r{i}": fig(i, "a", "b", id=f"r{i}") for i in range(30)}}
+    ctx, p, errors = open_app(browser, seed=seed, init=_parche_lectura(False))
+    assert p.locator("#safe-note").is_visible()
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    p.evaluate("() => document.querySelector('[data-act=\"examples\"]').click()")
+    p.evaluate("() => window.__bachateca.flush()")
+    p.wait_for_timeout(300)
+    p.evaluate("() => { window.__sinParche = true; }")
+    st = stored_state(p)
+    assert len(st["figures"]) == 30, len(st["figures"])
+    assert not any(f.get("ejemplo") for f in st["figures"].values())
+    ctx.close()
+
+
+@test
+def lectura_fallida_una_vez_se_recupera(browser):
+    seed = {"schema": 6, "figures": {f"r{i}": fig(i, "a", "b", id=f"r{i}") for i in range(30)}}
+    ctx, p, errors = open_app(browser, seed=seed, init=_parche_lectura(True))
+    assert p.locator("#safe-note").count() == 0
+    assert len(p.evaluate("() => window.__bachateca.state().figures")) == 30
+    assert p.evaluate("() => window.__bachateca.safeMode()") is False
+    ctx.close()
+
+
+@test
+def sin_indexeddb_sigue_con_localstorage(browser):
+    ctx, p, errors = open_app(browser, init='Object.defineProperty(window, "indexedDB", {value: undefined, configurable: true});')
+    assert p.locator("#safe-note").count() == 0
+    p.evaluate("() => document.querySelector('[data-act=\"examples\"]').click()")
+    p.evaluate("() => window.__bachateca.flush()")
+    n = p.evaluate("() => Object.keys(JSON.parse(localStorage.getItem('bachateca.v1')).figures).length")
+    assert n == 8, n
     ctx.close()
 
 

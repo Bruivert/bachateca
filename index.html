@@ -1103,7 +1103,7 @@ const LS_FALLBACK = "bachateca.v1";
 let idb = null;
 function idbOpen(){
   return new Promise((res,rej)=>{
-    if(!("indexedDB" in window)) return rej(new Error("sin IndexedDB"));
+    if(!window.indexedDB) return rej(new Error("sin IndexedDB"));
     const r=indexedDB.open("bachateca",1);
     r.onupgradeneeded=()=>{ const d=r.result; if(!d.objectStoreNames.contains("kv")) d.createObjectStore("kv"); if(!d.objectStoreNames.contains("videos")) d.createObjectStore("videos"); };
     r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error("bloqueado"));
@@ -1114,7 +1114,7 @@ function tx(store, m, fn){
 }
 const kvGet = k => tx("kv","readonly",s=>s.get(k));
 const kvSet = (k,v) => tx("kv","readwrite",s=>s.put(v,k));
-const vidPut = (id,b) => idb ? tx("videos","readwrite",s=>s.put(b,id)) : Promise.reject(new Error("sin almacenamiento"));
+const vidPut = (id,b) => safeMode ? Promise.reject(Object.assign(new Error("modo seguro"),{userMsg:"Modo seguro: no se pueden guardar vídeos."})) : idb ? tx("videos","readwrite",s=>s.put(b,id)) : Promise.reject(new Error("sin almacenamiento"));
 const vidGet = id => idb ? tx("videos","readonly",s=>s.get(id)) : Promise.resolve(undefined);
 const vidDel = id => idb ? tx("videos","readwrite",s=>s.delete(id)) : Promise.resolve();
 const vidCache = new Map();
@@ -1185,14 +1185,17 @@ new MutationObserver(ms=>{
   }
 }).observe(document.body, {childList:true, subtree:true});
 let saveT = null;
+// Modo seguro: si no se han podido leer los datos, no se escribe nada (guardar el estado vacío pisaría la biblioteca real).
+let safeMode = false, safeToasted = false;
 function persist(op){
+  if(safeMode){ if(!safeToasted){ safeToasted = true; toast("Modo seguro: los cambios no se guardan."); } return; }
   if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); } vidDel(op.id).catch(()=>{});
     const cu=coverCache.get(op.id); if(cu){ try{URL.revokeObjectURL(cu);}catch{} coverCache.delete(op.id); } if(coverSet.delete(op.id)) vidDel(COVER(op.id)).catch(()=>{}); return; }
   clearTimeout(saveT); saveT=setTimeout(saveNow, 150);
   lsSet(BK_CH, (+lsGet(BK_CH)||0)+1);
 }
 async function saveNow(){
-  saveT=null; const snap=clone(S);
+  saveT=null; if(safeMode) return; const snap=clone(S);
   try{ if(idb) await kvSet("state", snap); else lsSet(LS_FALLBACK, snap); }
   catch{ lsSet(LS_FALLBACK, snap); toast("No se pudo guardar en el dispositivo. Revisa el espacio libre."); }
 }
@@ -1254,17 +1257,33 @@ window.addEventListener("pageshow", fixBottom);
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") setTimeout(fixBottom, 200); });
 if(window.visualViewport){ visualViewport.addEventListener("resize", fixBottomSoon); visualViewport.addEventListener("scroll", fixBottomSoon); }
 fixBottom();
+// Lee los datos con hasta 3 intentos (el arranque de iOS a veces falla una vez). ok:false = no se sabe qué hay guardado.
+async function readStored(){
+  const ls = lsGet(LS_FALLBACK);
+  if(!window.indexedDB) return {ok:true, idb:null, ls};
+  for(let i=0;i<3;i++){
+    if(i) await new Promise(r=>setTimeout(r,300));
+    let d=null;
+    try{ d = await idbOpen(); idb = d; const c = await kvGet("state"); return {ok:true, idb:c||null, ls}; }
+    catch{ if(d){ try{ d.close(); }catch{} } idb = null; }
+  }
+  return {ok:false, idb:null, ls};
+}
+function safeHTML(){
+  return `<div class="note" id="safe-note" role="alert">No se han podido leer tus datos. Para no estropearlos, la app no guardará nada hasta que se lean bien.
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="safe-retry">Volver a intentarlo</button></div></div>`;
+}
 async function initStore(){
-  try{ idb = await idbOpen(); }catch{ idb = null; }
-  let c=null; try{ if(idb) c = await kvGet("state"); }catch{}
-  if(!c) c = lsGet(LS_FALLBACK);
+  const r = await readStored();
+  if(!r.ok) safeMode = true;
+  let c = r.idb || r.ls;
   if(c){
     const old = c.schema;
     c = migrate(c);
     applyData(c);
     if(old !== c.schema) saveNow();   // guarda ya la versión al día (no cuenta como cambio para la copia)
   }
-  assetsApi = idb ? {delete:id=>vidDel(id)} : null;
+  assetsApi = idb && !safeMode ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
   await loadCoverKeys(); render();
@@ -3797,6 +3816,7 @@ function render(){
   else if(tab==="repasar") renderRepasar();
   else if(tab==="enlazar") renderEnlazar();
   else if(tab==="social") renderSocial();
+  if(safeMode) $("#v-"+tab).insertAdjacentHTML("afterbegin", safeHTML());
   hydrateVideos($("#v-"+tab)); hydrateCovers($("#v-"+tab));
   justSaved = null; lastSal = null;
   if(fk && !$("#sheet-root .sheet") && !$("#overlay-root").firstElementChild){ const el=$("#v-"+tab).querySelector(fk); if(el && el!==document.activeElement) el.focus({preventScroll:true}); }
@@ -3851,6 +3871,7 @@ document.addEventListener("click", async e=>{
   if(a==="close") return requestClose();
   if(a==="quick") return openFigure(null,{quick:true});
   if(a==="full") return openFigure();
+  if(a==="safe-retry") return location.reload();
   if(a==="examples"){ closeSheet(); return loadExamples(); }
   if(a==="clear-examples"){ figs().filter(f=>f.ejemplo).forEach(f=>deleteFigure(f.id)); toast("Ejemplos quitados"); return openSettings(); }
   if(a==="coach"){ learn("coach"); return runCoach(); }
@@ -3999,7 +4020,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

@@ -7,8 +7,9 @@ funciona sin conexión y guarda tus figuras y vídeos **en el propio iPhone** (s
 
 1. Entra en github.com con tu cuenta (o crea una gratis).
 2. Pulsa **New repository**, nombre `bachateca`, marca **Public** y créalo.
-3. En el repositorio: **Add file → Upload files**, arrastra **todos** los archivos de esta carpeta
-   (`index.html`, `sw.js`, `manifest.webmanifest` y los `icon-*.png`) y pulsa **Commit changes**.
+3. En el repositorio: **Add file → Upload files**, arrastra **todo el contenido del repositorio** (todos los archivos
+   y carpetas de esta carpeta, incluida la carpeta `sonidos/`) y pulsa **Commit changes**.
+   Sin `sonidos/` la app no funciona sin conexión.
 4. Ve a **Settings → Pages**. En *Build and deployment*, elige **Deploy from a branch**, rama **main**, carpeta **/ (root)** y **Save**.
 5. En un minuto tendrás la dirección: `https://TU-USUARIO.github.io/bachateca/`
 
@@ -32,9 +33,12 @@ Todo vive en el iPhone: si borras la app, se pierde. Cada cierto tiempo:
 - **Ajustes → Exportar copia** (figuras, registros y ajustes) y guárdala en Archivos o iCloud Drive.
 - Los vídeos ya están en tu carrete; desde cada figura puedes usar **Guardar en Fotos**.
 
+**Ajustes → Instantáneas**: la app guarda sola una copia al día y otra antes de importar o restaurar; no sustituyen a
+Exportar, porque viven en el mismo iPhone.
+
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v36` → `bachateca-v37`).
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v50` → `bachateca-v51`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
 
 ## Pruebas automáticas

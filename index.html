@@ -1406,7 +1406,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.51";
+const APP_VERSION = "1.52";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -2102,7 +2102,7 @@ function renderEnlazar(){
         ${sel.into.length ? `<p class="small muted">Llegas aquí desde: ${sel.into.map(f=>esc(f.nombre)+(f.agarreOut?` (${esc(f.agarreOut)})`:"")).join(", ")}.</p>`:""}
         ${sel.out.length ? `<div class="practice">
           <h3>Practicar enlaces</h3>
-          ${firstHelp("chain", "Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
+          ${firstHelp("chain", "Varias figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
           <div class="chips">
             <button class="chip sm" data-chainopt="safe" aria-pressed="${chainSafe}">Solo seguras</button>
             <button class="chip sm" data-chainopt="strict" aria-pressed="${chainStrict}">Agarres exactos</button>

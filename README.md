@@ -38,7 +38,7 @@ Exportar, porque viven en el mismo iPhone.
 
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v51` → `bachateca-v52`).
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v52` → `bachateca-v53`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
 
 ## Practicar para el social
@@ -55,6 +55,17 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
 - Una figura marcada en un social cuenta como un repaso «Fluida» (una vez al día); si borras el registro, se deshace.
   «Atrasada» ya no se confunde con «Olvidada».
 - La cuenta pide a iOS el audio de reproducción, para que suene aunque el iPhone esté en silencio.
+- **Aprender a enlazar** (versión 1.52):
+  - El repaso de enlaces ahora es independiente en cada baile.
+  - **«Lo he bailado»** marca los enlaces que ya has probado, en la ficha («Y después») y en las cadenas. Las cadenas
+    prefieren los enlaces probados. Tras un social en el que marcas dos figuras seguidas, la app te pregunta si
+    bailaste A → B.
+  - **«Preguntas de memoria»** (en Repasar): ¿Dónde termina?, ¿Desde dónde entras? y ¿Qué puedes hacer después?
+    Cuentan como repaso de la figura, una vez al día.
+  - En **«Errores que cometo»** se cuentan las repeticiones (×N). Puedes marcar un error como **«Ya no me pasa»** y
+    volver a ponerlo con **«Me ha vuelto a pasar»**. Mientras un error siga activo, la figura se repasa como mucho
+    cada 7 días.
+  - **«Opciones de la cadena»**: terminar en una figura, incluir una, dejar fuera otras, y elegir la longitud (de 2 a 6).
 
 ## Pruebas automáticas
 
@@ -73,7 +84,7 @@ Abren la app en un navegador sin ventana y con datos de prueba: no tocan tus dat
 
 Los datos guardados llevan un número de versión (`schema`). Si un cambio necesita guardar las figuras de otra forma,
 se sube `SCHEMA` en `index.html` y se añade un paso en `MIGRATIONS`: al abrir la app, los datos antiguos se ponen al día
-solos, sin borrar nada. La versión 1.51 pasa los datos a la versión 7 (añade las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
+solos, sin borrar nada. La versión 1.52 pasa los datos a la versión 10 (la versión 1.51 los había pasado a la 7 con las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
 
 ## Limitaciones conocidas
 

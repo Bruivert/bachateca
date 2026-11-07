@@ -3895,6 +3895,14 @@ async function importData(replace){
     if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
     S.figures[f.id]=f; persist({t:"fig",id:f.id});
   });
+  // Las que se quedan como las tuyas reciben los intentos y partes que solo trae la copia; lo tuyo no cambia.
+  if(!replace) inc.filter(f=>S.figures[f.id] && S.figures[f.id]!==f).forEach(f=>{
+    const g = S.figures[f.id], add = (mine, got) => { const ids = new Set(mine.map(x=>x.id)), extra = got.filter(x=>!ids.has(x.id));
+      return extra.length ? [...mine, ...extra].sort((x,y)=>(x.creado||0)-(y.creado||0)) : null; };
+    const ni = add(intentosOf(g), intentosOf(f)), np = add(partesOf(g), partesOf(f));
+    if(ni) g.intentos = ni; if(np) g.partes = np;
+    if(ni || np) persist({t:"fig",id:f.id});
+  });
   Object.values(d.logs).forEach(l=>{ if(replace || !S.logs[l.id]){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
   const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
   S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);

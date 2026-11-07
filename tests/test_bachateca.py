@@ -1713,6 +1713,35 @@ def figuras_distintas_sin_orden_ni_intentos(browser):
     ctx.close()
 
 
+@test
+def anadir_trae_intentos_y_partes_nuevos(browser):
+    local_i1 = att(1, "a1", notas="mía")
+    for distinta in (False, True):
+        seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b", intentos=[local_i1], partes=[])}, "logs": {}}
+        ctx, p, errors = open_app(browser, seed=seed, videos=["a1"])
+        copia = json.loads(p.evaluate("() => window.__bachateca.exportData()"))
+        f = copia["figures"]["f1"]
+        f["intentos"] = [att(1, "a1", notas="de la copia"), att(2, "a2")]
+        f["partes"] = [{"id": "p1", "nombre": "Parte 1", "creado": 7000}]
+        if distinta:
+            f["notas"] = "de la copia"
+        import_text(p, json.dumps(copia))
+        if distinta:
+            p.click('#confirm-root [data-cf="no"]')
+            p.wait_for_timeout(300)
+        else:
+            assert p.locator("#confirm-root .confirm").count() == 0
+        g = p.evaluate("() => window.__bachateca.state().figures.f1")
+        assert [a["id"] for a in g["intentos"]] == ["i1", "i2"], g["intentos"]
+        assert g["intentos"][0] == local_i1, "el intento local no cambia"
+        assert [x["id"] for x in g["partes"]] == ["p1"], g["partes"]
+        assert g.get("notas") != "de la copia", "se conservan los campos locales"
+        p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+        assert [a["id"] for a in stored_state(p)["figures"]["f1"]["intentos"]] == ["i1", "i2"]
+        assert not errors, errors
+        ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

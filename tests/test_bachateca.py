@@ -2532,6 +2532,54 @@ def simulacro_solo_falta_el_agarre(browser):
     ctx.close()
 
 
+@test
+def simulacro_una_subida_por_dia(browser):
+    ctx, p, errors = open_app(browser, seed={"figures": sim_figs()})
+    p.evaluate("() => window.__bachateca.simForce(['Cerrada', 'Sombra', 'Cerrada'])")
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('#v-social [data-act="sim-open"]')
+    p.click("#sim-go")
+    for _ in range(3):
+        p.click("#sim-ok"); p.click('[data-simg="fluida"]')
+    lr = p.evaluate("() => window.__bachateca.state().linkRep")
+    assert lr["Cerrada"]["step"] == 1 and lr["Sombra"]["step"] == 1, lr
+    hoy = p.evaluate("() => window.__bachateca.todayStr()")
+    assert p.evaluate("() => window.__bachateca.state().actividad")[hoy] == 3
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def copia_con_repantes_raro(browser):
+    import datetime
+    hoy = datetime.date.today().isoformat()
+    rep = {"step": 1, "due": hoy, "last": hoy, "aciertos": 1, "fallos": 0}
+    ctx, p, errors = open_app(browser)
+    cp = {"app": "bachateca", "version": 3, "figures": {"f1": fig(1, "Cerrada", "Sombra", rep=rep)},
+          "logs": {"l1": {"id": "l1", "fecha": hoy, "figs": ["f1"], "repAntes": {"f1": {"step": "x", "due": "<b>"}}, "repDespues": {"f1": rep}}}}
+    import_text(p, json.dumps(cp))
+    p.click('[data-act="close"]')
+    p.click('nav.tabs [data-tab="social"]')
+    p.click('[data-act="log-open"]')
+    p.click('[data-dellog]')
+    r = p.evaluate("() => window.__bachateca.state().figures.f1.rep")
+    assert r is None or (isinstance(r["step"], int) and ("due" not in r or r["due"][:2] == "20")), r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_opciones_sin_cadena_no_generan(browser):
+    ctx, p, errors = open_app(browser)
+    p.evaluate("o => window.__bachateca.setFigs(o)", {"f1": fig(1, "Cerrada", "Sombra", estado="disponible")})
+    p.click('nav.tabs [data-tab="enlazar"]')
+    p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar [data-chainopt="safe"]')
+    assert p.locator("#v-enlazar .chain").count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

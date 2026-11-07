@@ -2632,7 +2632,8 @@ function simDecide(late){
 function simGrade(g){
   if(!sim || sim.fase!=="revela") return;
   const r = sim.res[sim.i]; r.g = g;
-  S.linkRep[r.pos] = nextRep(S.linkRep[r.pos], g); persist({t:"lr"});
+  // Un solo paso hacia arriba por posición y día: «La tenía» repetida el mismo día no vuelve a subir el intervalo.
+  if(!(g==="fluida" && S.linkRep[r.pos]?.last===todayStr())){ S.linkRep[r.pos] = nextRep(S.linkRep[r.pos], g); persist({t:"lr"}); }
   const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
   sim.i++;
   if(sim.i < sim.rondas) return simRound();
@@ -4151,6 +4152,13 @@ const okId = v => typeof v==="string" && ID_RE.test(v);
 // Dentro de cada figura: intentos, partes, errores y marcas con id seguro; contadores como números; estado y tipo conocidos.
 // Trabaja sobre copias: no cambia lo que recibe.
 const cuenta = v => { const n = typeof v==="number" ? v : typeof v==="string" && /^\s*\d+\s*$/.test(v) ? +v : NaN; return Number.isInteger(n) && n>=0 ? n : null; };
+function sanitizeRep(r0){
+  const r = {...r0};
+  ["step","aciertos","fallos"].forEach(k=>{ if(k in r) r[k] = cuenta(r[k]) ?? 0; });
+  if("step" in r) r.step = Math.min(r.step, LADDER.length-1);
+  ["due","last"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; });
+  return r;
+}
 function sanitizeFig(f0){
   const f = {...f0}; let malas = 0;
   const lista = (v, fix) => { if(!Array.isArray(v)){ if(v!=null) malas++; return []; }
@@ -4163,13 +4171,7 @@ function sanitizeFig(f0){
   if(f.estado!==undefined && !EST[f.estado]) f.estado = "practica";
   if(f.tipo!==undefined && !TIPO[f.tipo]) f.tipo = "figura";
   if("usos" in f){ const n = cuenta(f.usos); if(n==null) delete f.usos; else f.usos = n; }
-  if("rep" in f){
-    if(!isObj(f.rep)) delete f.rep;
-    else { const r = f.rep = {...f.rep};
-      ["step","aciertos","fallos"].forEach(k=>{ if(k in r) r[k] = cuenta(r[k]) ?? 0; });
-      if("step" in r) r.step = Math.min(r.step, LADDER.length-1);
-      ["due","last"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; }); }
-  }
+  if("rep" in f){ if(!isObj(f.rep)) delete f.rep; else f.rep = sanitizeRep(f.rep); }
   ["tiempo","tiempos"].forEach(k=>{ if(k in f && f[k]!=="" && cuenta(f[k])==null) delete f[k]; });
   return {f, malas};
 }
@@ -4177,7 +4179,13 @@ function sanitizeImport(d){
   const figures={}, logs={}; let descartadas=0;
   const fs = isObj(d&&d.figures) ? Object.values(d.figures) : [], ls = isObj(d&&d.logs) ? Object.values(d.logs) : [];
   fs.forEach(f=>{ if(isObj(f) && okId(f.id) && typeof f.nombre==="string" && f.nombre.trim()){ const r = sanitizeFig(f); figures[f.id]=r.f; descartadas += r.malas; } else descartadas++; });
-  ls.forEach(l=>{ if(isObj(l) && okId(l.id) && typeof l.fecha==="string") logs[l.id]={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []}; else descartadas++; });
+  ls.forEach(l=>{ if(isObj(l) && okId(l.id) && typeof l.fecha==="string") {
+    const o={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []};
+    // repAntes/repDespues: deleteLog los vuelve a poner en f.rep, así que pasan por la misma validación; si falla un mapa, se quitan los dos.
+    const mapa = m => { if(!isObj(m)) return null; const out={};
+      Object.entries(m).forEach(([k,v])=>{ if(v===null) out[k]=null; else if(isObj(v)) out[k]=sanitizeRep(v); }); return out; };
+    if("repAntes" in o || "repDespues" in o){ const a=mapa(o.repAntes), b=mapa(o.repDespues); if(a&&b){ o.repAntes=a; o.repDespues=b; } else { delete o.repAntes; delete o.repDespues; } }
+    logs[l.id]=o; } else descartadas++; });
   // Preguntas para clase: id seguro y posición con texto; las fechas mal escritas se quitan.
   const preguntas={}, ps = isObj(d&&d.preguntas) ? Object.values(d.preguntas) : [];
   ps.forEach(q=>{
@@ -4356,7 +4364,7 @@ document.addEventListener("click", async e=>{
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
-  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict}); chain=makeChain(linkPos); return render(); }
+  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict}); chain=chain ? makeChain(linkPos) : null; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.fest){ filt.estado=d.fest; return render(); }
   if(d.promote){ promoteFig(d.promote, d.to||"disponible", !!t.closest("[data-viewfig]"), t); return; }

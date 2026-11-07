@@ -537,6 +537,8 @@ def importar_conserva_intentos_locales(browser):
                               videos=["a1"])
     old = {"app": "bachateca", "version": 3, "schema": 2, "figures": {"f1": fig(1, "Cerrada", "Sombra", nombre="Renombrada")}, "logs": {}}
     import_text(p, json.dumps(old))
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_timeout(300)
     f = p.evaluate("() => window.__bachateca.state().figures.f1")
     assert f["nombre"] == "Renombrada", "se aplica la copia"
     assert [a["id"] for a in f["intentos"]] == ["i1"], "el intento que solo está en este dispositivo se queda"
@@ -1590,6 +1592,124 @@ def sanear_copia_filtra_figuras_y_registros(browser):
     assert list(r["figures"]) == ["a"] and list(r["logs"]) == ["l1"], r
     assert r["logs"]["l1"]["figs"] == ["a"] and r["descartadas"] == 5, r
     assert p.evaluate("() => window.__bachateca.sanitizeImport({figures: [1]}).figures") == {}
+    ctx.close()
+
+
+_SNAP_FALLA = """() => { const put = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (v, k) {
+    if (typeof k === "string" && k.startsWith("snap:")) throw new DOMException("simulado", "QuotaExceededError");
+    return put.apply(this, arguments); }; }"""
+
+
+@test
+def anadir_conserva_mis_figuras(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b", vid="vA")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["vA"])
+    copia = p.evaluate("() => window.__bachateca.exportData()")
+    p.evaluate("""() => { const f = window.__bachateca.state().figures.f1;
+      Object.assign(f, {notas: "mías", estado: "consolidada", vid: "vB", rep: {...(f.rep || {}), step: 4}}); }""")
+    import_text(p, copia)
+    assert "1 figura ya está y es distinta" in p.locator("#confirm-root .confirm").inner_text()
+    p.click('#confirm-root [data-cf="no"]')
+    p.wait_for_timeout(300)
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    assert (f["notas"], f["estado"], f["rep"]["step"], f["vid"]) == ("mías", "consolidada", 4, "vB"), f
+    assert "se conservan tus 1" in p.locator(".toast").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def anadir_solo_nuevas_sin_preguntar(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    import_text(p, json.dumps({"schema": 6, "figures": {"f2": fig(2, "a", "b"), "f3": fig(3, "a", "b")}, "logs": {}}))
+    assert p.locator("#confirm-root .confirm").count() == 0
+    assert sorted(p.evaluate("() => Object.keys(window.__bachateca.state().figures)")) == ["f1", "f2", "f3"]
+    assert "2 figuras añadidas" in p.locator(".toast").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_guarda_instantanea(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    import_text(p, json.dumps({"schema": 6, "figures": {"f2": fig(2, "a", "b")}, "logs": {}}))
+    sn = [x for x in p.evaluate("() => window.__bachateca.listSnapshots()") if x["reason"] == "antes-de-importar"]
+    assert len(sn) == 1 and sn[0]["nFig"] == 1, sn
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def reemplazar_no_borra_videos_al_momento(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b", vid="v1")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"])
+    import_text(p, json.dumps({"schema": 6, "figures": {"f2": fig(2, "a", "b")}, "logs": {}}), replace=True)
+    assert "Antes se guarda una instantánea" in p.locator("#confirm-root .confirm").inner_text()
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_timeout(300)
+    assert list(p.evaluate("() => window.__bachateca.state().figures")) == ["f2"]
+    p.evaluate("() => window.__bachateca.flush()"); p.wait_for_timeout(300)
+    assert "v1" in stored_video_sizes(p), stored_video_sizes(p)
+    sn = [x for x in p.evaluate("() => window.__bachateca.listSnapshots()") if x["reason"] == "antes-de-reemplazar"]
+    assert len(sn) == 1, sn
+    p.evaluate("k => { window.__t = window.__bachateca.restoreSnapshot(k); }", sn[0]["key"])
+    p.click('#confirm-root [data-cf="ok"]')
+    assert p.evaluate("() => window.__t") is True
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.vid") == "v1"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cancelar_reemplazo_no_guarda_instantanea(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    import_text(p, json.dumps({"schema": 6, "figures": {"f2": fig(2, "a", "b")}, "logs": {}}), replace=True)
+    p.click('#confirm-root [data-cf="no"]')
+    p.wait_for_timeout(300)
+    assert list(p.evaluate("() => window.__bachateca.state().figures")) == ["f1"]
+    assert not [x for x in p.evaluate("() => window.__bachateca.listSnapshots()") if x["reason"] == "antes-de-reemplazar"]
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_sin_copia_previa_no_cambia_nada(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {"f1": fig(1, "a", "b")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
+    antes = p.evaluate("() => JSON.stringify(window.__bachateca.state())")
+    p.evaluate(_SNAP_FALLA)
+    import_text(p, json.dumps({"schema": 6, "figures": {"f2": fig(2, "a", "b")}, "logs": {}}))
+    assert "No he cambiado nada" in p.locator(".toast").inner_text()
+    assert p.evaluate("() => JSON.stringify(window.__bachateca.state())") == antes
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_en_modo_seguro_no_hace_nada(browser):
+    seed = {"schema": 6, "figures": {"f1": fig(1, "a", "b")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, init=_parche_lectura(False))
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    antes = p.evaluate("() => JSON.stringify(window.__bachateca.state())")
+    import_text(p, json.dumps({"schema": 6, "figures": {"f2": fig(2, "a", "b")}, "logs": {}}))
+    assert "Modo seguro: no se puede importar." in p.locator(".toast").inner_text()
+    assert p.evaluate("() => JSON.stringify(window.__bachateca.state())") == antes
+    ctx.close()
+
+
+@test
+def figuras_distintas_sin_orden_ni_intentos(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const d = window.__bachateca.figDiffers;
+      return [d({id: "a", nombre: "A", rep: {step: 1, due: "x"}, intentos: [1]}, {rep: {due: "x", step: 1}, nombre: "A", id: "a", partes: [2]}),
+              d({id: "a", nombre: "A"}, {id: "a", nombre: "B"}), d({id: "a", rep: {step: 1}}, {id: "a", rep: {step: 4}})]; }""")
+    assert r == [False, True, True], r
+    assert not errors, errors
     ctx.close()
 
 

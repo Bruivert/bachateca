@@ -3853,7 +3853,14 @@ function sanitizeImport(d){
   ls.forEach(l=>{ if(isObj(l) && ID_RE.test(l.id) && typeof l.fecha==="string") logs[l.id]={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []}; else descartadas++; });
   return {figures, logs, descartadas};
 }
+// Compara dos figuras sin intentos ni partes (esos se fusionan aparte); el orden de las claves no cuenta.
+const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : isObj(v) ? Object.fromEntries(Object.keys(v).sort().map(k=>[k, sortKeys(v[k])])) : v;
+function figDiffers(a, b){
+  const key = f => { const {intentos, partes, ...r} = f||{}; return JSON.stringify(sortKeys(r)); };
+  return key(a) !== key(b);
+}
 async function importData(replace){
+  if(safeMode){ toast("Modo seguro: no se puede importar."); return; }
   const raw=$("#imp-text").value.trim();
   if(!raw){ toast("Elige un archivo de copia o pega su texto primero."); return; }
   let d; try{ d=JSON.parse(raw); }catch{ toast("Ese texto no es una copia completa. Pega todo el contenido o elige el archivo."); return; }
@@ -3868,14 +3875,19 @@ async function importData(replace){
   const inc=Object.values(d.figures), nIn=inc.length;
   if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."+desc); return; }
   if(!nIn && !Object.keys(d.logs).length){ toast("Esa copia no tiene figuras ni registros que añadir."+desc); return; }
-  const nNew=inc.filter(f=>!S.figures[f.id]).length, nOld=nIn-nNew;
-  if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Las figuras, registros y vídeos que no estén en ella se borran y no se puede deshacer.${san.descartadas?` ${san.descartadas} ${san.descartadas===1?"entrada está mal formada y no se importará":"entradas están mal formadas y no se importarán"}.`:""}`, ok:"Reemplazar todo"}))) return;
+  const nuevas = inc.filter(f=>!S.figures[f.id]), distintas = inc.filter(f=>S.figures[f.id] && figDiffers(S.figures[f.id], f));
+  const nIg = nIn - nuevas.length - distintas.length, nD = distintas.length;
+  if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Antes se guarda una instantánea de tus datos: podrás volver atrás en Ajustes → Instantáneas.${san.descartadas?` ${san.descartadas} ${san.descartadas===1?"entrada está mal formada y no se importará":"entradas están mal formadas y no se importarán"}.`:""}`, ok:"Reemplazar todo"}))) return;
+  if(!(await takeSnapshot(replace ? "antes-de-reemplazar" : "antes-de-importar"))){ toast("No se pudo guardar una copia de tus datos de ahora. No he cambiado nada."); return; }
+  // Al añadir, las que ya tienes y son distintas solo se cambian si lo eliges; cerrar o cancelar las conserva.
+  const usar = replace || (nD>0 && await askConfirm({title:`${nD} ${nD===1?"figura ya está y es distinta":"figuras ya están y son distintas"}`, msg:"La copia tiene otra versión de figuras que ya tienes (nombre, estado, repaso o notas).", ok:"Usar las de la copia", cancel:"Conservar las mías"}));
   if(replace){
-    Object.keys(S.figures).forEach(id=>{ if(!d.figures[id] && !inFigs.has(id)) deleteFigure(id); });
+    // Sin borrar sus vídeos: así la instantánea «antes de reemplazar» las recupera enteras.
+    Object.keys(S.figures).forEach(id=>{ if(!d.figures[id] && !inFigs.has(id)){ delete S.figures[id]; persist({t:"figdel",id}); } });
     Object.keys(S.logs).forEach(id=>{ if(!d.logs[id] && !inLogs.has(id)){ delete S.logs[id]; persist({t:"logdel",id}); } });
   }
   // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
-  inc.forEach(f=>{
+  (replace ? inc : [...nuevas, ...(usar ? distintas : [])]).forEach(f=>{
     const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
     const keep = mine.filter(a=>!got.has(a.id));
     if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
@@ -3883,7 +3895,7 @@ async function importData(replace){
     if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
     S.figures[f.id]=f; persist({t:"fig",id:f.id});
   });
-  Object.values(d.logs||{}).forEach(l=>{ if(l&&l.id){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
+  Object.values(d.logs).forEach(l=>{ if(replace || !S.logs[l.id]){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
   const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
   S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
   if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
@@ -3891,8 +3903,10 @@ async function importData(replace){
   saveMeta();
   confirmKey=null; openSettings();
   toast((replace ? `Repertorio restaurado: ${pl(nIn,"figura","figuras")}`
-    : !nNew ? (nIn ? `Ninguna figura nueva: ${nIn===1?"la de la copia ya estaba":`las ${nIn} de la copia ya estaban`}` : "Registros añadidos")
-    : `${pl(nNew,"figura añadida","figuras añadidas")}${nOld?` · ${nOld} ya ${nOld===1?"estaba":"estaban"}`:""}`)+desc);
+    : !nIn ? "Registros añadidos"
+    : (nuevas.length ? pl(nuevas.length,"figura añadida","figuras añadidas") : "Ninguna figura nueva")
+      + (nIg ? ` · ${nIg} ya ${nIg===1?"estaba":"estaban"}` : "")
+      + (nD ? (usar ? ` · ${nD} ${nD===1?"actualizada":"actualizadas"} con la copia` : ` · se conservan tus ${nD}`) : ""))+desc);
 }
 function loadExamples(){
   const ex = [
@@ -4136,7 +4150,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), takeSnapshot, listSnapshots, restoreSnapshot, setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }
 };
 
 // arranque

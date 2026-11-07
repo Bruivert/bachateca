@@ -2394,6 +2394,25 @@ def conteo_pide_sesion_de_audio(browser):
     ctx.close()
 
 
+@test
+def copia_en_memoria_solo_para_ese_video(browser):
+    """Si un vídeo necesitó la copia en memoria, solo ese la usa: los demás siguen como blob."""
+    seed = {"schema": 6, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", vid="v2")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, ls={"bachateca.vidmem": ["v1"]})
+    put_fixture(p, ["v1", "v2"])
+    p.reload(); p.wait_for_function("window.__bachateca && window.__bachateca.ready()")
+    p.click('nav.tabs [data-tab="repertorio"]')
+    for f in ("f1", "f2"):
+        p.click(f'#v-repertorio [data-view="{f}"]')
+        p.wait_for_function("document.querySelector('.fv-media video') && document.querySelector('.fv-media video').readyState >= 1", timeout=10000)
+        assert ficha_video(p)["err"] is None
+        p.click('[data-act="close"]'); p.wait_for_timeout(200)
+    k = p.evaluate("() => [window.__bachateca.vidUrlKind('v1'), window.__bachateca.vidUrlKind('v2')]")
+    assert k == ["mem", "blob"], k
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

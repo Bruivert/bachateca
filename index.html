@@ -1726,6 +1726,7 @@ function renderRepasar(){
     const anyActive = figs().some(active), anyLinks = linkPositions().length>0;
     const next = figs().filter(f=>active(f) && !isDue(f)).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||""))[0];
     v.innerHTML = `
+      ${baileChipsHTML()}
       <div class="panel">
         <h3>Enlaces</h3>
         ${firstHelp("rev", "Ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Es justo lo que se bloquea en el social.")}

@@ -2021,6 +2021,37 @@ def social_y_enlazar_por_baile(browser):
 
 
 @test
+def baile_viejo_vuelve_a_bachata(browser):
+    ctx, p, errors = open_app(browser)
+    both = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Abierta 2 manos", "Cerrada", baile="Salsa")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", both)
+    p.evaluate("() => window.__bachateca.setBaile('Salsa')")
+    only = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Abierta 2 manos", "Cerrada")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", only)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    assert p.locator("[data-baile]").count() == 0
+    assert p.locator("#v-enlazar .card").count() >= 1
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def repasar_elige_baile(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"),
+                                 fig(2, "Abierta 2 manos", "Cerrada", baile="Salsa"),
+                                 fig(3, "Sombra", "Cerrada", baile="Salsa")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    p.click('nav.tabs [data-tab="repasar"]')
+    assert p.locator("#v-repasar [data-baile]").count() == 2
+    assert "<b>1</b>" in p.inner_html("#v-repasar").split("Figuras</h3>")[0]
+    p.click('#v-repasar [data-baile="Salsa"]')
+    assert "<b>2</b>" in p.inner_html("#v-repasar").split("Figuras</h3>")[0]
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def un_solo_baile_sin_selector(browser):
     ctx, p, errors = open_app(browser)
     figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Abierta 2 manos", "Cerrada")]}

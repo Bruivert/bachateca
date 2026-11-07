@@ -38,7 +38,7 @@ Exportar, porque viven en el mismo iPhone.
 
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v52` → `bachateca-v53`).
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v53` → `bachateca-v54`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
 
 ## Practicar para el social
@@ -67,6 +67,19 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
     cada 7 días.
   - **«Opciones de la cadena»**: terminar en una figura, incluir una, dejar fuera otras, y elegir la longitud (de 2 a 6).
 
+## Vídeo y práctica (versión 1.53)
+
+- **Paso fino**: en el vídeo de la figura y en **Comparar** puedes avanzar o retroceder 0,1 s para ver bien un movimiento.
+- **«Nota aquí»**: mientras ves el vídeo de la clase, apunta una nota en el momento exacto. Se muestra mientras suena
+  esa parte del vídeo y queda en una lista con su tiempo. Si añades una parte al vídeo, las notas pasan a la parte
+  anterior; si reemplazas el vídeo, se borran.
+- **«Superponer»** (en Comparar): pone tu vídeo encima del de referencia, con transparencia y con espejo para tu vídeo.
+- **«Práctica guiada»** (en Repasar): una sesión de 10 o 20 minutos con figuras, enlaces y una cadena con la cuenta
+  de la voz. Te calificas después de cada bloque, y puedes marcar **«Con pareja»**.
+- **Dos medidas por figura**, en la ficha: **«La recuerdo»** y **«Me sale con pareja»**. La segunda solo sube con
+  pruebas reales: socials, práctica guiada con pareja o intentos en los que solo marcas «Bien». En Social salen
+  primero las figuras que te salen mejor con pareja.
+
 ## Pruebas automáticas
 
 Antes de publicar un cambio, comprueba que no se ha roto nada (repaso, enlaces, migración de datos, importar copias, vídeos):
@@ -84,7 +97,7 @@ Abren la app en un navegador sin ventana y con datos de prueba: no tocan tus dat
 
 Los datos guardados llevan un número de versión (`schema`). Si un cambio necesita guardar las figuras de otra forma,
 se sube `SCHEMA` en `index.html` y se añade un paso en `MIGRATIONS`: al abrir la app, los datos antiguos se ponen al día
-solos, sin borrar nada. La versión 1.52 pasa los datos a la versión 10 (la versión 1.51 los había pasado a la 7 con las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
+solos, sin borrar nada. La versión 1.53 pasa los datos a la versión 11 (la 1.52 los había pasado a la 10 y la versión 1.51 los había pasado a la 7 con las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
 
 ## Limitaciones conocidas
 

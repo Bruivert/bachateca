@@ -1909,6 +1909,10 @@ function renderEnlazar(){
         ${sel.out.length ? `<div class="practice">
           <h3>Practicar enlaces</h3>
           ${firstHelp("chain", "Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
+          <div class="chips">
+            <button class="chip sm" data-chainopt="safe" aria-pressed="${chainSafe}">Solo seguras</button>
+            <button class="chip sm" data-chainopt="strict" aria-pressed="${chainStrict}">Agarres exactos</button>
+          </div>
           <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
@@ -1930,21 +1934,32 @@ function mapHTML(cov, gaps, incN){
       <button class="btn" data-act="coach">✦ Preguntar a Claude qué trabajar</button>${firstHelp("coach", "Se abre la hoja de compartir con tus datos de salidas y bloqueos: elige la app de Claude.")}<div class="coach" id="coach-out" ${coachText?"":"hidden"}>${esc(coachText)}</div>
     </div>`;
 }
-function makeChain(start){
-  const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel);
+const holdFits = (a,b,strict) => strict ? (!!a && !!b && a===b) : holdOk(a,b);
+// Pura: recibe la reserva ya filtrada (usables, con posiciones, del baile y, si toca, solo seguras) y no toca S ni el DOM.
+function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
   const steps=[]; const used=new Set(); let prev=null;
-  let pos = start || (pool[Math.floor(Math.random()*pool.length)]||{}).entrada;
-  for(let i=0;i<4;i++){
-    const opts = pool.filter(f=>!used.has(f.id) && (prev ? canFollow(prev,f) : f.entrada===pos));
+  let pos = start || (pool[Math.floor(rnd()*pool.length)]||{}).entrada;
+  const fits = f => prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
+                         : (f.entrada===pos && holdFits(hold, f.agarreIn, strict));
+  for(let i=0;i<n;i++){
+    const opts = pool.filter(f=>!used.has(f.id) && fits(f));
     if(!opts.length){
       // ¿No hay salida o ya están todas en la cadena? Cambia el consejo.
-      const usedUp = pool.some(f=> used.has(f.id) && (prev ? canFollow(prev,f) : f.entrada===pos));
+      const usedUp = pool.some(f=> used.has(f.id) && fits(f));
       steps.push({dead: prev?prev.salida:pos, hold: prev?prev.agarreOut:"", usedUp}); break;
     }
-    const f = opts[Math.floor(Math.random()*opts.length)];
-    used.add(f.id); steps.push({f}); prev=f;
+    const f = opts[Math.floor(rnd()*opts.length)];
+    // vago: el enlace con el paso anterior (o con el agarre elegido) se apoyó en un agarre sin indicar.
+    const h = prev ? prev.agarreOut : hold;
+    used.add(f.id); steps.push({f, vago: !h || !f.agarreIn}); prev=f;
   }
   return {steps};
+}
+const LS_CHAIN = "bachateca.cadena";
+let {safe: chainSafe = false, strict: chainStrict = false} = lsGet(LS_CHAIN) || {};
+function makeChain(start){
+  const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
+  return buildChain(pool, {start, hold: linkHold, strict: chainStrict});
 }
 function renderChain(){
   if(!chain.steps.length) return `<p class="muted small">Aún no hay figuras para encadenar.</p>`;
@@ -1959,7 +1974,7 @@ function renderChain(){
     ? `<div class="step"><span class="k">↺</span><div><b>Básico</b><div class="small muted">${s.usedUp
         ? `Las salidas desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} ya están en la cadena. Vuelve al básico y empieza otra vuelta.`
         : `Desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} aún no tienes salidas. Vuelve al básico: también es una transición.`}</div></div></div>`
-    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
+    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}${ready(s.f)?"":" · en práctica"}${s.vago?" · agarre sin indicar":""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
 }
 
 // ---------- vista: social ----------
@@ -4004,7 +4019,7 @@ function loadExamples(){
 
 // ---------- render ----------
 // Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
-const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote"];
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote","data-chainopt"];
 function focusKey(el){
   if(!el || el===document.body) return null;
   if(el.id) return "#"+CSS.escape(el.id);
@@ -4045,7 +4060,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-mins],[data-tema],[data-fest]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-chainopt],[data-mins],[data-tema],[data-fest]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -4065,6 +4080,7 @@ document.addEventListener("click", async e=>{
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
+  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict}); chain=makeChain(linkPos); return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.fest){ filt.estado=d.fest; return render(); }
   if(d.promote){ promoteFig(d.promote, d.to||"disponible", !!t.closest("[data-viewfig]"), t); return; }
@@ -4231,7 +4247,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
-  SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 

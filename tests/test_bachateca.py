@@ -2066,6 +2066,78 @@ def un_solo_baile_sin_selector(browser):
     ctx.close()
 
 
+@test
+def cadena_respeta_el_agarre_elegido(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(0, "Cerrada", "Abierta 2 manos", estado="disponible"),
+                                 fig(1, "Abierta 2 manos", "Cerrada", agarreIn="Dos manos", estado="disponible"),
+                                 fig(2, "Abierta 2 manos", "Cerrada", agarreIn="Izq–der", estado="disponible")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    p.click('#v-enlazar [data-pos="Abierta 2 manos"]')
+    p.click('#v-enlazar [data-hold="Izq–der"]')
+    p.click('#v-enlazar [data-act="chain"]')
+    assert p.inner_text("#v-enlazar .chain .step:first-child b") == "Figura 2"
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), out = [];
+      for (let k = 0; k < 20; k++) out.push(B.buildChain(pool, {start: "Abierta 2 manos", hold: "Izq–der"}).steps[0].f.id);
+      return out; }""")
+    assert set(r) == {"f2"}, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_agarres_exactos(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos", agarreOut="Dos manos"),
+                                 fig(2, "Abierta 2 manos", "Cerrada")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), n = {a: 0, b: 0};
+      for (let k = 0; k < 30; k++) {
+        if (B.buildChain(pool, {start: "Cerrada", strict: true}).steps.filter(s => s.f).length > 1) n.a++;
+        if (B.buildChain(pool, {start: "Cerrada"}).steps.filter(s => s.f).length > 1) n.b++;
+      }
+      return n; }""")
+    assert r == {"a": 0, "b": 30}, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_solo_seguras_y_avisos(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos", estado="disponible", agarreOut="Dos manos"),
+                                 fig(2, "Abierta 2 manos", "Cerrada", estado="practica", nombre="Practicona")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar [data-act="chain"]')
+    t = p.inner_text("#v-enlazar .chain")
+    assert "Practicona" in t and "en práctica" in t and "agarre sin indicar" in t, t
+    p.click('#v-enlazar [data-chainopt="safe"]')
+    assert p.get_attribute('#v-enlazar [data-chainopt="safe"]', "aria-pressed") == "true"
+    assert p.evaluate("() => document.activeElement.dataset.chainopt") == "safe"
+    t = p.inner_text("#v-enlazar .chain")
+    assert "Practicona" not in t and "en práctica" not in t, t
+    assert p.get_attribute('#v-enlazar [data-chainopt="strict"]', "aria-pressed") == "false"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def buildChain_es_pura(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Cerrada", "Abierta 2 manos"),
+                                 fig(3, "Abierta 2 manos", "Cerrada"), fig(4, "Abierta 2 manos", "Cerrada")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures);
+      const ids = () => B.buildChain(pool, {start: "Cerrada"}, () => 0).steps.map(s => s.f ? s.f.id : "dead");
+      return [ids(), ids()]; }""")
+    assert r[0] == r[1] and len(r[0]) == 4, r
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

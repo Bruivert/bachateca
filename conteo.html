@@ -337,12 +337,14 @@ $("#c-rec").onclick = ()=>{
   const out = new MediaStream([...stream.getVideoTracks(), ...mix.stream.getAudioTracks()]);
   const cands = ["video/mp4;codecs=avc1,mp4a.40.2","video/mp4","video/webm;codecs=vp8,opus","video/webm"];
   const mime = cands.find(m=>{ try{ return MediaRecorder.isTypeSupported(m); }catch{ return false; } }) || "";
-  const chunks = []; let recAt = null;
+  const chunks = []; let recAt = null, cnt = null;
   rec = new MediaRecorder(out, mime ? {mimeType:mime} : undefined);
   rec.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
-  rec.onstart = ()=>{ recAt = c.currentTime; log(`Prueba 4: grabando (${rec.mimeType||mime||"formato por defecto"}).`); };
+  rec.onstart = ()=>{
+    recAt = c.currentTime; cnt = startCount(LONG, mix);   // el conteo se programa ya con recAt fijado, como en rcStart de la app
+    log(`Prueba 4: grabando (${rec.mimeType||mime||"formato por defecto"}).`); };
   rec.onstop = ()=>{
-    const t0 = cnt, b = run ? run.beat : beatSec(); stopCount("fin de la grabación");
+    const t0 = cnt ?? recAt, b = run ? run.beat : beatSec(); stopCount("fin de la grabación");
     const blob = new Blob(chunks, {type: rec.mimeType || mime || "video/mp4"}); rec = null; $("#c-rec").textContent = "Grabar";
     const first = t0 - (recAt ?? t0);
     showVideo("#c-out", blob, "Prueba 4 (dentro de la app)");
@@ -352,7 +354,6 @@ $("#c-rec").onclick = ()=>{
     $("#c-out").insertAdjacentHTML("beforeend", `<p class="small ok">Pulso sacado solo: el 1 en el segundo ${first.toFixed(2).replace(".",",")} y ${Math.round(60/b)} golpes por minuto. En la app se guardaría así, sin marcar tocando.</p>`);
   };
   rec.start(1000);
-  const cnt = startCount(LONG, mix);
   $("#c-rec").textContent = "Parar";
 };
 

@@ -2174,9 +2174,11 @@ function saveLog(){
     const f=S.figures[id]; if(!f) return;
     f.usos=(+f.usos||0)+1; f.ultimoUso=l.fecha; persist({t:"fig",id});
     // Bailarla en un social es un repaso «Fluida», una vez al día por figura. Las incompletas no entran en los repasos.
-    if(usable(f) && (f.rep||{}).last!==l.fecha){
+    // No cuenta si ya se repasó ese día o después (un social atrasado no mueve `last` hacia atrás ni suma encima).
+    if(usable(f) && !(f.rep && f.rep.last && f.rep.last >= l.fecha)){
       (l.repAntes ||= {})[id] = clone(f.rep || null);
       f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; counted = true;
+      (l.repDespues ||= {})[id] = clone(f.rep);
     }
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
@@ -2192,16 +2194,18 @@ function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
   const copy=clone(l);
   (l.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f && f.usos){ f.usos--; persist({t:"fig",id:fid}); } });
-  // Quita el repaso que dio el social, salvo que la figura se haya repasado después (entonces su repaso ya no es de este registro).
+  // Quita el repaso que dio el social solo si la figura sigue exactamente como la dejó el registro (repDespues);
+  // si se repasó después (en Repasar, otro social…), su repaso ya no es de este registro y se respeta.
+  const same = (a,b) => JSON.stringify(a||null)===JSON.stringify(b||null);
   const quitados = {};
   Object.entries(l.repAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
-    if(f && f.rep && f.rep.last===l.fecha){ quitados[fid]=clone(f.rep); if(antes) f.rep=antes; else delete f.rep; persist({t:"fig",id:fid}); } });
+    if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){ quitados[fid]={rep:clone(f.rep), antes}; if(antes) f.rep=clone(antes); else delete f.rep; persist({t:"fig",id:fid}); } });
   delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
     (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
-    // Vuelve a poner los repasos que quitó el borrado, solo si la figura no se repasó mientras tanto.
-    Object.entries(quitados).forEach(([fid,r])=>{ const f=S.figures[fid]; if(f && (f.rep||{}).last!==copy.fecha){ f.rep=r; persist({t:"fig",id:fid}); } });
+    // Vuelve a poner los repasos que quitó el borrado, solo si la figura sigue como la dejó el borrado.
+    Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
 }

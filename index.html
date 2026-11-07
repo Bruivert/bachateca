@@ -2107,10 +2107,25 @@ function renderEnlazar(){
             <button class="chip sm" data-chainopt="safe" aria-pressed="${chainSafe}">Solo seguras</button>
             <button class="chip sm" data-chainopt="strict" aria-pressed="${chainStrict}">Agarres exactos</button>
           </div>
+          ${chainOptsHTML()}
           <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
       </div>` : ""}`;
+}
+function chainOptsHTML(){
+  // Antes de repintar, el panel viejo sigue en el DOM: leer de él si estaba abierto evita perder el estado (el evento toggle llega tarde).
+  const live = document.querySelector("#v-enlazar details.chainopts"); if(live) chainOptsOpen = live.open;
+  const pool = chainPool().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+  const ends = [...new Set([...pool.map(f=>f.salida), ...(chainEnd?[chainEnd]:[])])].sort((a,b)=>a.localeCompare(b,"es"));   // la guardada se muestra aunque ya no llegue nadie
+  const musts = chainMust && !pool.some(f=>f.id===chainMust) ? [{id: chainMust, nombre: "(figura no disponible)"}] : [];
+  const opt = (v, t, cur) => `<option value="${esc(v)}"${v===cur?" selected":""}>${esc(t)}</option>`;
+  return `<details class="chainopts"${chainOptsOpen?" open":""}><summary>Opciones de la cadena</summary><div class="inner">
+    <label class="f">Terminar en<select data-chainsel="end">${opt("", "Donde sea", chainEnd)}${ends.map(p=>opt(p, p, chainEnd)).join("")}</select></label>
+    <label class="f">Incluir<select data-chainsel="must">${opt("", "Ninguna en concreto", chainMust)}${[...musts, ...pool].map(f=>opt(f.id, f.nombre, chainMust)).join("")}</select></label>
+    <div role="group" aria-label="Sin estas figuras"><span class="small muted">Sin</span><div class="chips">${pool.map(f=>`<button class="chip sm" data-chainx="${esc(f.id)}" aria-pressed="${chainExclude.includes(f.id)}">${esc(f.nombre)}</button>`).join("")}</div></div>
+    <label class="f">Longitud<select data-chainsel="n">${[2,3,4,5,6].map(k=>opt(String(k), k+" figuras", String(chainN))).join("")}</select></label>
+  </div></details>`;
 }
 function mapHTML(cov, gaps, incN){
   return `
@@ -2131,7 +2146,10 @@ function mapHTML(cov, gaps, incN){
 const holdFits = (a,b,strict) => strict ? (!!a && !!b && a===b) : holdOk(a,b);
 // Pura: recibe la reserva ya filtrada (usables, con posiciones, del baile y, si toca, solo seguras) y no toca S ni el DOM.
 // prefer(prev, f) → 0..1 (prev es null en el primer paso): cada opción pesa 1 + 3·prefer; sin prefer todas pesan igual.
-function buildChain(pool, {start, hold="", strict=false, n=4, prefer}, rnd=Math.random){
+// Con end (posición donde acaba) y/o must (id de una figura que debe entrar) busca caminos en vez de pasear al azar; exclude (ids) quita figuras de la reserva.
+function buildChain(pool, {start, hold="", strict=false, n=4, end="", must="", exclude=[], prefer}, rnd=Math.random){
+  if(end || must) return buildGoalChain(pool, {start, hold, strict, n, end, must, exclude, prefer}, rnd);
+  if(exclude.length) pool = pool.filter(f=>!exclude.includes(f.id));
   const steps=[]; const used=new Set(); let prev=null;
   let pos = start || (pool[Math.floor(rnd()*pool.length)]||{}).entrada;
   const fits = f => prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
@@ -2155,14 +2173,45 @@ function buildChain(pool, {start, hold="", strict=false, n=4, prefer}, rnd=Math.
   }
   return {steps};
 }
+// Búsqueda en profundidad: sin repetir figuras, ≤ n pasos, misma regla de encaje que el paseo (con agarre/estricto en el primer paso).
+// Cada camino que acaba en end (si hay) e incluye must (si hay) es válido, aunque sea más corto que n. Tope de caminos y de nodos para ir fluido en el móvil.
+// Elección: azar ponderado por la SUMA de (1+3·prefer) de sus pasos (como en el paseo, pero por camino entero; la suma, no el producto, para no hundir los largos).
+function buildGoalChain(pool, {start, hold, strict, n, end, must, exclude, prefer}, rnd){
+  pool = pool.filter(f=>!exclude.includes(f.id));
+  const paths=[]; let nodes=0; const MAXP=2000, MAXN=50000;
+  const dfs = (path, prev, w) => {
+    if(paths.length>=MAXP || nodes>=MAXN) return;
+    const opts = pool.filter(f=> !path.includes(f) && (prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
+                                                           : ((!start || f.entrada===start) && holdFits(hold, f.agarreIn, strict))));
+    for(const f of opts){
+      if(paths.length>=MAXP || ++nodes>MAXN) return;
+      const np = [...path, f], nw = w + 1 + 3*(prefer ? (+prefer(prev, f)||0) : 0);
+      if((!end || f.salida===end) && (!must || np.some(x=>x.id===must))) paths.push({np, w: nw});
+      if(np.length<n) dfs(np, f, nw);
+    }
+  };
+  dfs([], null, 0);
+  if(!paths.length) return {steps: [], noPath: true};
+  let r = rnd()*paths.reduce((a,c)=>a+c.w,0), j = 0;
+  while(j<paths.length-1 && r>=paths[j].w){ r-=paths[j].w; j++; }
+  const path = paths[j].np;
+  return {steps: path.map((f,i)=>({f, vago: i ? (!path[i-1].agarreOut || !f.agarreIn) : (!!hold && !f.agarreIn)}))};
+}
 const LS_CHAIN = "bachateca.cadena";
 const chainLS = lsGet(LS_CHAIN), chainV = chainLS && typeof chainLS==="object" ? chainLS : {};
 let chainSafe = chainV.safe === true, chainStrict = chainV.strict === true;
+// Opciones de objetivo, validadas al leer (el almacenamiento puede traer cualquier cosa).
+let chainEnd = typeof chainV.end==="string" ? chainV.end : "", chainMust = typeof chainV.must==="string" ? chainV.must : "";
+let chainExclude = Array.isArray(chainV.exclude) ? chainV.exclude.filter(x=>typeof x==="string") : [];
+let chainN = Number.isInteger(chainV.n) && chainV.n>=2 && chainV.n<=6 ? chainV.n : 4;
+let chainOptsOpen = !!(chainEnd || chainMust || chainExclude.length || chainN!==4);   // abierto si hay condiciones guardadas; luego manda el usuario
+const saveChainOpts = () => lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict, end: chainEnd, must: chainMust, exclude: chainExclude, n: chainN});
+const chainPool = () => figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
 function makeChain(start){
-  const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
-  return buildChain(pool, {start, hold: linkHold, strict: chainStrict, prefer: (p, f) => p && linkDone(p, f) ? 1 : 0});
+  return buildChain(chainPool(), {start, hold: linkHold, strict: chainStrict, n: chainN, end: chainEnd, must: chainMust, exclude: chainExclude, prefer: (p, f) => p && linkDone(p, f) ? 1 : 0});
 }
 function renderChain(){
+  if(chain.noPath) return `<p class="muted small" role="status">No hay ninguna cadena así con tus figuras. Prueba con más pasos o quita una condición.</p>`;
   if(!chain.steps.length) return `<p class="muted small">Aún no hay figuras para encadenar.</p>`;
   let n=0;
   // Barra de la canción: cada figura ocupa sus tiempos (8 si no los tiene) y el básico final, una frase.
@@ -4487,7 +4536,7 @@ function loadExamples(){
 
 // ---------- render ----------
 // Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
-const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote","data-chainopt"];
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote","data-chainopt","data-chainx"];
 function focusKey(el){
   if(!el || el===document.body) return null;
   if(el.id) return "#"+CSS.escape(el.id);
@@ -4515,6 +4564,13 @@ function render(){
 }
 
 // ---------- eventos ----------
+document.addEventListener("change", e=>{
+  const sel = e.target.closest && e.target.closest("[data-chainsel]"); if(!sel) return;
+  const k = sel.dataset.chainsel, v = sel.value;
+  if(k==="end") chainEnd=v; else if(k==="must") chainMust=v; else if(k==="n"){ const m=+v; chainN = Number.isInteger(m)&&m>=2&&m<=6 ? m : 4; }
+  saveChainOpts(); chain=chain ? makeChain(linkPos) : null;
+  focusAfter = `[data-chainsel="${k}"]`; render();
+});
 document.addEventListener("click", async e=>{
   const pc = e.target.closest("[data-speed],[data-mirror],[data-loopbtn]");
   if(pc){
@@ -4528,7 +4584,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-chainopt],[data-mins],[data-tema],[data-fest]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-chainopt],[data-chainx],[data-mins],[data-tema],[data-fest]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -4548,7 +4604,8 @@ document.addEventListener("click", async e=>{
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
-  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict}); chain=chain ? makeChain(linkPos) : null; return render(); }
+  if(d.chainx!==undefined){ chainExclude = chainExclude.includes(d.chainx) ? chainExclude.filter(x=>x!==d.chainx) : [...chainExclude, d.chainx]; saveChainOpts(); chain=chain ? makeChain(linkPos) : null; return render(); }
+  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; saveChainOpts(); chain=chain ? makeChain(linkPos) : null; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.fest){ filt.estado=d.fest; return render(); }
   if(d.promote){ promoteFig(d.promote, d.to||"disponible", !!t.closest("[data-viewfig]"), t); return; }

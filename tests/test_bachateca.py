@@ -2982,6 +2982,129 @@ def anadir_o_reabrir_error_limita_el_repaso_al_instante(browser):
     ctx.close()
 
 
+# ---------------------------------------------------------------- cadenas con objetivo (fase 5)
+# Mapa: Cerrada -f1-> Sombra -f2-> Abierta -f3-> Cerrada; atajo Cerrada -f4-> Abierta; f5: Sombra -> Cerrada.
+def objetivo_seed():
+    return {"figures": {"f1": fig(1, "Cerrada", "Sombra", estado="disponible"), "f2": fig(2, "Sombra", "Abierta 2 manos", estado="disponible"),
+                        "f3": fig(3, "Abierta 2 manos", "Cerrada", estado="disponible"), "f4": fig(4, "Cerrada", "Abierta 2 manos", estado="disponible"),
+                        "f5": fig(5, "Sombra", "Cerrada", estado="disponible")}}
+
+
+@test
+def cadena_hasta_una_posicion(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), out = [];
+      for (let k = 0; k < 40; k++) out.push(B.buildChain(pool, {start: "Cerrada", end: "Abierta 2 manos", n: 3}, () => k / 40).steps);
+      return out.map(st => st.map(s => s.f && {id: s.f.id, e: s.f.entrada, s: s.f.salida})); }""")
+    for st in r:
+        assert st and st[0]["e"] == "Cerrada" and st[-1]["s"] == "Abierta 2 manos" and len(st) <= 3, st
+        assert all(a["s"] == b["e"] for a, b in zip(st, st[1:])), st
+        assert len({x["id"] for x in st}) == len(st), st
+    assert {len(st) for st in r} == {1, 2, 3}, {len(st) for st in r}
+    # Con n = 1 solo cabe el atajo.
+    r1 = p.evaluate("""() => { const B = window.__bachateca; return B.buildChain(Object.values(B.state().figures), {start: "Cerrada", end: "Abierta 2 manos", n: 1}).steps.map(s => s.f.id); }""")
+    assert r1 == ["f4"], r1
+    # En la interfaz: Terminar en + Generar.
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    p.select_option('#v-enlazar [data-chainsel="end"]', "Abierta 2 manos")
+    assert p.locator('#v-enlazar .chain').count() == 0, "sin cadena a la vista no se genera sola"
+    p.click('#v-enlazar [data-act="chain"]')
+    t = p.locator("#v-enlazar .chain .step").all_inner_texts()
+    assert t and "→ Abierta 2 manos" in t[-1], t
+    ls = p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.cadena'))")
+    assert ls["end"] == "Abierta 2 manos" and ls["n"] == 4, ls
+    p.select_option('#v-enlazar [data-chainsel="n"]', "2")
+    assert p.locator("#v-enlazar .chain .step").count() <= 2, "con cadena a la vista se regenera"
+    assert p.locator('#v-enlazar details.chainopts').get_attribute("open") is not None, "el panel sigue abierto"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_que_incluye_una_figura(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), out = [];
+      for (let k = 0; k < 40; k++) out.push(B.buildChain(pool, {start: "Cerrada", must: "f2", n: 4}, () => k / 40).steps.map(s => s.f.id));
+      return out; }""")
+    assert all("f2" in st and st[0] in ("f1", "f4") for st in r), r
+    assert all(len(st) <= 4 for st in r)
+    # Con end y must a la vez.
+    r2 = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures);
+      return [0, .3, .6, .99].map(k => B.buildChain(pool, {start: "Cerrada", must: "f5", end: "Cerrada", n: 4}, () => k).steps.map(s => [s.f.id, s.f.salida])); }""")
+    for st in r2:
+        assert "f5" in [x[0] for x in st] and st[-1][1] == "Cerrada" and len(st) <= 4, st
+    # UI: Incluir
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    p.select_option('#v-enlazar [data-chainsel="must"]', "f2")
+    p.click('#v-enlazar [data-act="chain"]')
+    assert "Figura 2" in p.inner_text("#v-enlazar .chain")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_sin_camino_lo_dice(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures);
+      return [B.buildChain(pool, {start: "Cerrada", end: "Nada", n: 4}), B.buildChain(pool, {start: "Cerrada", must: "f3", end: "Sombra", n: 2}),
+              B.buildChain(pool, {start: "Cerrada", must: "f3", exclude: ["f3"]})]; }""")
+    assert all(x == {"steps": [], "noPath": True} for x in r), r
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    p.select_option('#v-enlazar [data-chainsel="n"]', "2")
+    p.select_option('#v-enlazar [data-chainsel="must"]', "f3")
+    p.select_option('#v-enlazar [data-chainsel="end"]', "Sombra")
+    p.click('#v-enlazar [data-act="chain"]')
+    assert "No hay ninguna cadena así con tus figuras. Prueba con más pasos o quita una condición." in p.inner_text("#v-enlazar .practice")
+    assert p.locator("#v-enlazar .chain .step").count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_excluye_figuras(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed())
+    r = p.evaluate("""() => { const B = window.__bachateca, pool = Object.values(B.state().figures), seen = new Set();
+      for (let k = 0; k < 40; k++) B.buildChain(pool, {start: "Cerrada", end: "Abierta 2 manos", n: 3, exclude: ["f4"]}, () => k / 40).steps.forEach(s => seen.add(s.f.id));
+      return [[...seen].sort(), B.buildChain(pool, {start: "Cerrada", end: "Abierta 2 manos", n: 3, exclude: ["f4", "f2"]}),
+              B.buildChain(pool, {start: "Cerrada", n: 1, exclude: ["f4"]}, () => 0.99).steps.map(s => s.f.id)]; }""")
+    assert r[0] == ["f1", "f2"] and r[1]["noPath"] is True and r[2] == ["f1"], r
+    # UI: chip «Sin»
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    c = p.locator('#v-enlazar [data-chainx="f1"]')
+    assert c.get_attribute("aria-pressed") == "false"
+    c.click()
+    assert p.locator('#v-enlazar [data-chainx="f1"]').get_attribute("aria-pressed") == "true"
+    assert p.evaluate("() => JSON.parse(localStorage.getItem('bachateca.cadena')).exclude") == ["f1"]
+    p.click('#v-enlazar [data-act="chain"]')
+    t = p.inner_text("#v-enlazar .practice")
+    assert "Figura 1" not in p.inner_text("#v-enlazar .chain") if p.locator("#v-enlazar .chain").count() else True
+    assert "Figura 4" in t
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def cadena_lee_opciones_guardadas_con_validacion(browser):
+    ctx, p, errors = open_app(browser, seed=objetivo_seed(), ls={"bachateca.cadena": {"safe": True, "end": 7, "must": ["x"], "exclude": ["f1", 3], "n": 99}})
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    assert p.input_value('#v-enlazar [data-chainsel="n"]') == "4" and p.input_value('#v-enlazar [data-chainsel="end"]') == ""
+    assert p.locator('#v-enlazar [data-chainx][aria-pressed="true"]').count() == 1
+    ctx.close()
+    ctx, p, errors = open_app(browser, seed=objetivo_seed(), ls={"bachateca.cadena": {"end": "Cerrada", "must": "f2", "exclude": "f1", "n": 3.5}})
+    p.click('nav.tabs [data-tab="enlazar"]'); p.click('#v-enlazar [data-pos="Cerrada"]')
+    p.click('#v-enlazar details.chainopts summary')
+    assert p.input_value('#v-enlazar [data-chainsel="n"]') == "4"
+    assert p.input_value('#v-enlazar [data-chainsel="end"]') == "Cerrada" and p.input_value('#v-enlazar [data-chainsel="must"]') == "f2"
+    assert p.locator('#v-enlazar [data-chainx][aria-pressed="true"]').count() == 0
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

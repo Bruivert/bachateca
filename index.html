@@ -372,6 +372,10 @@ button.card:active{background:var(--surface2)}
 .rc-media video{width:100%;height:46vh;object-fit:cover;display:block;background:#000}
 .rc-media video.mirror{transform:scaleX(-1)}
 .rc-rec{position:absolute;left:12px;top:10px;padding:4px 10px;border-radius:99px;background:rgba(0,0,0,.62);color:#ff6b6b;font-size:0.8824rem;font-weight:700;font-variant-numeric:tabular-nums}
+.sim-beat{font-size:3.4rem;font-weight:800;line-height:1.1;min-height:1.1em;text-align:center;font-variant-numeric:tabular-nums}
+.sim-ok{min-height:64px;font-size:1.1rem}
+.sim-n .chip{min-height:44px}
+.dim-all li{opacity:.6}
 .rc-beat{position:absolute;right:14px;bottom:10px;font-size:3.4rem;font-weight:800;line-height:1;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.7);font-variant-numeric:tabular-nums}
 .cmp-v figcaption{position:absolute;left:10px;top:8px;padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.62);color:#fff;font-size:0.8236rem;font-weight:600;font-variant-numeric:tabular-nums}
 .cmp-now{display:flex;align-items:baseline;gap:10px;margin-bottom:-6px}
@@ -557,6 +561,7 @@ details.info summary::after{inset:-10px -4px}
 .t-blue{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
 .t-red{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
 .t-grey{background:var(--fill);color:var(--muted)}
+.t-amber{background:color-mix(in srgb,var(--st-incompleta) 16%,transparent);color:var(--st-incompleta)}
 .t-hero{background:rgba(196,248,56,.18);color:#c4f838}
 .hero{position:relative;border-radius:24px;overflow:hidden;background:#0b1428;color:#fff;border:1px solid var(--edge)}
 .hero-media{position:absolute;right:0;top:0;width:62%;height:100%;object-fit:cover;pointer-events:none}
@@ -600,6 +605,8 @@ details.info summary::after{inset:-10px -4px}
 .in-next h2{color:var(--neon-ink);font-size:1.3rem;line-height:1.2}
 .in-next p{font-size:0.9412rem}
 .in-next .btn{background:var(--neon-ink);color:#fff;margin-top:4px}
+.q-row{display:flex;flex-direction:column;gap:8px;padding-top:12px;margin-top:12px;border-top:1px solid var(--line)}
+.in-h + .q-row{border-top:0;margin-top:8px;padding-top:0}
 .eyebrow{display:flex;align-items:center;gap:6px;font-size:0.7059rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .eyebrow .ico{width:16px;height:16px}
 .in-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -694,9 +701,9 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .flash .big{font-size:2rem;line-height:1.08}
 .flash-tag{align-self:flex-start}
 .grade .btn{min-height:64px;border-radius:16px;font-weight:800}
-.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
-.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
-.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
+.grade [data-simg="no"],.grade [data-grade="no"]{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.grade [data-simg="dudas"],.grade [data-grade="dudas"]{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.grade [data-simg="fluida"],.grade [data-grade="fluida"]{background:var(--neon);color:var(--neon-ink)}
 .progress{height:6px}
 
 /* Enlazar y Social: tarjetas sueltas con borde. */
@@ -727,6 +734,7 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .gtop .st-tag.st-espera{color:#c3cce0}
 .gtop .st-tag.st-incompleta{color:#ffb35c}
 .gtop .t-red{color:#ff8f9b}
+.gtop .t-amber{color:#ffb35c}
 .gplay{margin-left:auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .gbody{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px}
 .gname{font-family:var(--f-display);font-size:1.0588rem;font-weight:800;line-height:1.15;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 8px rgba(0,0,0,.35)}
@@ -872,7 +880,7 @@ const fold = v => String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").
 const joinY = a => a.length>1 ? a.slice(0,-1).join(", ")+" y "+a[a.length-1] : a.join("");
 const arrOr = (a,d) => Array.isArray(a)&&a.length ? [...a] : [...d];
 const figs = () => Object.values(S.figures).sort((a,b)=> (b.creado||0)-(a.creado||0));
-const tipoOf = f => f.tipo || "figura";
+const tipoOf = f => TIPO[f.tipo] ? f.tipo : "figura";
 const moveTipo = t => t==="figura" || t==="transicion";
 const isMove = f => moveTipo(tipoOf(f));
 const placed = f => isMove(f) && !!f.entrada && !!f.salida;
@@ -884,9 +892,21 @@ const active = f => f.estado !== "espera";
 const usable = f => active(f) && f.estado !== "incompleta";
 const ready = f => f.estado==="disponible" || f.estado==="consolidada";
 const holdOk = (a,b) => !a || !b || a===b;
-const canFollow = (p,n) => n.entrada===p.salida && holdOk(p.agarreOut, n.agarreIn);
-const exitsFrom = (pos, hold, excl) => figs().filter(f=> f.id!==excl && usable(f) && placed(f) && f.entrada===pos && holdOk(hold, f.agarreIn));
-const arrivals = pos => figs().filter(f=> usable(f) && placed(f) && f.salida===pos);
+// Un enlace solo vale dentro del mismo baile: una figura de salsa no sigue a una de bachata.
+const baileOf = f => f.baile || "Bachata";
+const LS_BAILE = "bachateca.baile";
+let baileSel = lsGet(LS_BAILE) || "Bachata";
+// Bailes con algo que enlazar o sacar en el social; «Bachata» primero. Con uno solo no hay selector.
+const bailes = () => [...new Set(figs().filter(f=>usable(f) && (placed(f) || !isMove(f))).map(baileOf))].sort((a,b)=> (b==="Bachata")-(a==="Bachata") || a.localeCompare(b));
+// Si el baile elegido ya no existe (borraste sus figuras), vuelve a Bachata o al primero.
+function syncBaile(){ const b=bailes(); if(b.length && !b.includes(baileSel)) baileSel = b.includes("Bachata") ? "Bachata" : b[0]; }
+const canFollow = (p,n) => n.entrada===p.salida && holdOk(p.agarreOut, n.agarreIn) && baileOf(p)===baileOf(n);
+const exitsFrom = (pos, hold, excl) => figs().filter(f=> f.id!==excl && usable(f) && placed(f) && baileOf(f)===baileSel && f.entrada===pos && holdOk(hold, f.agarreIn));
+const arrivals = pos => figs().filter(f=> usable(f) && placed(f) && baileOf(f)===baileSel && f.salida===pos);
+function baileChipsHTML(){
+  const b=bailes(); if(b.length<2) return "";
+  return `<div class="chips" role="group" aria-label="Baile">${b.map(x=>`<button class="chip" data-baile="${esc(x)}" aria-pressed="${x===baileSel}">${esc(x)}</button>`).join("")}</div>`;
+}
 const extraPositions = () => [...new Set(figs().flatMap(f=>[f.entrada,f.salida]).filter(Boolean))].filter(p=>!S.positions.includes(p));
 const allPositions = () => [...S.positions, ...extraPositions()];
 const isDue = f => active(f) && (!f.rep || !f.rep.due || f.rep.due <= todayStr());
@@ -931,13 +951,13 @@ const announce = m => { const r=$("#sr-live"); if(!r) return; r.textContent=""; 
 // Para lo que cambia mientras escribes: avisa solo cuando paras.
 let annT; const announceSoon = m => { clearTimeout(annT); annT=setTimeout(()=>announce(m), 700); };
 // Hoja de acción para confirmar (descartar, borrar). Devuelve true si se confirma.
-function askConfirm({title, msg="", ok, cancel="Cancelar"}){
+function askConfirm({title, msg="", ok, cancel="Cancelar", danger=true}){
   if(confirmDone) confirmDone(false);
   return new Promise(res=>{
     const prev=document.activeElement;
     $("#confirm-root").innerHTML = `<div class="confirm-bg" data-cf="no"><div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="cf-t"${msg?' aria-describedby="cf-m"':""}>
       <div class="grp"><div class="msg"><b id="cf-t">${esc(title)}</b>${msg?`<span id="cf-m">${esc(msg)}</span>`:""}</div>
-      <button type="button" class="danger" data-cf="ok">${esc(ok)}</button></div>
+      <button type="button"${danger?' class="danger"':""} data-cf="ok">${esc(ok)}</button></div>
       <button type="button" class="cancel" data-cf="no">${esc(cancel)}</button></div></div>`;
     confirmDone = v=>{ confirmDone=null; $("#confirm-root").innerHTML=""; if(prev && prev.isConnected) prev.focus({preventScroll:true}); res(v); };
     $("#confirm-root .cancel").focus();
@@ -954,6 +974,7 @@ const fieldDirty = el => {
 function markClean(carried){ sheetBase = {press:pressSig(), v:vSig(), carried:!!carried}; }
 function sheetDirty(){
   if(!$(".sheet") || !sheetBase) return false;
+  if($("[data-sim]")) return false;   // cerrar el simulacro solo lo para: lo ya puntuado está guardado
   if(sheetBase.carried) return true;
   if(pk && pk.dirty && $("[data-pulso]")) return true;
   if(rc && rc.rec && $("[data-recc]")) return true;
@@ -983,8 +1004,9 @@ function backupStatus(b){
   return {main:`Última copia: ${when}.`, since: parts.length ? `Desde entonces: ${parts.join(" y ")}.` : (b.ch ? "Desde entonces has hecho cambios." : "Sin cambios desde entonces.")};
 }
 async function exportBackup(){
-  const ok = await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"}));
-  if(!ok) return;
+  // En modo seguro S no son tus datos (no se han podido leer): exportarlo daría una copia vacía o vieja por buena.
+  if(safeMode){ toast("Modo seguro: no se puede exportar."); return; }
+  if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return;
   lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copia exportada"); render();
   if($('[aria-label="Ajustes"]')) openSettings(); else if($('[data-sheet="log"]')) openLog();
 }
@@ -1036,7 +1058,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 6;
+const SCHEMA = 7;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1077,6 +1099,22 @@ const MIGRATIONS = [
   // (con f.parteFecha y f.parteNota). La lista empieza vacía.
   c => {
     Object.values(c.figures||{}).forEach(f=>{ if(f && typeof f==="object" && !Array.isArray(f.partes)) f.partes=[]; });
+  },
+  // 6 → 7: preguntas para clase ({id, pos, baile, creada, resuelta?, figId?}). Cada posición donde te bloqueaste
+  // en los últimos 60 días pasa a ser una pregunta abierta (fecha: el último bloqueo). Si ya hay una abierta
+  // para esa posición no se crea otra: así repetir el paso no duplica.
+  c => {
+    const q = (c.preguntas && typeof c.preguntas==="object" && !Array.isArray(c.preguntas)) ? c.preguntas : {};
+    const desde = todayStr(-60), last = {};
+    Object.values(c.logs||{}).forEach(l=>{
+      if(!l || typeof l!=="object" || typeof l.bloqueo!=="string" || !l.bloqueo || typeof l.fecha!=="string" || l.fecha<desde) return;
+      if(!last[l.bloqueo] || l.fecha>last[l.bloqueo]) last[l.bloqueo]=l.fecha;
+    });
+    Object.entries(last).forEach(([pos, d])=>{
+      if(Object.values(q).some(x=>x && x.pos===pos && !x.resuelta)) return;
+      const id = uid(); q[id] = {id, pos, baile:"Bachata", creada:d};
+    });
+    c.preguntas = q;
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1095,15 +1133,16 @@ function applyData(c){
   S = { ...c, figures:c.figures||{}, logs:c.logs||{}, positions:arrOr(c.positions,DEFAULT_POS), holds:arrOr(c.holds,DEFAULT_HOLDS),
         classes:Array.isArray(c.classes)?[...c.classes]:[...DEFAULT_CLASSES], linkRep:(c.linkRep&&typeof c.linkRep==="object")?c.linkRep:{},
         actividad:(c.actividad&&typeof c.actividad==="object")?c.actividad:{},
+        preguntas:(c.preguntas&&typeof c.preguntas==="object"&&!Array.isArray(c.preguntas))?c.preguntas:{},
         schema: Number.isInteger(c.schema) ? c.schema : SCHEMA };
 }
 function lsGet(k){ try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; } catch { return null; } }
-function lsSet(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+function lsSet(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
 const LS_FALLBACK = "bachateca.v1";
 let idb = null;
 function idbOpen(){
   return new Promise((res,rej)=>{
-    if(!("indexedDB" in window)) return rej(new Error("sin IndexedDB"));
+    if(!window.indexedDB) return rej(new Error("sin IndexedDB"));
     const r=indexedDB.open("bachateca",1);
     r.onupgradeneeded=()=>{ const d=r.result; if(!d.objectStoreNames.contains("kv")) d.createObjectStore("kv"); if(!d.objectStoreNames.contains("videos")) d.createObjectStore("videos"); };
     r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error("bloqueado"));
@@ -1114,10 +1153,10 @@ function tx(store, m, fn){
 }
 const kvGet = k => tx("kv","readonly",s=>s.get(k));
 const kvSet = (k,v) => tx("kv","readwrite",s=>s.put(v,k));
-const vidPut = (id,b) => idb ? tx("videos","readwrite",s=>s.put(b,id)) : Promise.reject(new Error("sin almacenamiento"));
+const vidPut = (id,b) => safeMode ? Promise.reject(Object.assign(new Error("modo seguro"),{userMsg:"Modo seguro: no se pueden guardar vídeos."})) : idb ? tx("videos","readwrite",s=>s.put(b,id)) : Promise.reject(new Error("sin almacenamiento"));
 const vidGet = id => idb ? tx("videos","readonly",s=>s.get(id)) : Promise.resolve(undefined);
 const vidDel = id => idb ? tx("videos","readwrite",s=>s.delete(id)) : Promise.resolve();
-const vidCache = new Map();
+const vidCache = new Map(), vidKinds = new Map(); // vidKinds: «mem» o «blob» junto a cada URL de vidCache
 // Portadas: un fotograma grande (hasta 720 px) de cada vídeo, guardado junto a los vídeos con la clave «cover:<id del vídeo>».
 // No viajan en la copia (se rehacen solas a partir del vídeo) y no engordan los datos que se guardan en cada cambio.
 const COVER = id => "cover:" + id;
@@ -1141,8 +1180,8 @@ function hydrateCovers(root){
 }
 async function vidObjUrl(id){
   if(vidCache.has(id)) return vidCache.get(id);
-  if(lsGet(LS_VIDMODE)==="mem"){ const r=await vidMemUrl(id); return r.url||null; }
-  const b=await vidGet(id); if(!b) return null; const u=URL.createObjectURL(b); vidCache.set(id,u); return u;
+  if(lsGet(LS_VIDMODE)==="mem" || vidMemList().includes(id)){ const r=await vidMemUrl(id); return r.url||null; }
+  const b=await vidGet(id); if(!b) return null; const u=URL.createObjectURL(b); vidCache.set(id,u); vidKinds.set(id,"blob"); return u;
 }
 // Si un vídeo da error 4 («formato no admitido»), se prueba por pasos y se recuerda en este dispositivo el que funcione:
 //   «frag»: la dirección con «#t=» (para que Safari dibuje el primer fotograma de la figura sin pulsar play);
@@ -1150,6 +1189,10 @@ async function vidObjUrl(id){
 //   «mem»: una copia en memoria del archivo, con su tipo puesto según su contenido (Safari a veces no reproduce
 //          directamente lo que viene del almacén).
 const LS_VIDMODE = "bachateca.vidmode", VID_STEPS = ["frag","plain","mem"];
+// Ids de los vídeos que necesitaron la copia en memoria: solo ellos la usan (no todos los vídeos del dispositivo).
+const LS_VIDMEM = "bachateca.vidmem";
+const vidMemList = () => { const l = lsGet(LS_VIDMEM); return Array.isArray(l) ? l : []; };
+const vidMemAdd = id => lsSet(LS_VIDMEM, [...vidMemList().filter(x=>x!==id), id].slice(-200));
 const vidMode = () => VID_STEPS.includes(lsGet(LS_VIDMODE)) ? lsGet(LS_VIDMODE) : "frag";
 const withT = (u, s) => vidMode()==="frag" ? u + "#t=" + Math.max(0.05, s) : u;
 function sniffVideo(h){
@@ -1166,7 +1209,7 @@ async function vidMemUrl(id){
   let ab; try{ ab = await b.arrayBuffer(); }catch(e){ return {...d, err:`no se puede leer (${e && e.name || "error"})`}; }
   const sn = sniffVideo(new Uint8Array(ab, 0, Math.min(16, ab.byteLength)));
   const type = sn.type || b.type || "video/mp4";
-  const u = URL.createObjectURL(new Blob([ab], {type})); vidCache.set(id, u);
+  const u = URL.createObjectURL(new Blob([ab], {type})); vidCache.set(id, u); vidKinds.set(id, "mem");
   return {...d, url:u, type, marca:sn.marca, puede: document.createElement("video").canPlayType(type) || "no"};
 }
 function vidDiag(r, code){
@@ -1181,20 +1224,96 @@ new MutationObserver(ms=>{
     if(n.nodeType!==1) continue;
     // Si se sale de «Grabarme con conteo» por cualquier camino, la cámara y el micrófono se apagan.
     if(rc && !$("[data-recc]") && (n.matches("[data-recc]") || n.querySelector("[data-recc]"))) rcCleanup();
+    // Igual con el simulacro: sin su hoja no sigue sonando el conteo.
+    if(sim && !$("[data-sim]") && (n.matches("[data-sim]") || n.querySelector("[data-sim]"))) simStop();
     (n.tagName==="VIDEO" ? [n] : n.querySelectorAll("video")).forEach(v=>{ if(!v.isConnected && !v.dataset.aux) releaseVideo(v); });
   }
 }).observe(document.body, {childList:true, subtree:true});
 let saveT = null;
+// Modo seguro: si no se han podido leer los datos, no se escribe nada (guardar el estado vacío pisaría la biblioteca real).
+let safeMode = false, safeToasted = false;
 function persist(op){
-  if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); } vidDel(op.id).catch(()=>{});
+  if(safeMode){ if(!safeToasted){ safeToasted = true; toast("Modo seguro: los cambios no se guardan."); } return; }
+  if(op && op.t==="assetdel"){ const u=vidCache.get(op.id); if(u){ try{URL.revokeObjectURL(u);}catch{} vidCache.delete(op.id); vidKinds.delete(op.id); } vidDel(op.id).catch(()=>{});
     const cu=coverCache.get(op.id); if(cu){ try{URL.revokeObjectURL(cu);}catch{} coverCache.delete(op.id); } if(coverSet.delete(op.id)) vidDel(COVER(op.id)).catch(()=>{}); return; }
   clearTimeout(saveT); saveT=setTimeout(saveNow, 150);
   lsSet(BK_CH, (+lsGet(BK_CH)||0)+1);
 }
-async function saveNow(){
-  saveT=null; const snap=clone(S);
-  try{ if(idb) await kvSet("state", snap); else lsSet(LS_FALLBACK, snap); }
-  catch{ lsSet(LS_FALLBACK, snap); toast("No se pudo guardar en el dispositivo. Revisa el espacio libre."); }
+// Los guardados se encadenan: así dos llamadas seguidas (el retraso de 150 ms y un flush directo) nunca se solapan,
+// y cada uno copia S justo cuando le toca escribir, de modo que el último en escribir lleva siempre lo más reciente.
+let saveChain = Promise.resolve(), lastFigN = null;
+// true si al arrancar había otra copia en localStorage que no se pudo guardar aparte: entonces no se borra.
+let keepLs = false;
+function saveNow(){
+  saveT=null; if(safeMode) return Promise.resolve();
+  return saveChain = saveChain.then(doSave, doSave);
+}
+async function doSave(){
+  if(safeMode) return;
+  const n = Object.keys(S.figures||{}).length;
+  S.guardado=Date.now(); const snap=clone(S); let ok=false;
+  // Si de golpe quedan muchas menos figuras, la copia guardada anterior pasa a una instantánea en la MISMA transacción
+  // que escribe lo nuevo (iOS puede suspender la página entre pasos). Si esa transacción falla, se reintenta solo el guardado.
+  const encoge = idb && lastFigN!=null && n < lastFigN - 5 && n < lastFigN * 0.7;
+  try{
+    if(idb){
+      let hecho = false;
+      if(encoge){ try{ await kvSetWithSnap("antes-de-encoger", snap); hecho = true; pruneSnapshots().catch(()=>{}); }catch{} }
+      if(!hecho) await kvSet("state", snap);
+      ok=true; if(!keepLs) try{ localStorage.removeItem(LS_FALLBACK); }catch{}
+    } else ok=lsSet(LS_FALLBACK, snap);
+  }
+  catch{ ok=lsSet(LS_FALLBACK, snap); }
+  if(ok) lastFigN = n; else toast("No se ha podido guardar. Libera espacio en el iPhone y vuelve a intentarlo.");
+}
+// ---------- instantáneas ----------
+// Copias completas de los datos dentro del propio almacén («kv», clave «snap:<ms>:<motivo>»), para poder volver atrás.
+const SNAP = "snap:", SNAP_KEEP = {diaria: 7, otras: 5};
+const SNAP_RANGE = () => IDBKeyRange.bound(SNAP, SNAP + "\uffff");
+let lastSnapAt = 0;
+const snapKeys = async () => (await tx("kv","readonly",st=>st.getAllKeys(SNAP_RANGE()))) || [];
+const snapParse = k => { const m = /^snap:(\d+):(.*)$/.exec(k); return m ? {at:+m[1], reason:m[2]} : null; };
+async function pruneSnapshots(){
+  const all = (await snapKeys()).map(k=>({k, ...snapParse(k)})).filter(x=>x.reason!=null).sort((a,b)=>b.at-a.at);
+  const dia = all.filter(x=>x.reason==="diaria"), otras = all.filter(x=>x.reason!=="diaria");
+  for(const x of [...dia.slice(SNAP_KEEP.diaria), ...otras.slice(SNAP_KEEP.otras)]) await tx("kv","readwrite",st=>st.delete(x.k));
+}
+// Copia el «state» guardado a una instantánea y escribe el nuevo, todo en una sola transacción (o ninguna de las dos cosas).
+function kvSetWithSnap(reason, snap){
+  return new Promise((res,rej)=>{
+    const at = lastSnapAt = Math.max(Date.now(), lastSnapAt + 1);
+    const t = idb.transaction("kv","readwrite"), st = t.objectStore("kv"), g = st.get("state");
+    g.onsuccess = () => { const o = g.result;
+      // Si la instantánea no se puede ni pedir, se escribe lo nuevo igualmente (un fallo asíncrono aborta y se reintenta fuera).
+      if(o) try{ st.put({at, reason, nFig:Object.keys(o.figures||{}).length, nLog:Object.keys(o.logs||{}).length, schema:o.schema, state:o}, `${SNAP}${at}:${reason}`); }catch{}
+      st.put(snap, "state"); };
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error("cancelado"));
+  });
+}
+async function takeSnapshot(reason, state = S){
+  if(safeMode || !idb || !state) return null;
+  try{
+    // Marca única: dos instantáneas en el mismo milisegundo no deben pisarse.
+    const at = lastSnapAt = Math.max(Date.now(), lastSnapAt + 1);
+    const key = `${SNAP}${at}:${reason}`;
+    await kvSet(key, {at, reason, nFig:Object.keys(state.figures||{}).length, nLog:Object.keys(state.logs||{}).length, schema:state.schema, state:clone(state)});
+    await pruneSnapshots();
+    return key;
+  }catch{ return null; }
+}
+// Una «diaria» por día, solo con datos bien leídos; se decide mirando únicamente las claves.
+async function takeDaily(){
+  if(safeMode || !idb || !(lastFigN > 0)) return;
+  const hoy = todayStr();
+  if(!(await snapKeys()).some(k=>{ const x=snapParse(k); return x && x.reason==="diaria" && dayOf(x.at)===hoy; })) await takeSnapshot("diaria");
+}
+async function listSnapshots(){
+  if(!idb) return [];
+  try{
+    const ks = await snapKeys(), out = [];
+    for(const k of ks){ const v = await kvGet(k); if(v) out.push({key:k, at:v.at, reason:v.reason, nFig:v.nFig, nLog:v.nLog}); }
+    return out.sort((a,b)=>b.at-a.at);
+  }catch{ return []; }
 }
 window.addEventListener("pagehide", ()=>{ if(saveT){ clearTimeout(saveT); saveNow(); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && saveT){ clearTimeout(saveT); saveNow(); } });
@@ -1202,7 +1321,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.49";
+const APP_VERSION = "1.51";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1254,18 +1373,42 @@ window.addEventListener("pageshow", fixBottom);
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") setTimeout(fixBottom, 200); });
 if(window.visualViewport){ visualViewport.addEventListener("resize", fixBottomSoon); visualViewport.addEventListener("scroll", fixBottomSoon); }
 fixBottom();
+// Lee los datos con hasta 3 intentos (el arranque de iOS a veces falla una vez). ok:false = no se sabe qué hay guardado.
+async function readStored(){
+  const ls = lsGet(LS_FALLBACK);
+  if(!window.indexedDB) return {ok:true, idb:null, ls};
+  for(let i=0;i<3;i++){
+    if(i) await new Promise(r=>setTimeout(r,300));
+    let d=null;
+    try{ d = await idbOpen(); idb = d; const c = await kvGet("state"); return {ok:true, idb:c||null, ls}; }
+    catch{ if(d){ try{ d.close(); }catch{} } idb = null; }
+  }
+  return {ok:false, idb:null, ls};
+}
+// Idempotente: lo usan todos los caminos que reescriben una vista (render, búsqueda, repaso).
+function safeNote(v){ if(safeMode && v && !v.querySelector("#safe-note")) v.insertAdjacentHTML("afterbegin", safeHTML()); }
+function safeHTML(){
+  return `<div class="note" id="safe-note" role="alert">No se han podido leer tus datos. Para no estropearlos, la app no guardará nada hasta que se lean bien.
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="safe-retry">Volver a intentarlo</button></div></div>`;
+}
 async function initStore(){
-  try{ idb = await idbOpen(); }catch{ idb = null; }
-  let c=null; try{ if(idb) c = await kvGet("state"); }catch{}
-  if(!c) c = lsGet(LS_FALLBACK);
+  const r = await readStored();
+  if(!r.ok) safeMode = true;
+  // Si hay dos copias, gana la guardada más tarde (ausente = 0); si empatan, la de IndexedDB.
+  let c = r.idb && r.ls ? ((r.ls.guardado||0) > (r.idb.guardado||0) ? r.ls : r.idb) : (r.idb || r.ls);
+  // La que pierde en localStorage (p. ej. datos de 1.49, sin «guardado») pasa a una instantánea antes de que el
+  // primer guardado la borre; si no se puede, se deja donde está. Solo ocurre cuando hay dos copias.
+  if(r.idb && r.ls && c !== r.ls) keepLs = !(await takeSnapshot("copia-local", r.ls));
   if(c){
     const old = c.schema;
     c = migrate(c);
     applyData(c);
     if(old !== c.schema) saveNow();   // guarda ya la versión al día (no cuenta como cambio para la copia)
+    lastFigN = Object.keys(S.figures||{}).length;
   }
-  assetsApi = idb ? {delete:id=>vidDel(id)} : null;
+  assetsApi = idb && !safeMode ? {delete:id=>vidDel(id)} : null;
   loaded=true; render();
+  takeDaily().catch(()=>{});   // sin esperar: el arranque no depende del almacén de instantáneas
   try{ if(isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch{}
   await loadCoverKeys(); render();
   setTimeout(genMissingThumbs, 1200);
@@ -1273,8 +1416,36 @@ async function initStore(){
 }
 
 // ---------- mutaciones ----------
+// Preguntas para clase: «Desde Sombra, ¿qué figura sencilla puedo hacer?». Una por posición y baile mientras esté abierta.
+const qBaile = q => q.baile || "Bachata";
+const openQs = () => Object.values(S.preguntas||{}).filter(q=>q && !q.resuelta).sort((a,b)=>(a.creada||"").localeCompare(b.creada||""));
+function askFor(pos, fecha){
+  if(!pos) return;
+  if(openQs().some(q=>q.pos===pos && qBaile(q)===baileSel)) return;
+  const id = uid(); (S.preguntas ||= {})[id] = {id, pos, baile:baileSel, creada:fecha||todayStr()};
+  persist({t:"meta"});
+}
+function resolveQuestion(id, figId){
+  const q = S.preguntas && S.preguntas[id]; if(!q) return;
+  q.resuelta = todayStr(); if(figId) q.figId = figId; else delete q.figId;
+  persist({t:"meta"}); render();
+}
+// saveFigure apunta aquí la pregunta abierta a la que podría responder la figura que acaba de entrar en juego.
+// Quien enseña su propio aviso al guardar (la ficha, cambiar de estado) lo junta con la pregunta en uno solo
+// con qToast; si no, el aviso de la pregunta se pisaría al momento. Los demás lo ignoran.
+let qMatch = null;
+function qToast(msg){
+  const m = qMatch; qMatch = null;
+  if(!m || !S.preguntas?.[m.id] || S.preguntas[m.id].resuelta) return toast(msg);
+  toast(`${msg}. ¿Responde a tu pregunta desde ${m.pos}?`, {label:"Sí", fn:()=>{ resolveQuestion(m.id, m.fig); toast("Pregunta resuelta"); }});
+}
 function saveFigure(f){
   const prev = S.figures[f.id];
+  qMatch = null;
+  if(usable(f) && placed(f) && (!prev || !usable(prev))){
+    const q = openQs().find(q=>q.pos===f.entrada && qBaile(q)===baileOf(f));
+    if(q) qMatch = {id:q.id, pos:q.pos, fig:f.id};
+  }
   if(!prev) f.hist = f.hist || [{e:f.estado, d:todayStr()}];
   else if(prev.estado !== f.estado){
     const h = Array.isArray(f.hist) ? [...f.hist] : (Array.isArray(prev.hist) ? [...prev.hist] : [{e:prev.estado, d:dayOf(prev.creado)}]);
@@ -1330,7 +1501,7 @@ const holdName = h => holdSay(h)===h ? esc(h) : `<span aria-hidden="true">${esc(
 const holdTxt = h => h ? ` <span class="hold">(${holdName(h)})</span>` : "";
 // Ruta con una sola flecha: «Cerrada (Abrazo) → Sombra (Dos manos)». Sin el inicio cuando ya lo dice el contexto.
 const routeTxt = (f, from) => `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${holdName(f.agarreIn)} ` : "")}<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
-function pill(k){ return `<span class="pill st-${k}">${esc(EST[k]?.t||k)}</span>`; }
+function pill(k){ return `<span class="pill st-${esc(k)}">${esc(EST[k]?.t||k)}</span>`; }
 // Compás de 8 de una figura: qué tiempos de la frase ocupa y en cuál empieza.
 function compasTxt(f){
   const t=+f.tiempo||0, n=+f.tiempos||0;
@@ -1357,21 +1528,21 @@ function galCard(f, inGroup){
   else if(f.entrada && f.salida) sub = inGroup ? `<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}` : `${esc(f.entrada)} <span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}`;
   else if(f.estado==="incompleta") sub = esc(parteTxt(f));
   else sub = `<span class="warnc">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
-  return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${f.id}">${media}<span class="gshade" aria-hidden="true"></span>
-    <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"?`<span class="tagx t-red">Olvidada</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
-    <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${f.usos?`<span class="gusos">salió ${f.usos}×</span>`:""}</span>
+  return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${esc(f.id)}">${media}<span class="gshade" aria-hidden="true"></span>
+    <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"||ms==="atrasada"?`<span class="tagx ${MEM[ms][1]}">${MEM[ms][0]}</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
+    <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${+f.usos?`<span class="gusos">salió ${+f.usos}×</span>`:""}</span>
   </button>`;
 }
 function figCard(f, inGroup){
   // Siempre con miniatura: la del vídeo o, si no tiene, el compás de la figura sobre fondo azul.
   const th = f.thumb ? `<img class="thumb" src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="thumb thumb-ph" aria-hidden="true">${f.vid?"▶":compas(f)||ico("music")}</span>`;
-  const ms = memState(f), mtag = ms==="olvidada" ? `<span class="tagx t-red">Olvidada</span>` : "";
+  const ms = memState(f), mtag = ms==="olvidada"||ms==="atrasada" ? `<span class="tagx ${MEM[ms][1]}">${MEM[ms][0]}</span>` : "";
   let sub;
   if(!isMove(f)) sub = `${esc(TIPO[tipoOf(f)].t)}${f.entrada?` · en ${esc(f.entrada)}`:""}`;
   else if(f.entrada && f.salida) sub = routeTxt(f, !inGroup);
   else if(f.estado==="incompleta") sub = esc(parteTxt(f));
   else sub = `<span class="tag warn">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
-  return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-view="${f.id}">${th}${th?`<div class="card-body">`:""}
+  return `<button class="card${th?" has-thumb":""}${f.id===justSaved?" lit":""}" data-view="${esc(f.id)}">${th}${th?`<div class="card-body">`:""}
     <div class="fname">${esc(f.nombre)}</div>
     <div class="route"><span>${sub}</span></div>
     <div class="meta">${pill(f.estado)}${mtag}
@@ -1380,7 +1551,7 @@ function figCard(f, inGroup){
       ${compas(f)}
       ${f.baile && f.baile!=="Bachata" ? `<span class="tag">${esc(f.baile)}</span>`:""}
       ${f.profesor?`<span>${esc(f.profesor)}</span>`:""}
-      ${f.usos?`<span>salió ${f.usos}×</span>`:""}
+      ${+f.usos?`<span>salió ${+f.usos}×</span>`:""}
       ${f.vid?`<span class="tag">▶ vídeo</span>`:""}
       ${f.ejemplo?`<span class="tag">ejemplo</span>`:""}
     </div>${th?`</div>`:""}
@@ -1403,17 +1574,19 @@ let trainMins = [5,10,20].includes(+lsGet(LS_MINS)) ? +lsGet(LS_MINS) : 10;
 let training = null;
 const TRAIN = {5:{f:2,l:1,chain:false}, 10:{f:3,l:2,chain:true}, 20:{f:5,l:3,chain:true}};
 // Estado de memoria de una figura, a partir de su repaso:
-// olvidada = la última vez no la recordaste o lleva más de 3 días pendiente; dominada = intervalo de 14 días o más.
+// olvidada = la última vez no la recordaste; atrasada = lleva más de 3 días pendiente (no es lo mismo que olvidarla);
+// dominada = intervalo de 14 días o más.
 function memState(f){
   if(!active(f)) return null;
   const r=f.rep||{};
   if(!r.last) return "nueva";
-  if(((r.step||0)===0 && (r.fallos||0)>0) || (r.due && r.due < todayStr(-3))) return "olvidada";
+  if((r.step||0)===0 && (r.fallos||0)>0) return "olvidada";
+  if(r.due && r.due < todayStr(-3)) return "atrasada";
   if((r.step||0) >= 3) return "dominada";
   return "inestable";
 }
-const MEM = {nueva:["Nueva","t-grey"], olvidada:["Olvidada","t-red"], inestable:["Inestable","t-blue"], dominada:["Dominada","t-lime"]};
-const MEM_ORDER = {olvidada:0, inestable:1, nueva:2, dominada:3};
+const MEM = {nueva:["Nueva","t-grey"], olvidada:["Olvidada","t-red"], atrasada:["Atrasada","t-amber"], inestable:["Inestable","t-blue"], dominada:["Dominada","t-lime"]};
+const MEM_ORDER = {olvidada:0, atrasada:1, inestable:2, nueva:3, dominada:4};
 const byMem = (a,b) => (MEM_ORDER[memState(a)]??9) - (MEM_ORDER[memState(b)]??9);
 function lastLog(){ return Object.values(S.logs).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"") || (b.creado||0)-(a.creado||0))[0]; }
 function trainPlan(m){
@@ -1475,7 +1648,7 @@ function renderInicio(){
       <div class="row"><button class="btn pri" data-act="quick">Captura rápida</button><button class="btn ghost" data-act="examples">Ver con ejemplos</button></div></div>`;
     return;
   }
-  const act=all.filter(active), st={nueva:0, olvidada:0, inestable:0, dominada:0};
+  const act=all.filter(active), st={nueva:0, olvidada:0, atrasada:0, inestable:0, dominada:0};
   act.forEach(f=>{ st[memState(f)]++; });
   const rec = act.length ? Math.round((act.length-st.olvidada)/act.length*100) : 0;
   const plan = trainPlan(trainMins), fStep=plan.steps.find(x=>x.kind==="fig"), lStep=plan.steps.find(x=>x.kind==="link"), cStep=plan.steps.find(x=>x.kind==="chain");
@@ -1505,6 +1678,13 @@ function renderInicio(){
   const days=[...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); const k=d.toISOString().slice(0,10); return {k, n:(S.actividad||{})[k]||0, l:"LMXJVSD"[i], today:k===todayStr()}; });
   const maxN=Math.max(4, ...days.map(d=>d.n)), stk=streak(), weekN=days.filter(d=>d.n).length;
   const lgFigs = lg ? (lg.figs||[]).filter(id=>S.figures[id]).length : 0;
+  // Preguntas abiertas de todos los bailes; el baile solo se nombra si hay más de uno.
+  const qs = openQs(), qMulti = new Set([...bailes(), ...qs.map(qBaile)]).size > 1;
+  const qsHTML = qs.length ? `<section class="panel" aria-labelledby="in-q">
+      <div class="in-h"><h2 id="in-q">Para tu próxima clase</h2></div>
+      ${qs.map(q=>`<div class="q-row"><p>${qMulti?`<span class="muted">${esc(qBaile(q))} · </span>`:""}Desde ${esc(q.pos)}, ¿qué figura sencilla puedo hacer?</p>
+        <div class="row"><button class="btn sm" data-act="q-done" data-id="${esc(q.id)}" aria-label="Ya tengo salida desde ${esc(q.pos)}">Ya tengo salida</button><button class="btn ghost sm" data-act="q-del" data-id="${esc(q.id)}" aria-label="Quitar la pregunta desde ${esc(q.pos)}">Quitar</button></div></div>`).join("")}
+    </section>` : "";
   v.innerHTML = `
     ${staleHTML()}${nudgeHTML()}${installHTML()}
     <p class="in-date"><span>${esc(new Date().toLocaleDateString("es-ES",{weekday:"long", day:"numeric", month:"long"}))}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar">${pl(dueN,"repaso pendiente","repasos pendientes")}</button>`:""}</p>
@@ -1522,14 +1702,15 @@ function renderInicio(){
       <div class="ring">${ringSVG(rec/100, 92, 10)}<b>${rec}%</b></div>
       <div class="in-mem-t"><span class="muted small" id="in-mem">Figuras que recuerdas</span>
         <b class="in-big">${act.length-st.olvidada} <span>de ${act.length}</span></b>
-        <span class="tags">${st.dominada?`<span class="tagx t-lime">${st.dominada} ${st.dominada===1?"dominada":"dominadas"}</span>`:""}${st.inestable+st.nueva?`<span class="tagx t-blue">${st.inestable+st.nueva} en marcha</span>`:""}${st.olvidada?`<span class="tagx t-red">${st.olvidada} ${st.olvidada===1?"olvidada":"olvidadas"}</span>`:""}</span>
+        <span class="tags">${st.dominada?`<span class="tagx t-lime">${st.dominada} ${st.dominada===1?"dominada":"dominadas"}</span>`:""}${st.inestable+st.nueva?`<span class="tagx t-blue">${st.inestable+st.nueva} en marcha</span>`:""}${st.atrasada?`<span class="tagx t-amber">${st.atrasada} ${st.atrasada===1?"atrasada":"atrasadas"}</span>`:""}${st.olvidada?`<span class="tagx t-red">${st.olvidada} ${st.olvidada===1?"olvidada":"olvidadas"}</span>`:""}</span>
       </div>
     </section>` : ""}
     ${carr.length ? `<section aria-labelledby="in-due" class="in-sec">
       <div class="in-h"><h2 id="in-due">Repasar hoy <span class="muted">${dF.length}</span></h2><button class="lnk" data-tab="repasar">Ver todo</button></div>
-      <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${f.id}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
+      <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${esc(f.id)}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
     </section>` : ""}
     ${next ? `<section class="in-next" aria-labelledby="in-next"><span class="eyebrow">${ico("spark")}Tu siguiente paso</span>${next}</section>` : ""}
+    ${qsHTML}
     <div class="in-two">
       <section class="panel" aria-label="Racha"><span class="muted small">Racha</span><b class="in-big">${stk ? (stk===1?"1 día":`${stk} días`) : "—"}</b><span class="muted small">${weekN} ${weekN===1?"día":"días"} esta semana</span></section>
       <section class="panel" aria-label="Seguras en el social"><span class="muted small">Seguras en el social</span><b class="in-big lime">${readyN}</b><span class="muted small">disponibles o consolidadas</span></section>
@@ -1548,7 +1729,7 @@ function renderInicio(){
   const hv = v.querySelector("video[data-hvid]");
   if(hv){
     const at = u => withT(u, Math.max(0.1, +hv.dataset.s||0));
-    hv.addEventListener("error", ()=>{ if(hv.dataset.retry || !hv.isConnected || !hv.getAttribute("src")) return; hv.dataset.retry="1"; vidMemUrl(hv.dataset.hvid).then(r=>{ if(r.url && hv.isConnected) hv.src = r.url; }).catch(()=>{}); });
+    hv.addEventListener("error", ()=>{ if(hv.dataset.retry || !hv.isConnected || !hv.getAttribute("src")) return; hv.dataset.retry="1"; vidMemUrl(hv.dataset.hvid).then(r=>{ if(r.url && hv.isConnected){ hv.addEventListener("loadeddata", ()=>vidMemAdd(hv.dataset.hvid), {once:true}); hv.src = r.url; } }).catch(()=>{}); });
     vidObjUrl(hv.dataset.hvid).then(u=>{ if(u && hv.isConnected) hv.src = at(u); }).catch(()=>{});
   }
 }
@@ -1604,7 +1785,7 @@ function renderRepertorio(){
   const fb=$("#f-baile"); if(fb) fb.onchange=e=>{filt.baile=e.target.value; render();};
 
 }
-function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
+function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); safeNote($("#v-repertorio")); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
 
 // ---------- vista: repasar ----------
 function renderRepasar(){
@@ -1615,6 +1796,7 @@ function renderRepasar(){
     const anyActive = figs().some(active), anyLinks = linkPositions().length>0;
     const next = figs().filter(f=>active(f) && !isDue(f)).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||""))[0];
     v.innerHTML = `
+      ${baileChipsHTML()}
       <div class="panel">
         <h3>Enlaces</h3>
         ${firstHelp("rev", "Ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Es justo lo que se bloquea en el social.")}
@@ -1629,6 +1811,11 @@ function renderRepasar(){
           : anyActive ? `<p class="small muted">Nada pendiente hoy.${next?` Próxima: <b>${esc(next.nombre)}</b>, ${fmtDate(next.rep.due)}.`:""}</p><button class="btn" data-act="start-fig-any">Repasar 3 al azar</button>`
           : figs().length ? `<p class="small muted">Las figuras en lista de espera no entran en el repaso. Cámbialas a «En práctica» cuando quieras trabajarlas.</p>`
           : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
+      </div>
+      <div class="panel">
+        <h3>Simulacro de social</h3>
+        <p class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</p>
+        <button class="btn" data-act="sim-open">Simulacro</button>
       </div>
       ${progressHTML()}
       <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
@@ -1656,7 +1843,7 @@ function renderRepasar(){
       <div class="panel"><p>${link?pl(d.length,"posición repasada","posiciones repasadas"):pl(d.length,"figura repasada","figuras repasadas")}: ${joinY(res)}.</p>
       <ul class="rv-list">${items.map((x,n)=>`<li class="rv-${x.g}" style="--n:${n}"><i aria-hidden="true"></i><span class="t"><b>${esc(x.name)}</b><span>${GR[x.g]}${x.due?` · ${when(x.due)}`:""}</span></span></li>`).join("")}</ul>
       ${session.promote.length?`<p class="muted small">${session.promote.length===1?"Lleva varios repasos fluidos y sigue «En práctica». Si ya te sale en el social, márcala como disponible.":"Llevan varios repasos fluidos y siguen «En práctica». Si ya te salen en el social, márcalas como disponibles."}</p>
-      <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${i}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
+      <div class="row">${session.promote.map(i=>`<button class="btn sm" data-promote="${esc(i)}" data-to="disponible">Pasar «${esc(S.figures[i]?.nombre)}» a disponible</button>`).join("")}</div>`:""}
       ${session.weak.length?`<p class="muted small">${session.weak.length===1?"Solo tienes una salida desde":"Solo tienes una salida desde cada una de estas:"} ${joinY(session.weak.map(esc))}. Pregunta en clase otra figura sencilla desde ahí.</p>`:""}
       ${next?`<p class="small muted">${next}</p>`:""}
       ${training && training.i < training.steps.length-1 ? `<button class="btn pri" data-act="train-next">Seguir el entreno: ${esc(trainLabel(training.steps[training.i+1]))}</button><button class="btn" data-act="end">Terminar aquí</button>` :
@@ -1688,7 +1875,7 @@ function renderRepasar(){
     return;
   }
   const f = S.figures[session.ids[session.i]];
-  if(!f){ session.i++; return renderRepasar(); }
+  if(!f){ session.i++; renderRepasar(); return safeNote($("#v-repasar")); }
   const ms = memState(f);
   v.innerHTML = `${head}
     <div class="flash${f.thumb?" has-bg":""}">${f.thumb?`<span class="flash-bgw" aria-hidden="true"><img src="${esc(f.thumb)}" alt=""></span>`:""}
@@ -1777,9 +1964,9 @@ function renderEnlazar(){
   const exits = sel ? exitsFrom(sel.p, linkHold) : [];
   const incN = figs().filter(f=>active(f)&&incomplete(f)).length + figs().filter(f=>!active(f)&&incomplete(f)).length;
   const tabs2 = `<div class="seg2" role="group" aria-label="Vista"><button data-lview="aqui" aria-pressed="${linkView==="aqui"}">Desde aquí</button><button data-lview="mapa" aria-pressed="${linkView==="mapa"}">Mapa</button></div>`;
-  if(linkView==="mapa"){ v.innerHTML = `${tabs2}${mapHTML(cov, gaps, incN)}`; return; }
+  if(linkView==="mapa"){ v.innerHTML = `${baileChipsHTML()}${tabs2}${mapHTML(cov, gaps, incN)}`; return; }
   v.innerHTML = `
-    ${tabs2}
+    ${baileChipsHTML()}${tabs2}
     <div class="chips" role="group" aria-label="Posición">
       ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}${c.into.length&&c.ready.length<2?", menos de 2 seguras":""}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
     </div>
@@ -1791,12 +1978,16 @@ function renderEnlazar(){
           ${holdsHere.map(h=>`<button class="chip sm" data-hold="${esc(h)}" aria-pressed="${linkHold===h}"${holdSay(h)!==h?` aria-label="${esc(holdSay(h))}"`:""}>${esc(h)}</button>`).join("")}
         </div></div>`:""}
         <h3>Salen de ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""}</h3>
-        ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-view="${f.id}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${routeTxt(f)}</span>${compas(f)}</div></button>`).join("")}</div>`
+        ${exits.length ? `<div class="list">${exits.map(f=>`<button class="card" data-view="${esc(f.id)}"><div class="fname">${esc(f.nombre)}</div><div class="meta">${pill(f.estado)}<span>${routeTxt(f)}</span>${compas(f)}</div></button>`).join("")}</div>`
           : `<p class="muted">Aún no tienes figuras que empiecen en ${esc(sel.p)}${linkHold?` con ${esc(linkHold)}`:""} (sin contar la lista de espera). Pregunta en clase: «Desde ${esc(sel.p)}, ¿qué figura sencilla puedo hacer?»</p>`}
         ${sel.into.length ? `<p class="small muted">Llegas aquí desde: ${sel.into.map(f=>esc(f.nombre)+(f.agarreOut?` (${esc(f.agarreOut)})`:"")).join(", ")}.</p>`:""}
         ${sel.out.length ? `<div class="practice">
           <h3>Practicar enlaces</h3>
           ${firstHelp("chain", "Hasta 4 figuras que encajan por posición y agarre, para bailarlas seguidas con una canción.")}
+          <div class="chips">
+            <button class="chip sm" data-chainopt="safe" aria-pressed="${chainSafe}">Solo seguras</button>
+            <button class="chip sm" data-chainopt="strict" aria-pressed="${chainStrict}">Agarres exactos</button>
+          </div>
           <button class="btn" data-act="chain">${chain?"Otra cadena":`Generar cadena desde ${esc(sel.p)}`}</button>
           ${chain ? renderChain() : ""}
         </div>` : ""}
@@ -1818,21 +2009,33 @@ function mapHTML(cov, gaps, incN){
       <button class="btn" data-act="coach">✦ Preguntar a Claude qué trabajar</button>${firstHelp("coach", "Se abre la hoja de compartir con tus datos de salidas y bloqueos: elige la app de Claude.")}<div class="coach" id="coach-out" ${coachText?"":"hidden"}>${esc(coachText)}</div>
     </div>`;
 }
-function makeChain(start){
-  const pool = figs().filter(f=>usable(f)&&placed(f));
+const holdFits = (a,b,strict) => strict ? (!!a && !!b && a===b) : holdOk(a,b);
+// Pura: recibe la reserva ya filtrada (usables, con posiciones, del baile y, si toca, solo seguras) y no toca S ni el DOM.
+function buildChain(pool, {start, hold="", strict=false, n=4}, rnd=Math.random){
   const steps=[]; const used=new Set(); let prev=null;
-  let pos = start || (pool[Math.floor(Math.random()*pool.length)]||{}).entrada;
-  for(let i=0;i<4;i++){
-    const opts = pool.filter(f=>!used.has(f.id) && (prev ? canFollow(prev,f) : f.entrada===pos));
+  let pos = start || (pool[Math.floor(rnd()*pool.length)]||{}).entrada;
+  const fits = f => prev ? (f.entrada===prev.salida && holdFits(prev.agarreOut, f.agarreIn, strict) && baileOf(f)===baileOf(prev))
+                         : (f.entrada===pos && holdFits(hold, f.agarreIn, strict));
+  for(let i=0;i<n;i++){
+    const opts = pool.filter(f=>!used.has(f.id) && fits(f));
     if(!opts.length){
       // ¿No hay salida o ya están todas en la cadena? Cambia el consejo.
-      const usedUp = pool.some(f=> used.has(f.id) && (prev ? canFollow(prev,f) : f.entrada===pos));
+      const usedUp = pool.some(f=> used.has(f.id) && fits(f));
       steps.push({dead: prev?prev.salida:pos, hold: prev?prev.agarreOut:"", usedUp}); break;
     }
-    const f = opts[Math.floor(Math.random()*opts.length)];
-    used.add(f.id); steps.push({f}); prev=f;
+    const f = opts[Math.floor(rnd()*opts.length)];
+    // vago: el enlace se apoyó en un agarre sin indicar. En el primer paso solo cuenta si elegiste agarre («Cualquiera» no avisa).
+    const vago = prev ? (!prev.agarreOut || !f.agarreIn) : (!!hold && !f.agarreIn);
+    used.add(f.id); steps.push({f, vago}); prev=f;
   }
   return {steps};
+}
+const LS_CHAIN = "bachateca.cadena";
+const chainLS = lsGet(LS_CHAIN), chainV = chainLS && typeof chainLS==="object" ? chainLS : {};
+let chainSafe = chainV.safe === true, chainStrict = chainV.strict === true;
+function makeChain(start){
+  const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&(!chainSafe||ready(f)));
+  return buildChain(pool, {start, hold: linkHold, strict: chainStrict});
 }
 function renderChain(){
   if(!chain.steps.length) return `<p class="muted small">Aún no hay figuras para encadenar.</p>`;
@@ -1847,18 +2050,18 @@ function renderChain(){
     ? `<div class="step"><span class="k">↺</span><div><b>Básico</b><div class="small muted">${s.usedUp
         ? `Las salidas desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} ya están en la cadena. Vuelve al básico y empieza otra vuelta.`
         : `Desde ${esc(s.dead)}${s.hold?` (${esc(s.hold)})`:""} aún no tienes salidas. Vuelve al básico: también es una transición.`}</div></div></div>`
-    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
+    : `<div class="step"><span class="k">${++n}</span><div><b>${esc(s.f.nombre)}</b><div class="small muted">${esc(s.f.entrada)}${s.f.agarreIn?` (${esc(s.f.agarreIn)})`:""} → ${esc(s.f.salida)}${s.f.agarreOut?` (${esc(s.f.agarreOut)})`:""}${s.f.senal?` · ${esc(s.f.senal)}`:""}${ready(s.f)?"":" · en práctica"}${s.vago?" · agarre sin indicar":""}</div>${compas(s.f)}</div></div>`).join("")}</div>`;
 }
 
 // ---------- vista: social ----------
-function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && socOk(f)).sort(socSort); }
+function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && baileOf(f)===baileSel && socOk(f)).sort(socSort); }
 // Lo que ya marcaste esta noche se ve siempre, aunque esté en práctica o quede fuera de las primeras.
 const socOk = f => ready(f) || socialIncl || logSel.has(f.id);
 const socTop = (list, n) => [...list.slice(0,n), ...list.slice(n).filter(f=>logSel.has(f.id))];
 const socSort = (a,b) => (ready(b)-ready(a)) || ((b.estado==="consolidada")-(a.estado==="consolidada")) || ((b.usos||0)-(a.usos||0));
 const CHECK = `<span class="ck" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" pathLength="1"/></svg></span>`;
 function socLi(f, sub){
-  return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${f.id}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}<span class="sr">, salió esta noche</span></span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
+  return `<li><button type="button" class="sf${ready(f)?"":" dim"}${f.id===lastSal?" pop":""}" data-sal="${esc(f.id)}" aria-pressed="${logSel.has(f.id)}"><span class="t"><span class="n">${esc(f.nombre)}<span class="sr">, salió esta noche</span></span><span class="to">${sub}</span></span>${CHECK}</button></li>`;
 }
 function renderSocial(){
   const v=$("#v-social");
@@ -1869,6 +2072,7 @@ function renderSocial(){
   const pend = [nSel?`${nSel} ${nSel===1?"marcada":"marcadas"}`:"", logBloq?`bloqueo en ${esc(logBloq)}`:""].filter(Boolean).join(" · ");
   v.innerHTML = `
     ${staleHTML()}
+    ${baileChipsHTML()}
     ${Object.keys(S.logs).length?"":`<p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>`}
     <div>
       ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${socTop(fw,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
@@ -1877,6 +2081,7 @@ function renderSocial(){
     </div>
     <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> Incluir las que están en práctica</label>
     <button class="btn pri block-btn" data-act="block">Me he bloqueado</button>
+    <button class="btn wide" data-act="sim-open">Simulacro</button>
     <button class="btn wide" data-act="log-open">Registrar el social${pend?` · ${pend}`:(last?` · último ${fmtDate(last.fecha)}`:"")}</button>
     ${socialLive()?`<button class="btn ghost wide" data-act="night-off">Terminar el social</button>`:""}`;
   $("#soc-incl").onchange=e=>{socialIncl=e.target.checked; render();};
@@ -1911,7 +2116,7 @@ function bkTap(){
 }
 function bkExit(f, on){
   const nx = nextOf(f), tag = on ? "div" : "button";
-  return `<li><${tag}${on?"":` type="button" data-bexit="${f.id}"`} class="bk-exit${ready(f)?"":" dim"}${on?" on":""}">
+  return `<li><${tag}${on?"":` type="button" data-bexit="${esc(f.id)}"`} class="bk-exit${ready(f)?"":" dim"}${on?" on":""}">
     <span class="nm">${esc(f.nombre)}</span>
     <span class="r">${routeTxt(f)}${ready(f)?"":" · en práctica"}</span>
     ${f.senal?`<span class="sg">${esc(f.senal)}</span>`:""}
@@ -1944,7 +2149,7 @@ function showBlock(focus){
   let ov = $("#overlay-root .overlay");
   if(!ov){
     if(bkT0 && performance.now()-bkT0 > 3e5) bkT0 = 0;   // otra canción: el compás vuelve a quedarse quieto
-    const fw = figs().filter(f=>usable(f) && !isMove(f));
+    const fw = figs().filter(f=>usable(f) && !isMove(f) && baileOf(f)===baileSel);
     // Una sola orden arriba; el pulso, debajo y opcional; la primera decisión es «¿Dónde estás?».
     $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
       <div class="bk-head"><h2 id="bk-t" tabindex="-1">Básico o footwork hasta el 1</h2>
@@ -2004,10 +2209,10 @@ function openLog(fresh){
     ${done?`<p class="small muted tn-date">${fmtDate(done.fecha)}</p>`:""}
     ${done ? tonightHTML(done) : ""}
     ${sug.length?`<div class="panel"><h3>Según tus socials</h3>
-      ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${S.figures[s.id].usos}×</span></span><button class="btn sm" data-promote="${s.id}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
+      ${sug.map(s=>`<div class="row" style="justify-content:space-between"><span>${esc(S.figures[s.id].nombre)} <span class="muted small">· salió ${+S.figures[s.id].usos||0}×</span></span><button class="btn sm" data-promote="${esc(s.id)}" data-to="${s.to}">Pasar a ${EST[s.to].t.toLowerCase()}</button></div>`).join("")}</div>`:""}
     ${done ? "" : `<div class="panel">
       <div class="f"><span>Figuras que te salieron</span>
-        ${cand.length?`${logAll && cand.length>8?`<input type="search" id="lg-q" placeholder="Buscar figura" aria-label="Buscar figura">`:""}<div class="chips" id="lg-chips">${shown.map(f=>`<button type="button" class="chip sm" data-logfig="${f.id}" data-q="${esc(fold(f.nombre))}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>${shown.length<cand.length?`<button type="button" class="btn ghost sm" data-act="log-all">Ver todas (${cand.length})</button>`:""}`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
+        ${cand.length?`${logAll && cand.length>8?`<input type="search" id="lg-q" placeholder="Buscar figura" aria-label="Buscar figura">`:""}<div class="chips" id="lg-chips">${shown.map(f=>`<button type="button" class="chip sm" data-logfig="${esc(f.id)}" data-q="${esc(fold(f.nombre))}" aria-pressed="${logSel.has(f.id)}">${esc(f.nombre)}</button>`).join("")}</div>${shown.length<cand.length?`<button type="button" class="btn ghost sm" data-act="log-all">Ver todas (${cand.length})</button>`:""}`:`<p class="small muted">Cuando tengas figuras en práctica o disponibles aparecerán aquí para marcarlas.</p>`}
       </div>
       <label class="f" for="lg-salio">Otra cosa que salió (opcional)<input type="text" id="lg-salio" placeholder="Ej.: un giro que improvisé"></label>
       <label class="f" for="lg-bloq">Me bloqueé en
@@ -2017,12 +2222,12 @@ function openLog(fresh){
       <label class="f" for="lg-prox">Para practicar la próxima vez<input type="text" id="lg-prox" placeholder="Una sola cosa"></label>
       <button class="btn pri" data-act="log-save">Guardar registro</button>
     </div>`}
-    ${!done && blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">La posición que más se repite es tu pregunta para la próxima clase.</p></div>`:""}
+    ${!done && blockList.length?`<div class="panel"><h3>Dónde te bloqueas</h3><p>${blockList.map(([p,n])=>`<b>${esc(p)}</b> ×${n}`).join(" · ")}</p><p class="small muted">${openQs().some(q=>q.pos===blockList[0][0] && qBaile(q)===baileSel) ? "Ya la tienes apuntada en Inicio, en «Para tu próxima clase»." : "La posición que más se repite es tu pregunta para la próxima clase."}</p></div>`:""}
     ${!done && logs.length?`<div class="list">${logs.slice(0,15).map(l=>{
       const names=(l.figs||[]).map(id=>S.figures[id]?.nombre).filter(Boolean);
       return `<div class="log"><span class="d">${fmtDate(l.fecha)}</span>
       <div>${names.length?`<div>✓ ${names.map(esc).join(", ")}</div>`:""}${l.salio?`<div>✓ ${esc(l.salio)}</div>`:""}${l.bloqueo?`<div class="muted">Bloqueo en <b style="color:var(--fg)">${esc(l.bloqueo)}</b></div>`:""}${l.proximo?`<div class="muted">→ ${esc(l.proximo)}</div>`:""}</div>
-      <button class="btn ghost sm danger" data-dellog="${l.id}" aria-label="Borrar el registro del ${fmtDate(l.fecha)}">Borrar</button></div>`;}).join("")}</div>`:""}
+      <button class="btn ghost sm danger" data-dellog="${esc(l.id)}" aria-label="Borrar el registro del ${fmtDate(l.fecha)}">Borrar</button></div>`;}).join("")}</div>`:""}
   </div></div>`;
   if(!done){
     if(keep) LG.forEach((k,i)=>{ if(keep[i]) $("#"+k).value=keep[i]; });
@@ -2036,14 +2241,23 @@ function openLog(fresh){
 function saveLog(){
   const l={id:uid(), fecha:salD || socDay(), creado:Date.now(), figs:[...logSel].filter(id=>S.figures[id]), salio:$("#lg-salio").value.trim(), bloqueo:$("#lg-bloq").value, proximo:$("#lg-prox").value.trim()};
   if(!l.figs.length && !l.salio && !l.bloqueo && !l.proximo){ toast("Marca una figura o rellena algún campo."); return; }
-  logSuggest = [];
+  logSuggest = []; let counted = false;
   l.figs.forEach(id=>{
     const f=S.figures[id]; if(!f) return;
-    f.usos=(f.usos||0)+1; f.ultimoUso=l.fecha; persist({t:"fig",id});
+    f.usos=(+f.usos||0)+1; f.ultimoUso=l.fecha; persist({t:"fig",id});
+    // Bailarla en un social es un repaso «Fluida», una vez al día por figura. Las incompletas no entran en los repasos.
+    // No cuenta si ya se repasó ese día o después (un social atrasado no mueve `last` hacia atrás ni suma encima).
+    if(usable(f) && !(f.rep && f.rep.last && f.rep.last >= l.fecha)){
+      (l.repAntes ||= {})[id] = clone(f.rep || null);
+      f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; counted = true;
+      (l.repDespues ||= {})[id] = clone(f.rep);
+    }
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
     else if(f.estado==="disponible" && f.usos>=PROMOTE_CONS) logSuggest.push({id, to:"consolidada"});
   });
+  if(counted){ S.actividad ||= {}; S.actividad[l.fecha] = (+S.actividad[l.fecha]||0) + 1; persist({t:"act"}); }
   S.logs[l.id]=l; persist({t:"log",id:l.id});
+  if(l.bloqueo) askFor(l.bloqueo, l.fecha);
   logSel = new Set(); logBloq = ""; saveSel(); setNight(false);
   if(backupInfo().stale) lsSet(LS_NUDGE, 1);
   render(); logAll=false; logDone=l.id; tonightFresh=true; openLog(); tonightFresh=false;
@@ -2053,10 +2267,18 @@ function deleteLog(id){
   const l=S.logs[id]; if(!l) return;
   const copy=clone(l);
   (l.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f && f.usos){ f.usos--; persist({t:"fig",id:fid}); } });
+  // Quita el repaso que dio el social solo si la figura sigue exactamente como la dejó el registro (repDespues);
+  // si se repasó después (en Repasar, otro social…), su repaso ya no es de este registro y se respeta.
+  const same = (a,b) => JSON.stringify(a||null)===JSON.stringify(b||null);
+  const quitados = {};
+  Object.entries(l.repAntes||{}).forEach(([fid,antes])=>{ const f=S.figures[fid];
+    if(f && f.rep && same(f.rep, (l.repDespues||{})[fid])){ quitados[fid]={rep:clone(f.rep), antes}; if(antes) f.rep=clone(antes); else delete f.rep; persist({t:"fig",id:fid}); } });
   delete S.logs[id]; persist({t:"logdel",id}); if(logDone===id) logDone=null; render(); openLog();
   toast("Registro borrado", {label:"Deshacer", fn:()=>{
     S.logs[id]=copy; persist({t:"log",id});
-    (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(f.usos||0)+1; persist({t:"fig",id:fid}); } });
+    (copy.figs||[]).forEach(fid=>{ const f=S.figures[fid]; if(f){ f.usos=(+f.usos||0)+1; persist({t:"fig",id:fid}); } });
+    // Vuelve a poner los repasos que quitó el borrado, solo si la figura sigue como la dejó el borrado.
+    Object.entries(quitados).forEach(([fid,q])=>{ const f=S.figures[fid]; if(f && same(f.rep, q.antes)){ f.rep=q.rep; persist({t:"fig",id:fid}); } });
     render(); if($('[data-sheet="log"]')) openLog();
   }});
 }
@@ -2077,26 +2299,26 @@ function openView(id){
   const CHEV = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
   // Puntos clave: la señal, una línea por idea (se separa por punto, punto y coma o salto de línea).
   const keys = String(f.senal||"").split(/\s*(?:[;\n]|\.(?:\s|$))\s*/).map(x=>x.trim()).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1));
-  const ms = memState(f), r = f.rep || {}, step = Math.min(r.step||0, LADDER.length-1);
+  const ms = memState(f), r = f.rep || {}, step = Math.max(0, Math.min(Math.floor(+r.step)||0, LADDER.length-1));
   const when = d => !d ? "" : d<=todayStr() ? "hoy" : d===todayStr(1) ? "mañana" : fmtDate(d);
   const mem = active(f) ? `<section class="fv-card fv-mem" aria-labelledby="fv-mem">
       <div class="ring sm">${ringSVG((step+1)/LADDER.length, 70, 8)}<b>${LADDER[step]} d</b></div>
       <div class="fv-mem-t"><div class="in-h"><h3 id="fv-mem">Memoria</h3><span class="tagx ${(MEM[ms]||MEM.nueva)[1]}">${(MEM[ms]||MEM.nueva)[0]}</span></div>
-        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${r.aciertos||r.fallos ? ` · ${pl(r.aciertos||0,"acierto","aciertos")}, ${pl(r.fallos||0,"fallo","fallos")}` : ""}${f.usos?` · salió ${f.usos}× en el social`:""}</p></div>
+        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p></div>
     </section>` : "";
-  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${f.id}">
-    <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${f.id}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewfig="${esc(f.id)}">
+    <div class="sheet-head"><span class="fv-spacer"></span><button type="button" class="btn ghost sm" data-edit="${esc(f.id)}">Editar</button><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${f.vid ? `<div class="fv-media">${playerHTML(f)}</div>` : f.thumb ? `<div class="fv-media"><img class="fv-img" src="${esc(f.thumb)}" alt=""></div>` : ""}
     <div class="fv-title">
       <h2 id="sheet-t" tabindex="-1">${esc(f.nombre)}</h2>
       ${isMove(f) && placed(f) ? `<p class="route-big">${routeTxt(f, true)}</p>` : (!isMove(f) && f.entrada ? `<p class="route-big">En ${esc(f.entrada)}</p>` : "")}
       <div class="tags">${tags}</div>
     </div>
-    ${isMove(f) && !placed(f) && f.estado!=="incompleta" ? `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${f.id}">Completar</button></div>` : ""}
+    ${isMove(f) && !placed(f) && f.estado!=="incompleta" ? `<div class="note">${incomplete(f) ? (f.entrada ? "Falta dónde acaba." : f.salida ? "Falta dónde empieza." : "Falta dónde empieza y dónde acaba.") : ""} Complétala para que salga en Enlazar.<br><button class="btn sm" data-edit="${esc(f.id)}">Completar</button></div>` : ""}
     <div class="fv-actions">
-      ${active(f) ? `<button type="button" class="btn pri" data-act="rev-one" data-id="${f.id}">Repasarla ahora</button>` : ""}
-      ${f.estado==="incompleta" ? `<button type="button" class="btn" data-act="inc-done" data-id="${f.id}">Ya está completa</button>` : ""}
-      ${up ? `<button type="button" class="btn" data-promote="${f.id}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
+      ${active(f) ? `<button type="button" class="btn pri" data-act="rev-one" data-id="${esc(f.id)}">Repasarla ahora</button>` : ""}
+      ${f.estado==="incompleta" ? `<button type="button" class="btn" data-act="inc-done" data-id="${esc(f.id)}">Ya está completa</button>` : ""}
+      ${up ? `<button type="button" class="btn" data-promote="${esc(f.id)}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
     </div>
     ${f.estado==="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
@@ -2108,7 +2330,7 @@ function openView(id){
     ${attCardHTML(f, CHEV)}
     ${f.estado!=="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${placed(f) ? `<section class="fv-card" aria-labelledby="fv-x"><h3 id="fv-x">Y después, desde ${esc(f.salida)}</h3>${nexts.length
-      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${x.id}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
+      ? `<div class="menu">${nexts.map(x=>`<button type="button" class="mrow" data-view="${esc(x.id)}">${x.thumb?`<img class="nx-th" src="${esc(x.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${compas(x)||ico("music")}</span>`}<span><b>${esc(x.nombre)}</b><span class="small muted nx-r"><span class="arrow">→</span> ${esc(x.salida)}${holdTxt(x.agarreOut)}${ready(x)?"":" · en práctica"}</span></span>${CHEV}</button>`).join("")}</div>`
       : `<p class="small muted">Desde ${esc(f.salida)}${f.agarreOut?` (${esc(f.agarreOut)})`:""} aún no tienes otra figura. Vuelve al básico y pregunta en clase.</p>`}</section>` : ""}
   </div></div>`;
   hydrateVideos($("#sheet-root"));
@@ -2122,11 +2344,11 @@ const attHora = a => { try{ return a.creado ? new Date(a.creado).toLocaleTimeStr
 function attCardHTML(f, chev){
   if(!assetsApi) return "";
   const list = [...intentosOf(f)].sort((x,y)=>(y.creado||0)-(x.creado||0));
-  const row = a => `<button type="button" class="mrow" data-act="att-open" data-id="${f.id}" data-att="${esc(a.id)}">${a.thumb?`<img class="nx-th" src="${esc(a.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`}<span><b>Intento del ${esc(fmtDate(a.fecha))}</b><span class="small muted">${[attHora(a), a.vidInfo?.dur?fmtT(a.vidInfo.dur):"", pulsoOk(a.pulso,a.vid)?`${pulsoBpm(a.pulso)} bpm`:"", a.vidSaved===a.vid?"":"sin copia en Fotos"].filter(Boolean).join(" · ")}</span></span>${chev}</button>`;
+  const row = a => `<button type="button" class="mrow" data-act="att-open" data-id="${esc(f.id)}" data-att="${esc(a.id)}">${a.thumb?`<img class="nx-th" src="${esc(a.thumb)}" alt="">`:`<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`}<span><b>Intento del ${esc(fmtDate(a.fecha))}</b><span class="small muted">${[attHora(a), a.vidInfo?.dur?fmtT(a.vidInfo.dur):"", pulsoOk(a.pulso,a.vid)?`${pulsoBpm(a.pulso)} bpm`:"", a.vidSaved===a.vid?"":"sin copia en Fotos"].filter(Boolean).join(" · ")}</span></span>${chev}</button>`;
   return `<section class="fv-card" aria-labelledby="fv-i"><h3 id="fv-i">Mis intentos${list.length?` · ${list.length}`:""}</h3>
     ${list.length ? `<div class="menu">${list.map(row).join("")}</div>` : `<p class="small muted">Grábate haciendo la figura y guárdalo aquí para compararte con el vídeo de la clase.</p>`}
     <input type="file" id="att-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="att-lib" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">
-    ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder!=="undefined" ? `<button type="button" class="btn pri" data-act="rc-open" data-id="${f.id}">Grabarme con conteo${pulsoOk(f.pulso, f.vid) ? ` · ${pulsoBpm(f.pulso)} bpm` : ""}</button>` : ""}
+    ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder!=="undefined" ? `<button type="button" class="btn pri" data-act="rc-open" data-id="${esc(f.id)}">Grabarme con conteo${pulsoOk(f.pulso, f.vid) ? ` · ${pulsoBpm(f.pulso)} bpm` : ""}</button>` : ""}
     <div class="fv-actions"><button type="button" class="btn" data-pick="att-cam">Cámara del iPhone</button><button type="button" class="btn" data-pick="att-lib">Elegir de Fotos</button></div>
   </section>`;
 }
@@ -2136,7 +2358,10 @@ function attCardHTML(f, chev){
 // directo a la grabación, así que queda en el vídeo; y como se sabe cuándo sonó cada número, el pulso sale solo.
 // La voz son 8 archivos cortos (sonidos/conteo); se mide dónde empieza en cada uno para que caiga en el golpe.
 let cntCtx = null, cntVoz = null, cntVozP = null;
-function cntAudio(){ if(!cntCtx){ const AC = window.AudioContext || window.webkitAudioContext; cntCtx = new AC(); } return cntCtx; }
+// Safari 16.4+: con el interruptor de silencio puesto, el audio web calla salvo que la sesión sea «playback»
+// (o «play-and-record» al grabar con micrófono). En otros navegadores no existe y no hace falta.
+function setAudioSession(type){ try{ if(navigator.audioSession) navigator.audioSession.type = type; }catch{} }
+function cntAudio(){ if(!cntCtx){ setAudioSession("playback"); const AC = window.AudioContext || window.webkitAudioContext; cntCtx = new AC(); } return cntCtx; }
 function cntLoad(){
   if(cntVozP) return cntVozP;
   const c = cntAudio();
@@ -2178,6 +2403,7 @@ function rcCleanup(){
   (rc.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} });
   if(rc.stream) rc.stream.getTracks().forEach(t=>t.stop());
   cancelAnimationFrame(rc.raf); clearTimeout(rc.stopT);
+  setAudioSession("auto");   // suelta la sesión: que el iPhone vuelva a su comportamiento normal
   rc = null;
 }
 function openRecCount(figId){
@@ -2186,7 +2412,7 @@ function openRecCount(figId){
   const ref = pulsoOk(f.pulso, f.vid) ? pulsoBpm(f.pulso) : null;
   rc = {figId, facing:"environment", mic:true, voz:true, bpm: ref || 110, ref};
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-recc>
-    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${f.id}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${esc(f.id)}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     <div class="fv-media rc-media"><video id="rc-live" playsinline muted autoplay></video><div class="rc-beat" id="rc-beat" aria-hidden="true"></div><div class="rc-rec" id="rc-rec" hidden></div></div>
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Grabarme con conteo</h2>
       <p class="small muted">${ref ? `El conteo suena a <b class="fg">${ref} bpm</b>, como el vídeo de la clase.` : `El vídeo de la clase no tiene el pulso marcado: elige el ritmo.`} Empieza a bailar en el ${+f.tiempo===5?"5":"1"} que quieras; luego recortas la figura y el pulso queda marcado solo.</p></div>
@@ -2223,7 +2449,7 @@ async function rcCam(){
 }
 function rcStart(){
   if(!rc || !rc.stream || rc.rec) return;
-  const c = cntAudio(); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const c = cntAudio(); setAudioSession(rc.mic ? "play-and-record" : "playback"); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
   const mix = c.createMediaStreamDestination();
   if(rc.mic && rc.stream.getAudioTracks().length) c.createMediaStreamSource(rc.stream).connect(mix);
   const out = new MediaStream([...rc.stream.getVideoTracks(), ...mix.stream.getAudioTracks()]);
@@ -2265,6 +2491,167 @@ function rcStop(){
   try{ rc.rec.stop(); }catch{}
   if(tab!=="social") releaseWake();
 }
+// ---------- simulacro de social ----------
+// Lo que se bloquea en el social es decidir a tiempo: la app dice dónde estás (posición y agarre) mientras suena
+// el conteo, y hay que tener una salida antes del siguiente 1 (8 tiempos). Luego ves tus salidas y te pones nota.
+// sim es null fuera de una ronda (también en la pantalla de elegir rondas); simCfg recuerda lo elegido.
+let sim = null;       // {rondas, i, bpm, voz, beat, t0, nodes, raf, timeout, cola:[{pos, hold}], res:[{pos, hold, beats|null, g}], fase:"decide"|"revela"|"fin"}
+let simCfg = {n:6, bpm:0, voz:true}, simForced = null;
+const simPick = a => a[Math.floor(Math.random()*a.length)];
+const simBloq = () => { const lg=lastLog(); return (salPending() && logBloq) || (lg && lg.bloqueo) || ""; };
+// Posiciones del baile elegido a las que llegas o desde las que sales. Pesan más la del último bloqueo,
+// las que tienen menos de dos salidas seguras y las que tienen una pregunta abierta para clase.
+function simPositions(){
+  const bloq = simBloq();
+  return allPositions().filter(p=>exitsFrom(p).length || arrivals(p).length).map(pos=>({pos,
+    hold: arrivals(pos).length ? (simPick(arrivals(pos)).agarreOut || "") : "",
+    w: 1 + (pos===bloq ? 2 : 0) + (exitsFrom(pos).filter(ready).length<2 ? 1 : 0) + (openQs().some(q=>q.pos===pos && qBaile(q)===baileSel) ? 1 : 0)}));
+}
+// Cola al azar por peso, sin repetir la misma posición dos rondas seguidas si hay otra.
+function simQueue(n){
+  const out=[];
+  for(let k=0; k<n; k++){
+    let ps = simPositions(); const prev = out[k-1];
+    if(prev && ps.length>1) ps = ps.filter(x=>x.pos!==prev.pos);
+    let r = Math.random()*ps.reduce((s,x)=>s+x.w, 0), x = ps[ps.length-1];
+    for(const y of ps){ r -= y.w; if(r<0){ x=y; break; } }
+    out.push({pos:x.pos, hold:x.hold});
+  }
+  return out;
+}
+// Para el audio de la ronda (lo que quede del conteo), el dibujo y la cuenta atrás.
+function simQuiet(){
+  if(!sim) return;
+  (sim.nodes||[]).forEach(n=>{ try{ n.stop(); }catch{} }); sim.nodes = [];
+  cancelAnimationFrame(sim.raf); clearTimeout(sim.timeout);
+}
+// Al cerrar la hoja, salir de la app o terminar: nada sigue sonando. keep: se queda el resumen en pantalla.
+function simStop(keep){
+  if(!sim) return;
+  simQuiet(); setAudioSession("auto");
+  if(tab!=="social" && !busy && !socialLive()) releaseWake();
+  if(!keep) sim = null;
+}
+// Tiempos desde el primer 1 de la ronda (con decimal).
+const simBeats = () => { const c=cntAudio(); return Math.max(0, (c.currentTime - sim.t0)/sim.beat); };
+const fmtBeats = b => (Math.round(b*10)/10).toLocaleString("es-ES");
+function openSim(note){
+  simStop();
+  if(!simCfg.bpm){
+    const bs = figs().filter(f=>baileOf(f)===baileSel && pulsoOk(f.pulso, f.vid)).map(f=>pulsoBpm(f.pulso)).filter(Boolean);
+    simCfg.bpm = bs.length ? Math.max(90, Math.min(150, Math.round(bs.reduce((a,b)=>a+b,0)/bs.length))) : 120;
+  }
+  const any = simPositions().length>0;
+  $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-sim>
+    <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Simulacro de social</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div id="sim-body">${!any ? `<p>Aún no tienes posiciones con salidas. Añade dónde empiezan y acaban tus figuras.</p>` : `
+      <p>Te digo dónde estás mientras suena el pulso. Decide una salida antes del siguiente 1.</p>
+      ${note ? `<p class="note">${esc(note)}</p>` : ""}
+      ${bailes().length>1 ? `<p class="small muted">Baile: ${esc(baileSel)}</p>` : ""}
+      <div class="chips sim-n" role="group" aria-label="Rondas">${[6,10].map(n=>`<button type="button" class="chip" data-simn="${n}" aria-pressed="${simCfg.n===n}">${n} rondas</button>`).join("")}</div>
+      <label class="f" for="sim-bpm">Golpes por minuto<input type="number" id="sim-bpm" min="90" max="150" step="1" value="${simCfg.bpm}" inputmode="numeric"></label>
+      <div class="seg neutral" role="group" aria-label="Sonido del conteo"><button type="button" data-simsnd="voz" aria-pressed="${simCfg.voz}">Voz</button><button type="button" data-simsnd="pitido" aria-pressed="${!simCfg.voz}">Pitidos</button></div>
+      <div class="row sheet-foot"><button type="button" class="btn pri" id="sim-go" style="flex:1">Empezar</button></div>`}</div>
+  </div></div>`;
+  if(any) cntLoad().catch(()=>{});   // la voz se carga ya; si no llega, suenan pitidos
+  $("[data-sim]").onclick = simClick;
+  const bi = $("#sim-bpm"); if(bi) bi.onchange = ()=>{ simCfg.bpm = Math.max(90, Math.min(150, Math.round(+bi.value)||120)); bi.value = simCfg.bpm; };
+}
+function simClick(e){
+  const b = e.target.closest("button"); if(!b) return;
+  const d = b.dataset;
+  if(d.simn){ simCfg.n = +d.simn; document.querySelectorAll("[data-simn]").forEach(x=>x.setAttribute("aria-pressed", x===b)); return; }
+  if(d.simsnd){ simCfg.voz = d.simsnd==="voz"; document.querySelectorAll("[data-simsnd]").forEach(x=>x.setAttribute("aria-pressed", x===b)); return; }
+  if(d.simg) return simGrade(d.simg);
+  if(b.id==="sim-go" || d.simact==="again") return simStart();
+  if(b.id==="sim-ok") return simDecide();
+}
+function simStart(){
+  const bi = $("#sim-bpm"); if(bi) bi.onchange();
+  simStop();
+  const c = cntAudio(); setAudioSession("playback"); if(c.state!=="running") c.resume();   // en el mismo toque: iOS solo deja sonar después de tocar
+  const cola = simForced ? simForced.map(x=>typeof x==="string" ? {pos:x, hold:""} : {pos:x.pos, hold:x.hold||""}) : simQueue(simCfg.n);
+  simForced = null;
+  sim = {rondas:cola.length, i:0, bpm:simCfg.bpm, voz:simCfg.voz, beat:60/simCfg.bpm, cola, res:[], nodes:[], fase:"decide"};
+  askWake();
+  simRound();
+}
+// Una ronda: el conteo 1–8 empieza en t0 y el siguiente 1 (t0 + 8 tiempos) es el límite para decidir.
+function simRound(){
+  const c = cntAudio(), q = sim.cola[sim.i];
+  sim.fase = "decide"; sim.t0 = c.currentTime + .3; sim.nodes = [];
+  for(let k=0; k<8; k++) sim.nodes.push(...cntPlay([c.destination], sim.t0 + k*sim.beat, k+1, sim.voz && !!cntVoz));
+  $("#sim-body").innerHTML = `<p class="small muted">Ronda ${sim.i+1} de ${sim.rondas}</p>
+    <div class="flash"><div class="route"><span>Estás en</span></div>
+      <div class="big">${esc(q.pos)}</div>
+      ${q.hold ? `<p>Con ${holdName(q.hold)}</p>` : ""}
+      <div class="sim-beat" id="sim-beat" aria-hidden="true"></div>
+      <button type="button" class="btn pri sim-ok" id="sim-ok">La tengo</button></div>`;
+  $("#sim-ok").focus({preventScroll:true});
+  announce(`Estás en ${q.pos}${q.hold ? `, ${holdSay(q.hold)}` : ""}`);
+  const end = sim.t0 + 8*sim.beat;
+  const tick = ()=>{
+    if(!sim || sim.fase!=="decide") return;
+    if(c.currentTime >= end) return simDecide(true);
+    const el = $("#sim-beat"), t = c.currentTime - sim.t0;
+    if(el) el.textContent = t<0 ? "" : String(Math.min(8, Math.floor(t/sim.beat)+1));
+    sim.raf = requestAnimationFrame(tick);
+  };
+  tick();
+  // Por si el reloj del audio se para (el sistema corta el sonido): la ronda acaba igual, un segundo más tarde.
+  // Se arma cuando el audio ya corre: si resume() tarda, contar desde el reloj de pared acabaría la ronda antes de tiempo.
+  const r0 = sim;
+  const arm = ()=>{ if(sim!==r0 || sim.fase!=="decide" || sim.t0+8*sim.beat!==end) return; clearTimeout(sim.timeout);
+    sim.timeout = setTimeout(()=>{ if(sim===r0 && sim.fase==="decide") simDecide(true); }, (end - c.currentTime + 1)*1000); };
+  if(c.state==="running") arm(); else Promise.resolve(c.resume()).then(arm, ()=>{});
+}
+// «La tengo» o se acabó el tiempo: se para el conteo y se enseñan las salidas.
+function simDecide(late){
+  if(!sim || sim.fase!=="decide") return;
+  late = late || simBeats() >= 8;   // un toque en el siguiente 1 o después ya llega tarde
+  const q = sim.cola[sim.i], beats = late ? null : Math.round(simBeats()*10)/10;
+  simQuiet();
+  sim.fase = "revela"; sim.res[sim.i] = {pos:q.pos, hold:q.hold, beats, g:null};
+  // Si hay salidas pero ninguna con este agarre, se enseñan atenuadas: lo que falta es cambiar de agarre, no una figura nueva.
+  const ex = exitsFrom(q.pos, q.hold), otras = ex.length ? [] : exitsFrom(q.pos);
+  if(!ex.length && !otras.length) askFor(q.pos);
+  $("#sim-body").innerHTML = `<p class="small muted">Ronda ${sim.i+1} de ${sim.rondas}</p>
+    <div class="flash"><div class="route"><span>Estabas en</span></div>
+      <div class="big">${esc(q.pos)}</div>
+      ${q.hold ? `<p>Con ${holdName(q.hold)}</p>` : ""}
+      ${late ? `<p class="note" role="alert"><b>Se acabó el tiempo</b></p>` : `<p class="small muted">Decidiste en ${fmtBeats(beats)} tiempos.</p>`}
+      <div class="answer" id="sim-ans" tabindex="-1">
+        ${ex.length ? `<ul class="exits">${ex.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>`
+          : otras.length ? `<div class="note">Con ${holdName(q.hold)} aún no tienes salida desde aquí.</div><ul class="exits dim-all">${otras.map(f=>exitLi(f,{dim:!ready(f)})).join("")}</ul>`
+          : `<div class="note">Desde aquí aún no tienes salida: básico y pide una en clase.</div>`}
+        <p class="small muted">¿Cómo te ha salido?</p>
+        <div class="grade"><button type="button" class="btn" data-simg="no">No me salió</button><button type="button" class="btn" data-simg="dudas">Dudé</button>${late ? "" : `<button type="button" class="btn" data-simg="fluida">La tenía</button>`}</div>
+      </div></div>`;
+  $("#sim-ans").focus({preventScroll:true});
+}
+function simGrade(g){
+  if(!sim || sim.fase!=="revela") return;
+  const r = sim.res[sim.i]; r.g = g;
+  // Un solo paso hacia arriba por posición y día: «La tenía» repetida el mismo día no vuelve a subir el intervalo.
+  if(!(g==="fluida" && S.linkRep[r.pos]?.last===todayStr())){ S.linkRep[r.pos] = nextRep(S.linkRep[r.pos], g); persist({t:"lr"}); }
+  const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
+  sim.i++;
+  if(sim.i < sim.rondas) return simRound();
+  simEnd();
+}
+function simEnd(){
+  sim.fase = "fin"; simStop(true);
+  const res = sim.res, ok = res.filter(r=>r.g==="fluida").length, dec = res.filter(r=>r.beats!=null);
+  const avg = dec.length ? dec.reduce((s,r)=>s+r.beats, 0)/dec.length : null;
+  const dud = [...new Set(res.filter(r=>r.g!=="fluida" || r.beats==null).map(r=>r.pos))];
+  $("#sim-body").innerHTML = `<div class="panel"><h3 id="sim-fin" tabindex="-1">Simulacro terminado</h3>
+      <p>La tenías en <b>${ok} de ${sim.rondas}</b> ${sim.rondas===1?"ronda":"rondas"}.</p>
+      ${avg!=null ? `<p class="small muted">Tardaste de media ${fmtBeats(avg)} tiempos en decidir.</p>` : ""}</div>
+    ${dud.length ? `<div class="panel"><h3>Dónde dudaste</h3><ul class="exits">${dud.map(p=>`<li><span>${esc(p)}</span><button type="button" class="btn sm" data-act="goto-pos" data-p="${esc(p)}">Ver salidas</button></li>`).join("")}</ul></div>` : ""}
+    <div class="row sheet-foot"><button type="button" class="btn pri" data-simact="again" style="flex:1">Otra vez</button><button type="button" class="btn" data-act="close">Hecho</button></div>`;
+  $("#sim-fin").focus({preventScroll:true});
+  render();
+}
 // Hoja «Nuevo intento»: el vídeo ya elegido, con el mismo recorte que el vídeo de la clase.
 // Por defecto se guarda solo el fragmento en calidad media: los vídeos de la cámara ocupan mucho.
 function openAttemptNew(figId, file, auto){
@@ -2303,14 +2690,14 @@ function openAttemptView(figId, attId){
   const f = S.figures[figId], a = intentosOf(f).find(x=>x.id===attId); if(!f || !a) return;
   const info = [a.vidInfo?.dur ? fmtT(a.vidInfo.dur) : "", a.vidInfo?.bytes ? fmtMB(a.vidInfo.bytes) : "", a.vidInfo?.comprimido ? "calidad media" : ""].filter(Boolean).join(" · ");
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewatt="${esc(a.id)}">
-    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${f.id}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${esc(f.id)}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     <div class="fv-media">${playerHTML({vid:a.vid, vidTrim:a.vidTrim, thumb:a.thumb})}</div>
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Intento del ${esc(fmtDate(a.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${a.vidSaved===a.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
     ${cmpCardHTML(f, a)}
     ${pkCardHTML(a.pulso, a.vid, f.id, a.id)}
-    <div class="fv-actions"><button type="button" class="btn" data-act="att-savevid" data-id="${f.id}" data-att="${esc(a.id)}">Guardar en Fotos</button></div>
-    <button type="button" class="btn danger wide del-row" data-act="att-del" data-id="${f.id}" data-att="${esc(a.id)}">Borrar intento</button>
+    <div class="fv-actions"><button type="button" class="btn" data-act="att-savevid" data-id="${esc(f.id)}" data-att="${esc(a.id)}">Guardar en Fotos</button></div>
+    <button type="button" class="btn danger wide del-row" data-act="att-del" data-id="${esc(f.id)}" data-att="${esc(a.id)}">Borrar intento</button>
   </div></div>`;
   hydrateVideos($("#sheet-root"));
   attBlob = null; vidGet(a.vid).then(b=>{ attBlob = b ? {vid:a.vid, b} : null; }).catch(()=>{});
@@ -2321,7 +2708,7 @@ async function attSaveVid(figId, attId){
   if(!attBlob || attBlob.vid!==a.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
   const b = attBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
   const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
-  const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
+  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
 }
 // ---------- pulso: marcar los tiempos de la música en un vídeo ----------
@@ -2333,7 +2720,7 @@ function pkCardHTML(p, vid, figId, attId){
     <p class="small muted">${ok ? `${pl(n,"tiempo marcado","tiempos marcados")}. Sirve para compararte por tiempos de la música, aunque bailes a otro ritmo.`
       : old ? "Las marcas eran del vídeo anterior: vuelve a marcarlo."
       : "Sin marcar. Toca al ritmo de la música para que la app sepa en qué segundo cae cada tiempo."}</p>
-    <div class="fv-actions"><button type="button" class="btn" data-act="pk-open" data-id="${figId}"${attId?` data-att="${esc(attId)}"`:""}>${ok?"Revisar el pulso":"Marcar el pulso"}</button></div></section>`;
+    <div class="fv-actions"><button type="button" class="btn" data-act="pk-open" data-id="${esc(figId)}"${attId?` data-att="${esc(attId)}"`:""}>${ok?"Revisar el pulso":"Marcar el pulso"}</button></div></section>`;
 }
 let pk = null;
 function pkTarget(figId, attId){
@@ -2456,12 +2843,12 @@ const marcasOf = a => (a && Array.isArray(a.marcadores)) ? a.marcadores : [];
 const erroresOf = f => (f && Array.isArray(f.errores)) ? f.errores : [];
 const cmpReady = (f, a) => !!(f && a && f.vid && pulsoOk(f.pulso, f.vid) && pulsoOk(a.pulso, a.vid));
 function cmpCardHTML(f, a){
-  if(cmpReady(f, a)) return `<div class="fv-actions"><button type="button" class="btn pri" data-act="cmp-open" data-id="${f.id}" data-att="${esc(a.id)}">Comparar con la clase</button></div>${marcasHTML(a)}`;
+  if(cmpReady(f, a)) return `<div class="fv-actions"><button type="button" class="btn pri" data-act="cmp-open" data-id="${esc(f.id)}" data-att="${esc(a.id)}">Comparar con la clase</button></div>${marcasHTML(a)}`;
   const okT = f.vid && pulsoOk(f.pulso, f.vid), okM = pulsoOk(a.pulso, a.vid);
   const falta = !f.vid ? "Añade el vídeo de la clase a la figura para compararte."
     : `Para compararte por tiempos falta marcar el pulso ${[!okT?"del vídeo de la clase":"", !okM?"de este intento":""].filter(Boolean).join(" y ")}.`;
   return `<section class="fv-card" aria-labelledby="fv-cmp"><h3 id="fv-cmp">Comparar con la clase</h3><p class="small muted">${falta}</p>
-    ${f.vid && !okT ? `<div class="fv-actions"><button type="button" class="btn" data-act="pk-open" data-id="${f.id}">Marcar el pulso de la clase</button></div>` : ""}</section>${marcasHTML(a)}`;
+    ${f.vid && !okT ? `<div class="fv-actions"><button type="button" class="btn" data-act="pk-open" data-id="${esc(f.id)}">Marcar el pulso de la clase</button></div>` : ""}</section>${marcasHTML(a)}`;
 }
 function marcasHTML(a){
   const ms = [...marcasOf(a)].sort((x,y)=>x.b-y.b); if(!ms.length) return "";
@@ -2469,7 +2856,7 @@ function marcasHTML(a){
 }
 function errCardHTML(f){
   const es = erroresOf(f); if(!es.length) return "";
-  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3><ul class="cmp-marks">${es.map(e=>`<li><span>${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}</span><button type="button" class="icon-btn" data-act="err-del" data-id="${f.id}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
+  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3><ul class="cmp-marks">${es.map(e=>`<li><span>${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}</span><button type="button" class="icon-btn" data-act="err-del" data-id="${esc(f.id)}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
     <p class="small muted">Salen al repasar la figura. Quítalos cuando ya no te pasen.</p></section>`;
 }
 function errDelete(figId, errId){
@@ -2641,7 +3028,7 @@ function cmpMarks(){
   const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId);
   const ms=[...marcasOf(a)].sort((x,y)=>x.b-y.b);
   el.innerHTML = ms.length ? ms.map(m=>{ const inErr = erroresOf(f).some(e=>e.marca===m.id);
-    return `<li><button type="button" class="btn sm" data-cgo="${m.b}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
+    return `<li><button type="button" class="btn sm" data-cgo="${esc(m.b)}">en el ${beatName(m.b)}</button><span class="tagx ${m.tipo==="error"?"t-red":"t-lime"}">${m.tipo==="error"?"Error":"Bien"}</span><span class="cmp-nt">${esc(m.nota||"")}</span>
       ${m.tipo==="error" ? (inErr ? `<span class="small muted">En tus errores</span>` : `<button type="button" class="btn ghost sm" data-cerr="${esc(m.id)}">A mis errores</button>`) : ""}
       <button type="button" class="icon-btn" data-cdel="${esc(m.id)}" aria-label="Borrar la marca del ${beatName(m.b)}">✕</button></li>`; }).join("")
     : `<li class="small muted">Pausa en el tiempo que quieras y toca «Error aquí» o «Bien hecho aquí».</li>`;
@@ -2679,7 +3066,7 @@ function promoteFig(id, to, fromView, el){
     if(fin) fieldError([!f.entrada && fin, !f.salida && fout].filter(Boolean), fin.closest(".grid2"), `Para ${to==="practica"?"empezar a practicarla":"pasarla a "+EST[to].t.toLowerCase()} indica dónde empieza y dónde acaba.`);
     return;
   }
-  f.estado=to; saveFigure(f); toast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`);
+  f.estado=to; saveFigure(f); qToast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`);
   if($('[data-sheet="log"]')) openLog(); else if(fromView || $("#sheet-root [data-viewfig]")) openView(f.id); else if(el) el.remove();
 }
 // ---------- partes: figuras que enseñan en varias clases ----------
@@ -2692,11 +3079,11 @@ function parteCardHTML(f, chev){
   if(!inc && !ps.length) return "";
   const th = x => x.thumb ? `<img class="nx-th" src="${esc(x.thumb)}" alt="">` : `<span class="nx-th thumb-ph" aria-hidden="true">${ico("music")}</span>`;
   const cur = `<div class="mrow pt-cur">${th(f)}<span><b>Parte ${ps.length+1} · ${esc(fmtDate(parteHoy(f)))}</b><span class="small muted">${[f.vid ? (inc ? "La de ahora: el vídeo de arriba" : "La última: el vídeo de arriba") : "Sin vídeo", f.parteNota ? esc(f.parteNota) : ""].filter(Boolean).join(" · ")}</span></span></div>`;
-  const rows = ps.map((x,i)=>({x,i})).reverse().map(({x,i})=>`<button type="button" class="mrow" data-act="pt-open" data-id="${f.id}" data-pt="${esc(x.id)}">${th(x)}<span><b>Parte ${i+1} · ${esc(fmtDate(x.fecha))}</b><span class="small muted">${[x.vid ? (x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "") : "Sin vídeo", x.nota ? esc(x.nota) : "", x.vid && x.vidSaved!==x.vid ? "sin copia en Fotos" : ""].filter(Boolean).join(" · ")}</span></span>${chev}</button>`).join("");
+  const rows = ps.map((x,i)=>({x,i})).reverse().map(({x,i})=>`<button type="button" class="mrow" data-act="pt-open" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">${th(x)}<span><b>Parte ${i+1} · ${esc(fmtDate(x.fecha))}</b><span class="small muted">${[x.vid ? (x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "") : "Sin vídeo", x.nota ? esc(x.nota) : "", x.vid && x.vidSaved!==x.vid ? "sin copia en Fotos" : ""].filter(Boolean).join(" · ")}</span></span>${chev}</button>`).join("");
   return `<section class="fv-card" aria-labelledby="fv-pt"><h3 id="fv-pt">${inc ? "Partes" : "Partes de la clase"} · ${ps.length+1}</h3>
     <div class="menu">${cur}${rows}</div>
     ${inc ? `<p class="small muted">Cada clase, añade el vídeo nuevo: pasa a ser el de la figura y el anterior se queda aquí. Mientras esté incompleta, sale en el repaso cada día.</p>
-    ${assetsApi ? `<div class="fv-actions"><button type="button" class="btn pri" data-act="pt-new" data-id="${f.id}">Añadir la parte de hoy</button></div>` : ""}` : ""}
+    ${assetsApi ? `<div class="fv-actions"><button type="button" class="btn pri" data-act="pt-new" data-id="${esc(f.id)}">Añadir la parte de hoy</button></div>` : ""}` : ""}
   </section>`;
 }
 function openParteNew(figId){
@@ -2743,13 +3130,13 @@ function openParteView(figId, ptId){
   const f = S.figures[figId], ps = partesOf(f), i = ps.findIndex(x=>x.id===ptId); if(!f || i<0) return;
   const x = ps[i], info = [x.vidInfo?.dur ? fmtT(x.vidInfo.dur) : "", x.vidInfo?.bytes ? fmtMB(x.vidInfo.bytes) : ""].filter(Boolean).join(" · ");
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet fview" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-viewpt="${esc(x.id)}">
-    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${f.id}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
+    <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${esc(f.id)}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${x.vid ? `<div class="fv-media">${playerHTML({vid:x.vid, vidTrim:x.vidTrim, thumb:x.thumb})}</div>` : ""}
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Parte ${i+1} · ${esc(fmtDate(x.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${x.nota ? `<section class="fv-card"><p class="txt">${esc(x.nota)}</p></section>` : ""}
     ${x.vid ? `${x.vidSaved===x.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
-    <div class="fv-actions"><button type="button" class="btn" data-act="pt-savevid" data-id="${f.id}" data-pt="${esc(x.id)}">Guardar en Fotos</button></div>` : ""}
-    <button type="button" class="btn danger wide del-row" data-act="pt-del" data-id="${f.id}" data-pt="${esc(x.id)}">Borrar parte</button>
+    <div class="fv-actions"><button type="button" class="btn" data-act="pt-savevid" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Guardar en Fotos</button></div>` : ""}
+    <button type="button" class="btn danger wide del-row" data-act="pt-del" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Borrar parte</button>
   </div></div>`;
   hydrateVideos($("#sheet-root"));
   ptBlob = null; if(x.vid) vidGet(x.vid).then(b=>{ ptBlob = b ? {vid:x.vid, b} : null; }).catch(()=>{});
@@ -2760,7 +3147,7 @@ async function ptSaveVid(figId, ptId){
   if(!ptBlob || ptBlob.vid!==x.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
   const b = ptBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
   const name = parteName(f, x).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "parte";
-  const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
+  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo", "Sí, está guardado");
   if(ok){ markVidSaved(figId, x.vid); toast("Vídeo guardado"); if($(`[data-viewpt="${CSS.escape(ptId)}"]`)) openParteView(figId, ptId); }
 }
 async function ptDelete(figId, ptId){
@@ -2811,7 +3198,7 @@ function openFigure(id, opts={}){
   if(!quick && !id && f.estado==="espera" && !opts.keepState) f.estado="practica";
   if(opts.estado) f.estado=opts.estado;
   const optList=(list,sel,empty)=>`<option value="">${empty}</option>${[...new Set([...list, sel].filter(Boolean))].map(p=>`<option ${p===sel?"selected":""}>${esc(p)}</option>`).join("")}`;
-  let tipo = tipoOf(f), estado = f.estado, prof = f.profesor||"", baile = f.baile||"Bachata";
+  let tipo = tipoOf(f), estado = EST[f.estado] ? f.estado : "practica", prof = f.profesor||"", baile = f.baile||"Bachata";
   const hasCls = S.classes.length>0, otherCls = !quick && !!prof && !S.classes.includes(prof);
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="fig-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${quick?"Captura rápida":(id?"Editar figura":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
@@ -2846,7 +3233,7 @@ function openFigure(id, opts={}){
       <label class="f" for="ff-enlace">Enlace al vídeo (Drive, Instagram…)<input type="text" id="ff-enlace" value="${esc(f.enlace)}" inputmode="url" placeholder="https://"></label>
       <label class="f" for="ff-notas">Notas<textarea id="ff-notas" placeholder="Correcciones del profe, errores típicos…">${esc(f.notas)}</textarea></label>
     </div></details>`}
-    ${id?`<button type="button" class="btn danger wide del-row" data-act="del-fig" data-id="${f.id}">Borrar figura</button>`:""}
+    ${id?`<button type="button" class="btn danger wide del-row" data-act="del-fig" data-id="${esc(f.id)}">Borrar figura</button>`:""}
     <div class="row sheet-foot">
       <button type="submit" class="btn pri" style="flex:1">Guardar</button>
       ${quick?`<button type="button" class="btn" data-act="to-full">Ficha completa</button>`:""}
@@ -2931,7 +3318,7 @@ function openFigure(id, opts={}){
     if(oldVid && oldVid!==out.vid) persist({t:"assetdel", id:oldVid});   // después de guardar la figura
     closeSheet();
     if(opts.fromView) openView(out.id);
-    toast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
+    qToast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
   };
   const cmpUpd = ()=>{ const el=$("#ff-cmp"); if(el) el.innerHTML = compas({tiempo:$("#ff-tiempo").value, tiempos:$("#ff-dur").value}, true); };
   ["ff-tiempo","ff-dur"].forEach(k=>$("#"+k)?.addEventListener("change", cmpUpd));
@@ -2971,7 +3358,7 @@ function clearFieldError(){
   document.querySelectorAll('#fig-form [aria-invalid="true"]').forEach(x=>{ x.removeAttribute("aria-invalid"); x.removeAttribute("aria-describedby"); });
 }
 function closeSheet(){
-  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup();
+  formApi = null; pk = null; cmpStop(); cmp = null; rcCleanup(); simStop();
   if(busy){ toast("Espera a que termine de guardar el vídeo."); return; }
   const u=(vstate && !vstate.fromId) ? vstate.url : null; vstate=null; sheetBase=null; $("#sheet-root").innerHTML="";
   if(u) setTimeout(()=>{ try{ URL.revokeObjectURL(u); }catch{} }, 1000);
@@ -3042,7 +3429,7 @@ function renderVidbox(){
       const blob=vstate.curBlob; if(!blob){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
       const ty=blob.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
       const vidId = vstate.cur, figId = vstate.figId;
-      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
+      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(how=>confirmSaved(how, "el vídeo", "Sí, está guardado")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
     }
     else if(k==="ai"){ prepareCapture(); }
   });
@@ -3133,7 +3520,7 @@ function hydrateVideos(root){
     let step = VID_STEPS.indexOf(first);
     const srcOf = u => fv ? withT(u, s) : u;
     // Lo que ha funcionado se recuerda para no tener que fallar cada vez.
-    v.addEventListener("loadeddata", ()=>{ const m = VID_STEPS[step]; if(m!==first && v.isConnected) lsSet(LS_VIDMODE, m); });
+    v.addEventListener("loadeddata", ()=>{ const m = VID_STEPS[step]; if(m!==first && v.isConnected){ if(m==="mem") vidMemAdd(id); else lsSet(LS_VIDMODE, m); } });
     // Si no carga, el siguiente paso; si ninguno sirve, se dice con los datos del archivo en vez del play tachado.
     v.addEventListener("error", async ()=>{
       if(!v.isConnected || !v.getAttribute("src")) return;
@@ -3155,10 +3542,16 @@ function hydrateVideos(root){
 }
 async function shareOrDownload(file){
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file]}); return true; }catch(e){ if(e && e.name==="AbortError") return false; }
+    try{ await navigator.share({files:[file]}); return "compartido"; }catch(e){ if(e && e.name==="AbortError") return false; }
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click();
-  setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return true;
+  setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return "descargado";
+}
+// Una descarga no prueba que el archivo haya quedado guardado: se pregunta antes de darlo por hecho.
+async function confirmSaved(how, what, ok="Sí, está guardada"){
+  if(how==="compartido") return true;
+  if(!how) return false;
+  return askConfirm({title:`¿Se ha guardado ${what}?`, msg:"Compruébalo en Archivos o en Descargas.", ok, cancel:"No", danger:false});
 }
 // ---------- vídeos sin copia fuera de la app ----------
 // La copia de seguridad (JSON) no lleva vídeos. Se apunta qué vídeo se sacó con «Guardar en Fotos»
@@ -3216,7 +3609,7 @@ async function saveVidBatch(){
   }
   if(!ok){
     // Sin hoja de compartir con varios archivos: de uno en uno, como «Guardar en Fotos» en la ficha.
-    ok = await shareOrDownload(files[0]); ids = ok ? ids.slice(0,1) : [];
+    ok = await confirmSaved(await shareOrDownload(files[0]), "el vídeo", "Sí, está guardado"); ids = ok ? ids.slice(0,1) : [];
   }
   if(!ok) return;
   vidBatch = null;
@@ -3489,7 +3882,7 @@ function coachPrompt(){
   const cov = coverage().map(c=>`- ${c.p}: ${c.ready.length} salidas seguras (disponibles o consolidadas) de ${c.out.length}; llegas desde ${c.into.length} figuras`).join("\n");
   const blocks = {}; Object.values(S.logs).forEach(l=>{ if(l.bloqueo) blocks[l.bloqueo]=(blocks[l.bloqueo]||0)+1; });
   const bl = Object.entries(blocks).sort((a,b)=>b[1]-a[1]).map(([p,n])=>`- ${p}: ${n} veces`).join("\n") || "(sin registros)";
-  const act = figs().filter(active).slice(0,120).map(f=>`- ${f.nombre} [${TIPO[tipoOf(f)].t}, ${EST[f.estado].t}]${placed(f)?`: ${f.entrada}${f.agarreIn?` (${f.agarreIn})`:""} → ${f.salida}${f.agarreOut?` (${f.agarreOut})`:""}`:""}${f.usos?`, salió ${f.usos} veces`:""}`).join("\n") || "(ninguna)";
+  const act = figs().filter(active).slice(0,120).map(f=>`- ${f.nombre} [${TIPO[tipoOf(f)].t}, ${EST[f.estado]?.t||f.estado}]${placed(f)?`: ${f.entrada}${f.agarreIn?` (${f.agarreIn})`:""} → ${f.salida}${f.agarreOut?` (${f.agarreOut})`:""}`:""}${+f.usos?`, salió ${+f.usos} veces`:""}`).join("\n") || "(ninguna)";
   return `Eres profesor de bachata. Tu alumno baila como leader desde hace unos 6 meses y en los socials se bloquea al enlazar figuras.
 Con sus datos, dale en español y en menos de 140 palabras:
 1. Las 3 preguntas concretas que debería hacer a sus profesores esta semana (sobre las posiciones donde tiene menos salidas o donde más se bloquea).
@@ -3529,7 +3922,7 @@ function graphHTML(cov){
   const P={};
   nodes.forEach((p,i)=>{ const a = n<=2 ? Math.PI*(1-i) : -Math.PI/2+2*Math.PI*i/n; P[p]={x:cx+rx*Math.cos(a), y:cy+ry*Math.sin(a), w:hw(p), h:16}; });
   const E={};
-  figs().filter(f=>usable(f)&&placed(f)&&P[f.entrada]&&P[f.salida]).forEach(f=>{
+  figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&P[f.entrada]&&P[f.salida]).forEach(f=>{
     const k=f.entrada+"␟"+f.salida; const e=E[k]||(E[k]={a:f.entrada,b:f.salida,n:0,r:0}); e.n++; if(ready(f)) e.r++;
   });
   const gaps = new Set(cov.filter(c=>c.into.length && c.ready.length<2).map(c=>c.p));
@@ -3667,10 +4060,33 @@ function listHTML(kind, bare){
 }
 // Pantalla de Ajustes abierta: null es el menú; si no, una de SET_VIEWS.
 let setView = null;
-const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos"};
+const SET_VIEWS = {pos:"Posiciones", hold:"Agarres", cls:"Tus clases", importar:"Restaurar o importar", espacio:"Espacio en el dispositivo", ejemplos:"Ejemplos", instantaneas:"Instantáneas"};
 function setGo(v){ setView=v; confirmKey=null; editKey=null; openSettings(); const sh=$(".sheet"); if(sh) sh.scrollTop=0; $("#sheet-t")?.focus({preventScroll:true}); }
+const SNAP_WHY = {diaria:"Copia del día", "antes-de-importar":"Antes de importar", "antes-de-reemplazar":"Antes de reemplazar todo", "antes-de-restaurar":"Antes de restaurar", "antes-de-encoger":"Antes de borrar muchas figuras", "copia-local":"Copia guardada aparte"};
+const snapWhen = at => { try{ return new Date(at).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }catch{ return ""; } };
+let restoring = false;
+async function restoreSnapshot(key){
+  if(restoring) return false;
+  if(safeMode){ toast("Modo seguro: no se puede restaurar."); return false; }
+  restoring = true;
+  try{
+    if(!(await askConfirm({title:"¿Volver a esta instantánea?", msg:"Antes se guarda otra instantánea con tus datos de ahora, por si quieres deshacerlo. Los vídeos no cambian.", ok:"Restaurar"}))) return false;
+    let v = null; try{ v = await kvGet(key); }catch{}
+    if(!v || !v.state || typeof v.state!=="object"){ toast("No se pudo leer esa instantánea. No he cambiado nada."); return false; }
+    if(!(await takeSnapshot("antes-de-restaurar"))){ toast("No se pudo guardar una copia de tus datos de ahora. No he cambiado nada."); return false; }
+    applyData(migrate(clone(v.state)));
+    persist({t:"meta"}); render(); openSettings();
+    toast(`Restaurado: ${pl(figs().length,"figura","figuras")}`);
+    return true;
+  }finally{ restoring = false; }
+}
 function openSettings(){
   const sc = $(".sheet")?.scrollTop || 0;
+  // En el menú basta con contar las claves; las instantáneas enteras solo se leen en su pantalla.
+  if(setView==="instantaneas") listSnapshots().then(l=>{
+    const el=$("#snap-list"); if(el) el.innerHTML = l.length ? l.map(x=>`<div class="mrow"><span><b>${esc(snapWhen(x.at))}</b><span class="small muted">${esc(SNAP_WHY[x.reason]||x.reason)} · ${pl(+x.nFig||0,"figura","figuras")} · ${pl(+x.nLog||0,"registro","registros")}</span></span><button type="button" class="btn sm" data-act="snap-restore" data-key="${esc(x.key)}">Restaurar</button></div>`).join("") : `<p class="small muted">Aún no hay instantáneas.</p>`;
+  });
+  else if(!setView && idb) snapKeys().then(ks=>{ const mv=$("#snap-n"); if(mv) mv.textContent = ks.filter(k=>snapParse(k)).length; }).catch(()=>{});
   const exN = figs().filter(f=>f.ejemplo).length;
   if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e=>{ const el=$("#vid-usage"); if(el) el.textContent = `${pl(figs().filter(f=>f.vid).length,"vídeo","vídeos")} · ${fmtMB(e.usage||0)} en uso${e.quota?` de ${fmtMB(e.quota)} disponibles para Bachateca`:""}.`; }).catch(()=>{});
   if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(p=>{ const el=$("#persist-st"); if(el) el.textContent = p ? "Datos protegidos: el sistema no los borrará aunque falte espacio." : "Pide al sistema que no borre tus datos si el dispositivo se queda sin espacio."; const b=$('[data-act="persist"]'); if(b) b.hidden=!!p; }).catch(()=>{});
@@ -3695,6 +4111,10 @@ function openSettings(){
       <p class="small muted" id="persist-st"></p>
       <button class="btn sm" data-act="persist">Proteger mis datos</button>
     </div>`;
+  else if(setView==="instantaneas") body = `<div class="panel">
+      <p class="small muted">Bachateca guarda copias de tus datos en este dispositivo: una al día y otra antes de cambios grandes. Se conservan las más recientes.</p>
+    </div>
+    <div class="menu" id="snap-list"><p class="small muted">Cargando…</p></div>`;
   else if(setView==="ejemplos") body = `<div class="panel">
       <p class="small muted">${exN?"Las figuras de muestra llevan la etiqueta «ejemplo». Quítalas cuando ya tengas las tuyas.":"Figuras de muestra para ver cómo funciona la app. Llevan la etiqueta «ejemplo»."}</p>
       <div class="row">${exN?`<button class="btn danger" data-act="clear-examples">Quitar ${exN} ejemplos</button>`:`<button class="btn" data-act="examples">Cargar ejemplos</button>`}</div>
@@ -3712,7 +4132,7 @@ function openSettings(){
     <p class="menu-h">Apariencia</p>
     <div class="seg2 seg3" role="group" aria-label="Apariencia">${[["oscuro","Oscuro"],["auto","Como el sistema"],["claro","Claro"]].map(([k,t])=>`<button type="button" data-tema="${k}" aria-pressed="${temaActual()===k}">${t}</button>`).join("")}</div>
     <p class="menu-h">Datos</p>
-    <div class="menu">${row("importar","Restaurar o importar","")}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
+    <div class="menu">${row("importar","Restaurar o importar","")}${row("instantaneas","Instantáneas",`<span id="snap-n"></span>`)}${row("espacio","Espacio en el dispositivo","")}${row("ejemplos","Ejemplos",exN?pl(exN,"cargado","cargados"):"")}</div>
     <details class="info"><summary>Versión ${APP_VERSION} · datos técnicos</summary><span id="screen-diag">${esc(screenDiag)} · pestaña ${esc(tab)} · vídeos: ${esc({frag:"normal", plain:"sin #t", mem:"copia en memoria"}[vidMode()])}</span><a class="lnk" href="conteo.html">Prueba del conteo al grabar</a></details>`;
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     ${head}
@@ -3723,42 +4143,148 @@ function openSettings(){
   if(editKey){ const inp=$("#ren-"+editKey); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); inp.parentElement.querySelector("[data-lsave]").click(); } }; } }
   markClean();
 }
-function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{}},null,2); }
+function exportData(){ return JSON.stringify({app:"bachateca",version:3,schema:S.schema||SCHEMA,exportado:new Date().toISOString(),figures:S.figures,logs:S.logs,positions:S.positions,holds:S.holds,classes:S.classes,linkRep:S.linkRep,actividad:S.actividad||{},preguntas:S.preguntas||{}},null,2); }
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const isObj = o => !!o && typeof o==="object" && !Array.isArray(o);
+// test() convierte a texto: sin comprobar el tipo, un id ausente pasaría como «undefined».
+const okId = v => typeof v==="string" && ID_RE.test(v);
+// Deja solo lo que la app sabe pintar: ids seguros, nombre en las figuras y fecha en los registros.
+// Dentro de cada figura: intentos, partes, errores y marcas con id seguro; contadores como números; estado y tipo conocidos.
+// Trabaja sobre copias: no cambia lo que recibe.
+const cuenta = v => { const n = typeof v==="number" ? v : typeof v==="string" && /^\s*\d+\s*$/.test(v) ? +v : NaN; return Number.isInteger(n) && n>=0 ? n : null; };
+function sanitizeRep(r0){
+  const r = {...r0};
+  ["step","aciertos","fallos"].forEach(k=>{ if(k in r) r[k] = cuenta(r[k]) ?? 0; });
+  if("step" in r) r.step = Math.min(r.step, LADDER.length-1);
+  ["due","last"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; });
+  return r;
+}
+function sanitizeFig(f0){
+  const f = {...f0}; let malas = 0;
+  const lista = (v, fix) => { if(!Array.isArray(v)){ if(v!=null) malas++; return []; }
+    return v.flatMap(x=>{ if(isObj(x) && okId(x.id)) return [fix ? fix(x) : {...x}]; malas++; return []; }); };
+  // Solo se tocan las listas que vienen: añadir una vacía haría que tu propia copia pareciera distinta.
+  const marcas = a => { const b={...a}; if("marcadores" in b) b.marcadores = lista(a.marcadores, m=>({...m})).filter(m=>{ if(Number.isFinite(m.b)) return true; malas++; return false; }); return b; };
+  if("intentos" in f) f.intentos = lista(f.intentos, marcas);
+  if("partes" in f) f.partes = lista(f.partes);
+  if("errores" in f) f.errores = lista(f.errores);
+  if(f.estado!==undefined && !EST[f.estado]) f.estado = "practica";
+  if(f.tipo!==undefined && !TIPO[f.tipo]) f.tipo = "figura";
+  if("usos" in f){ const n = cuenta(f.usos); if(n==null) delete f.usos; else f.usos = n; }
+  if("rep" in f){ if(!isObj(f.rep)) delete f.rep; else f.rep = sanitizeRep(f.rep); }
+  ["tiempo","tiempos"].forEach(k=>{ if(k in f && f[k]!=="" && cuenta(f[k])==null) delete f[k]; });
+  return {f, malas};
+}
+function sanitizeImport(d){
+  const figures={}, logs={}; let descartadas=0;
+  const fs = isObj(d&&d.figures) ? Object.values(d.figures) : [], ls = isObj(d&&d.logs) ? Object.values(d.logs) : [];
+  fs.forEach(f=>{ if(isObj(f) && okId(f.id) && typeof f.nombre==="string" && f.nombre.trim()){ const r = sanitizeFig(f); figures[f.id]=r.f; descartadas += r.malas; } else descartadas++; });
+  ls.forEach(l=>{ if(isObj(l) && okId(l.id) && typeof l.fecha==="string") {
+    const o={...l, figs: Array.isArray(l.figs) ? l.figs.filter(x=>typeof x==="string") : []};
+    // repAntes/repDespues: deleteLog los vuelve a poner en f.rep, así que pasan por la misma validación; si falla un mapa, se quitan los dos.
+    const mapa = m => { if(!isObj(m)) return null; const out={};
+      Object.entries(m).forEach(([k,v])=>{ if(v===null) out[k]=null; else if(isObj(v)) out[k]=sanitizeRep(v); }); return out; };
+    if("repAntes" in o || "repDespues" in o){ const a=mapa(o.repAntes), b=mapa(o.repDespues); if(a&&b){ o.repAntes=a; o.repDespues=b; } else { delete o.repAntes; delete o.repDespues; } }
+    logs[l.id]=o; } else descartadas++; });
+  // Preguntas para clase: id seguro y posición con texto; las fechas mal escritas se quitan.
+  const preguntas={}, ps = isObj(d&&d.preguntas) ? Object.values(d.preguntas) : [];
+  ps.forEach(q=>{
+    if(!(isObj(q) && okId(q.id) && typeof q.pos==="string" && q.pos.trim())){ descartadas++; return; }
+    const r = {...q};
+    ["creada","resuelta"].forEach(k=>{ if(k in r && !(typeof r[k]==="string" && /^\d{4}-\d{2}-\d{2}$/.test(r[k]))) delete r[k]; });
+    if("figId" in r && !okId(r.figId)) delete r.figId;
+    if("baile" in r && !(typeof r.baile==="string" && r.baile.trim())) delete r.baile;
+    preguntas[q.id] = r;
+  });
+  return {figures, logs, preguntas, descartadas};
+}
+// Compara dos figuras sin intentos ni partes (esos se fusionan aparte); el orden de las claves no cuenta.
+const sortKeys = v => Array.isArray(v) ? v.map(sortKeys) : isObj(v) ? Object.fromEntries(Object.keys(v).sort().map(k=>[k, sortKeys(v[k])])) : v;
+function figDiffers(a, b){
+  const key = f => { const {intentos, partes, ...r} = f||{}; return JSON.stringify(sortKeys(r)); };
+  return key(a) !== key(b);
+}
+// Solo una importación a la vez: dos toques seguidos no deben aplicar la copia dos veces.
+let importing = false, failImport = false;
 async function importData(replace){
+  if(importing) return;
+  importing = true;
+  try{ await importData1(replace); }finally{ importing = false; }
+}
+async function importData1(replace){
+  if(safeMode){ toast("Modo seguro: no se puede importar."); return; }
   const raw=$("#imp-text").value.trim();
   if(!raw){ toast("Elige un archivo de copia o pega su texto primero."); return; }
   let d; try{ d=JSON.parse(raw); }catch{ toast("Ese texto no es una copia completa. Pega todo el contenido o elige el archivo."); return; }
   if(!d || !d.figures || typeof d.figures!=="object"){ toast("Ese archivo no es una copia de Bachateca."); return; }
   if(Number.isInteger(d.schema) && d.schema > SCHEMA){ toast("Esa copia es de una versión más nueva de Bachateca. Actualiza la app (ábrela con conexión) y vuelve a importarla."); return; }
   d = migrate(d);
-  const inc=Object.values(d.figures).filter(f=>f&&f.id&&f.nombre), nIn=inc.length;
-  if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."); return; }
-  if(!nIn && !Object.keys(d.logs||{}).length){ toast("Esa copia no tiene figuras ni registros que añadir."); return; }
-  const nNew=inc.filter(f=>!S.figures[f.id]).length, nOld=nIn-nNew;
-  if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Las figuras, registros y vídeos que no estén en ella se borran y no se puede deshacer.`, ok:"Reemplazar todo"}))) return;
-  if(replace){
-    Object.keys(S.figures).forEach(id=>{ if(!d.figures[id]) deleteFigure(id); });
-    Object.keys(S.logs).forEach(id=>{ if(!(d.logs||{})[id]){ delete S.logs[id]; persist({t:"logdel",id}); } });
+  // Lo que venía en la copia aunque esté mal formado: en «Reemplazar» eso no se borra de este dispositivo.
+  const rawIds = o => new Set(isObj(o) ? Object.entries(o).flatMap(([k,v])=>[k, ...(isObj(v)&&typeof v.id==="string"?[v.id]:[])]) : []);
+  const inFigs = rawIds(d.figures), inLogs = rawIds(d.logs), inQs = rawIds(d.preguntas);
+  const san = sanitizeImport(d), desc = san.descartadas ? ` · ${san.descartadas} descartadas por estar mal formadas` : "";
+  d.figures = san.figures; d.logs = san.logs; d.preguntas = san.preguntas;
+  const inc=Object.values(d.figures), nIn=inc.length;
+  if(!nIn && replace){ toast("Esa copia no tiene figuras. No reemplazo tu repertorio para no dejarlo vacío."+desc); return; }
+  if(!nIn && !Object.keys(d.logs).length){ toast("Esa copia no tiene figuras ni registros que añadir."+desc); return; }
+  const nuevas = inc.filter(f=>!S.figures[f.id]), distintas = inc.filter(f=>S.figures[f.id] && figDiffers(S.figures[f.id], f));
+  const nIg = nIn - nuevas.length - distintas.length, nD = distintas.length;
+  if(replace && !(await askConfirm({title:"¿Reemplazar todo tu repertorio?", msg:`Se queda solo lo que hay en la copia (${pl(nIn,"figura","figuras")}). Antes se guarda una instantánea de tus datos: podrás volver atrás en Ajustes → Instantáneas.${san.descartadas?` ${san.descartadas} ${san.descartadas===1?"entrada está mal formada y no se importará":"entradas están mal formadas y no se importarán"}.`:""}`, ok:"Reemplazar todo"}))) return;
+  if(!(await takeSnapshot(replace ? "antes-de-reemplazar" : "antes-de-importar"))){ toast("No se pudo guardar una copia de tus datos de ahora. No he cambiado nada."); return; }
+  // Al añadir, las que ya tienes y son distintas solo se cambian si lo eliges; cerrar o cancelar las conserva.
+  const usar = replace || (nD>0 && await askConfirm({title:`${nD} ${nD===1?"figura ya está y es distinta":"figuras ya están y son distintas"}`, msg:"La copia tiene otra versión de figuras que ya tienes (nombre, estado, repaso o notas).", ok:"Usar las de la copia", cancel:"Conservar las mías"}));
+  // Si algo falla a mitad, se vuelve a lo de antes (lo mismo que guarda la instantánea): nunca queda medio importado.
+  const prev = clone(S);
+  try{
+    if(replace){
+      // Sin borrar sus vídeos: así la instantánea «antes de reemplazar» las recupera enteras.
+      Object.keys(S.figures).forEach(id=>{ if(!d.figures[id] && !inFigs.has(id)){ delete S.figures[id]; persist({t:"figdel",id}); } });
+      Object.keys(S.logs).forEach(id=>{ if(!d.logs[id] && !inLogs.has(id)){ delete S.logs[id]; persist({t:"logdel",id}); } });
+    }
+    // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
+    (replace ? inc : [...nuevas, ...(usar ? distintas : [])]).forEach(f=>{
+      const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
+      const keep = mine.filter(a=>!got.has(a.id));
+      if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
+      const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
+      if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
+      S.figures[f.id]=f; persist({t:"fig",id:f.id});
+      if(failImport){ failImport = false; throw new Error("fallo simulado"); }
+    });
+    // Las que se quedan como las tuyas reciben los intentos y partes que solo trae la copia; lo tuyo no cambia.
+    if(!replace) inc.filter(f=>S.figures[f.id] && S.figures[f.id]!==f).forEach(f=>{
+      const g = S.figures[f.id], add = (mine, got) => { const ids = new Set(mine.map(x=>x.id)), extra = got.filter(x=>!ids.has(x.id));
+        return extra.length ? [...mine, ...extra].sort((x,y)=>(x.creado||0)-(y.creado||0)) : null; };
+      const ni = add(intentosOf(g), intentosOf(f)), np = add(partesOf(g), partesOf(f));
+      if(ni) g.intentos = ni; if(np) g.partes = np;
+      if(ni || np) persist({t:"fig",id:f.id});
+    });
+    Object.values(d.logs).forEach(l=>{ if(replace || !S.logs[l.id]){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
+    // Preguntas: «Reemplazar» deja las de la copia (sin borrar las que venían mal formadas); «Añadir», las que faltan.
+    // Al añadir, una abierta para una posición y baile que ya tienes abierta no se duplica (p. ej. la crea la migración de una copia antigua).
+    S.preguntas ||= {};
+    if(replace) Object.keys(S.preguntas).forEach(id=>{ if(!d.preguntas[id] && !inQs.has(id)) delete S.preguntas[id]; });
+    Object.values(d.preguntas).forEach(q=>{
+      if(!replace && (S.preguntas[q.id] || (!q.resuelta && openQs().some(x=>x.pos===q.pos && qBaile(x)===qBaile(q))))) return;
+      S.preguntas[q.id]=q;
+    });
+    const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
+    S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
+    if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
+    if(d.actividad && typeof d.actividad==="object"){ const a = replace ? {} : {...(S.actividad||{})}; Object.entries(d.actividad).forEach(([k,v])=>{ a[k]=Math.max(a[k]||0, +v||0); }); S.actividad=a; }
+    saveMeta();
+  }catch{
+    applyData(migrate(prev)); persist({t:"meta"}); render();
+    confirmKey=null; openSettings();
+    toast("No se pudo importar la copia. He dejado tus datos como estaban.");
+    return;
   }
-  // Los vídeos no viajan en la copia: los intentos que solo están en este dispositivo se conservan.
-  inc.forEach(f=>{
-    const mine = intentosOf(S.figures[f.id]), got = new Set(intentosOf(f).map(a=>a.id));
-    const keep = mine.filter(a=>!got.has(a.id));
-    if(keep.length) f.intentos = [...intentosOf(f), ...keep].sort((x,y)=>(x.creado||0)-(y.creado||0));
-    const gotP = new Set(partesOf(f).map(x=>x.id)), keepP = partesOf(S.figures[f.id]).filter(x=>!gotP.has(x.id));
-    if(keepP.length) f.partes = [...partesOf(f), ...keepP].sort((x,y)=>(x.creado||0)-(y.creado||0));
-    S.figures[f.id]=f; persist({t:"fig",id:f.id});
-  });
-  Object.values(d.logs||{}).forEach(l=>{ if(l&&l.id){ S.logs[l.id]=l; persist({t:"log",id:l.id}); } });
-  const merge=(cur,inc)=> Array.isArray(inc)&&inc.length ? (replace ? [...inc] : [...new Set([...cur,...inc])]) : cur;
-  S.positions=merge(S.positions,d.positions); S.holds=merge(S.holds,d.holds); S.classes=merge(S.classes,d.classes);
-  if(d.linkRep && typeof d.linkRep==="object"){ S.linkRep = replace ? clone(d.linkRep) : Object.assign({}, d.linkRep, S.linkRep); persist({t:"lr"}); }
-  if(d.actividad && typeof d.actividad==="object"){ const a = replace ? {} : {...(S.actividad||{})}; Object.entries(d.actividad).forEach(([k,v])=>{ a[k]=Math.max(a[k]||0, +v||0); }); S.actividad=a; }
-  saveMeta();
   confirmKey=null; openSettings();
-  toast(replace ? `Repertorio restaurado: ${pl(nIn,"figura","figuras")}`
-    : !nNew ? (nIn ? `Ninguna figura nueva: ${nIn===1?"la de la copia ya estaba":`las ${nIn} de la copia ya estaban`}` : "Registros añadidos")
-    : `${pl(nNew,"figura añadida","figuras añadidas")}${nOld?` · ${nOld} ya ${nOld===1?"estaba":"estaban"}`:""}`);
+  toast((replace ? `Repertorio restaurado: ${pl(nIn,"figura","figuras")}`
+    : !nIn ? "Registros añadidos"
+    : (nuevas.length ? pl(nuevas.length,"figura añadida","figuras añadidas") : "Ninguna figura nueva")
+      + (nIg ? ` · ${nIg} ya ${nIg===1?"estaba":"estaban"}` : "")
+      + (nD ? (usar ? ` · ${nD} ${nD===1?"actualizada":"actualizadas"} con la copia` : ` · se conservan tus ${nD}`) : ""))+desc);
 }
 function loadExamples(){
   const ex = [
@@ -3777,7 +4303,7 @@ function loadExamples(){
 
 // ---------- render ----------
 // Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
-const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-view","data-act","data-promote"];
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote","data-chainopt"];
 function focusKey(el){
   if(!el || el===document.body) return null;
   if(el.id) return "#"+CSS.escape(el.id);
@@ -3786,6 +4312,7 @@ function focusKey(el){
 }
 let focusAfter = null;
 function render(){
+  syncBaile();
   const view = $("#v-"+tab), ae = document.activeElement;
   const fk = focusAfter || (view && view.contains(ae) && focusKey(ae)); focusAfter = null;
   paintNight();   // marcar o desmarcar cambia si el social sigue en curso
@@ -3797,6 +4324,7 @@ function render(){
   else if(tab==="repasar") renderRepasar();
   else if(tab==="enlazar") renderEnlazar();
   else if(tab==="social") renderSocial();
+  safeNote($("#v-"+tab));
   hydrateVideos($("#v-"+tab)); hydrateCovers($("#v-"+tab));
   justSaved = null; lastSal = null;
   if(fk && !$("#sheet-root .sheet") && !$("#overlay-root").firstElementChild){ const el=$("#v-"+tab).querySelector(fk); if(el && el!==document.activeElement) el.focus({preventScroll:true}); }
@@ -3816,7 +4344,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-mins],[data-tema],[data-fest]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-chainopt],[data-mins],[data-tema],[data-fest]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -3831,10 +4359,12 @@ document.addEventListener("click", async e=>{
   if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
   if(d.grade) return grade(d.grade);
   if(d.lview){ linkView=d.lview; return render(); }
+  if(d.baile){ baileSel=d.baile; lsSet(LS_BAILE, baileSel); chain=null; linkPos=null; return render(); }
   if(d.pos!==undefined && !t.closest("form")){ learn("pos"); linkPos=d.pos; linkHold=""; chain=null;
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
   if(d.hold!==undefined){ linkHold=d.hold; return render(); }
+  if(d.chainopt){ if(d.chainopt==="safe") chainSafe=!chainSafe; else chainStrict=!chainStrict; lsSet(LS_CHAIN, {safe: chainSafe, strict: chainStrict}); chain=chain ? makeChain(linkPos) : null; return render(); }
   if(d.vista){ filt.vista=d.vista; return render(); }
   if(d.fest){ filt.estado=d.fest; return render(); }
   if(d.promote){ promoteFig(d.promote, d.to||"disponible", !!t.closest("[data-viewfig]"), t); return; }
@@ -3851,6 +4381,7 @@ document.addEventListener("click", async e=>{
   if(a==="close") return requestClose();
   if(a==="quick") return openFigure(null,{quick:true});
   if(a==="full") return openFigure();
+  if(a==="safe-retry") return location.reload();
   if(a==="examples"){ closeSheet(); return loadExamples(); }
   if(a==="clear-examples"){ figs().filter(f=>f.ejemplo).forEach(f=>deleteFigure(f.id)); toast("Ejemplos quitados"); return openSettings(); }
   if(a==="coach"){ learn("coach"); return runCoach(); }
@@ -3865,7 +4396,14 @@ document.addEventListener("click", async e=>{
   if(a==="rev-one"){ if(!S.figures[d.id]) return; closeSheet(); training=null; session={kind:"fig", ids:[d.id], i:0, revealed:false, done:[], promote:[], weak:[]}; return go("repasar"); }
   if(a==="train-next"){ training.i++; return runTrainingStep(); }
   if(d.mins){ trainMins=+d.mins; lsSet(LS_MINS, trainMins); return render(); }
-  if(a==="goto-pos"){ linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
+  if(a==="sim-open") return openSim();
+  if(a==="goto-pos"){ if(t.closest("[data-sim]")) closeSheet(); linkPos=d.p; linkHold=""; linkView="aqui"; chain=null; return go("enlazar"); }
+  if(a==="q-done" || a==="q-del"){
+    const q = S.preguntas?.[d.id]; if(!q) return;
+    const copy = clone(q);
+    if(a==="q-done") resolveQuestion(q.id); else { delete S.preguntas[q.id]; persist({t:"meta"}); render(); }
+    return toast(a==="q-done" ? `Resuelta: salida desde ${copy.pos}` : "Pregunta quitada", {label:"Deshacer", fn:()=>{ S.preguntas[copy.id]=copy; persist({t:"meta"}); render(); }});
+  }
   if(a==="goto-filter"){ filt.estado=d.f; filt.q=""; return go("repertorio"); }
   if(a==="chain"){ learn("chain"); chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; blockHold=null; blockPick=null; return showBlock(); }
@@ -3877,6 +4415,7 @@ document.addEventListener("click", async e=>{
   }
   if(a==="bk-tap") return bkTap();
   if(a==="unblock") return closeBlock();
+  if(a==="snap-restore") return restoreSnapshot(t.dataset.key);
   if(a==="set-back"){ if(sheetDirty() && !(await askConfirm({title:"¿Descartar los cambios?", msg:"Lo que has escrito en esta pantalla no se ha guardado.", ok:"Descartar cambios", cancel:"Seguir editando"}))) return; return setGo(null); }
   if(a==="night-off"){
     setNight(false); releaseWake();
@@ -3927,6 +4466,7 @@ document.addEventListener("click", async e=>{
   if(a==="ai-share") return shareCapture();
   if(a==="ai-apply"){ const t=$("#ai-paste")?.value||""; if(!t.trim()){ toast("Pega primero la respuesta de Claude."); return; } return applySuggestion(cleanSug(parseReply(t))); }
   if(a==="copy"){
+    if(safeMode){ toast("Modo seguro: no se puede exportar."); return; }
     const txt=exportData();
     try{ await navigator.clipboard.writeText(txt); lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copiado. Pégalo en Notas o donde lo quieras guardar."); openSettings(); }
     catch{ const ta=$("#exp-text"); ta.hidden=false; ta.value=txt; ta.focus(); ta.select(); toast("No se pudo copiar solo. Mantén pulsado el recuadro y elige Copiar."); }
@@ -3992,14 +4532,17 @@ $("#confirm-root").addEventListener("click", e=>{
   if(b.classList.contains("confirm-bg") && e.target!==b) return;
   confirmDone(b.dataset.cf==="ok");
 });
+// Al salir de la app a mitad de un simulacro se para (el conteo no puede seguir sonando de fondo) y la hoja
+// vuelve a la pantalla de empezar, con un aviso. Lo ya puntuado queda guardado.
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden" && sim && sim.fase!=="fin"){ simStop(); if($("[data-sim]")) openSim("Se paró al salir de la app. Empieza otra vez cuando quieras."); } });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState!=="visible") return; paintNight(); if(tab==="social"||busy||socialLive()) askWake(); });
 $("#btn-new").onclick=()=>openFigure(null,{quick:true});
 $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; openSettings(); };
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
-if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
-  SCHEMA, migrate, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), setFigs: o=>{ S.figures=o; render(); }
+if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
+  SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

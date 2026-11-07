@@ -7,8 +7,9 @@ funciona sin conexión y guarda tus figuras y vídeos **en el propio iPhone** (s
 
 1. Entra en github.com con tu cuenta (o crea una gratis).
 2. Pulsa **New repository**, nombre `bachateca`, marca **Public** y créalo.
-3. En el repositorio: **Add file → Upload files**, arrastra **todos** los archivos de esta carpeta
-   (`index.html`, `sw.js`, `manifest.webmanifest` y los `icon-*.png`) y pulsa **Commit changes**.
+3. En el repositorio: **Add file → Upload files**, arrastra **todo el contenido del repositorio** (todos los archivos
+   y carpetas de esta carpeta, incluida la carpeta `sonidos/`) y pulsa **Commit changes**.
+   Sin `sonidos/` la app no funciona sin conexión.
 4. Ve a **Settings → Pages**. En *Build and deployment*, elige **Deploy from a branch**, rama **main**, carpeta **/ (root)** y **Save**.
 5. En un minuto tendrás la dirección: `https://TU-USUARIO.github.io/bachateca/`
 
@@ -32,10 +33,28 @@ Todo vive en el iPhone: si borras la app, se pierde. Cada cierto tiempo:
 - **Ajustes → Exportar copia** (figuras, registros y ajustes) y guárdala en Archivos o iCloud Drive.
 - Los vídeos ya están en tu carrete; desde cada figura puedes usar **Guardar en Fotos**.
 
+**Ajustes → Instantáneas**: la app guarda sola una copia al día y otra antes de importar o restaurar; no sustituyen a
+Exportar, porque viven en el mismo iPhone.
+
 ## 5. Actualizar la app
 
-Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v36` → `bachateca-v37`).
+Sube el `index.html` nuevo al repositorio y sube el número de versión en `sw.js` (por ejemplo, `bachateca-v51` → `bachateca-v52`).
 La próxima vez que abras la app con conexión, se actualizará sola. Tus datos no se tocan.
+
+## Practicar para el social
+
+- **Simulacro de social** (en Social y en Repasar): mientras suena la cuenta, la app te da una posición y un agarre.
+  Pulsa **«La tengo»** antes del siguiente 1; después ves las salidas posibles y te calificas. Esa calificación
+  alimenta tu repaso de enlaces. Si una posición no tiene salidas, se convierte en una pregunta para clase.
+- **Para tu próxima clase** (en Inicio): cada bloque que te atascas crea una pregunta. Si luego guardas una figura
+  desde esa posición, la app te ofrece marcar la pregunta como respondida.
+- Enlazar, Social y Repasar muestran un selector de baile solo cuando tienes figuras de más de un baile; los enlaces,
+  las cadenas y la lista del social nunca mezclan bailes.
+- Las cadenas respetan el agarre elegido. Puedes usar **«Solo seguras»** y **«Agarres exactos»**; los pasos muestran
+  «en práctica» y «agarre sin indicar».
+- Una figura marcada en un social cuenta como un repaso «Fluida» (una vez al día); si borras el registro, se deshace.
+  «Atrasada» ya no se confunde con «Olvidada».
+- La cuenta pide a iOS el audio de reproducción, para que suene aunque el iPhone esté en silencio.
 
 ## Pruebas automáticas
 
@@ -46,13 +65,15 @@ pip install playwright && playwright install chromium   # solo la primera vez
 python3 tests/test_bachateca.py
 ```
 
+Para probar también con el motor de Safari: `playwright install webkit` y luego `BROWSER=webkit python3 tests/test_bachateca.py`.
+
 Abren la app en un navegador sin ventana y con datos de prueba: no tocan tus datos.
 
 ## Versión de los datos
 
 Los datos guardados llevan un número de versión (`schema`). Si un cambio necesita guardar las figuras de otra forma,
 se sube `SCHEMA` en `index.html` y se añade un paso en `MIGRATIONS`: al abrir la app, los datos antiguos se ponen al día
-solos, sin borrar nada. Las copias exportadas con una versión anterior se ponen al día al importarlas.
+solos, sin borrar nada. La versión 1.51 pasa los datos a la versión 7 (añade las preguntas para clase). Las copias exportadas con una versión anterior se ponen al día al importarlas.
 
 ## Limitaciones conocidas
 

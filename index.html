@@ -3767,12 +3767,13 @@ const snapWhen = at => { try{ return new Date(at).toLocaleString("es-ES",{day:"n
 let restoring = false;
 async function restoreSnapshot(key){
   if(restoring) return false;
+  if(safeMode){ toast("Modo seguro: no se puede restaurar."); return false; }
   restoring = true;
   try{
     if(!(await askConfirm({title:"¿Volver a esta instantánea?", msg:"Antes se guarda otra instantánea con tus datos de ahora, por si quieres deshacerlo. Los vídeos no cambian.", ok:"Restaurar"}))) return false;
     let v = null; try{ v = await kvGet(key); }catch{}
     if(!v || !v.state || typeof v.state!=="object"){ toast("No se pudo leer esa instantánea. No he cambiado nada."); return false; }
-    await takeSnapshot("antes-de-restaurar");
+    if(!(await takeSnapshot("antes-de-restaurar"))){ toast("No se pudo guardar una copia de tus datos de ahora. No he cambiado nada."); return false; }
     applyData(migrate(clone(v.state)));
     persist({t:"meta"}); render(); openSettings();
     toast(`Restaurado: ${pl(figs().length,"figura","figuras")}`);

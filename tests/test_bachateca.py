@@ -1464,6 +1464,50 @@ def exportar_no_incluye_instantaneas(browser):
     ctx.close()
 
 
+_PUT_SNAP = """(snap) => new Promise((res, rej) => {
+  const r = indexedDB.open("bachateca", 1);
+  r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite");
+    t.objectStore("kv").put(snap, "snap:5000:diaria");
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error); };
+  r.onerror = () => rej(r.error); })"""
+_SNAP_1FIG = {"at": 5000, "reason": "diaria", "nFig": 1, "nLog": 0, "schema": 6,
+              "state": {"schema": 6, "figures": {"v1": {"id": "v1", "nombre": "vieja", "entrada": "a", "salida": "b", "estado": "practica", "partes": []}}, "logs": {}}}
+
+
+@test
+def restaurar_en_modo_seguro_no_hace_nada(browser):
+    seed = {"schema": 6, "figures": {f"r{i}": fig(i, "a", "b", id=f"r{i}") for i in range(3)}}
+    ctx, p, errors = open_app(browser, seed=seed, init=_parche_lectura(False))
+    assert p.evaluate("() => window.__bachateca.safeMode()") is True
+    antes = p.evaluate("() => JSON.stringify(window.__bachateca.state())")
+    p.evaluate(_PUT_SNAP, _SNAP_1FIG)
+    assert p.evaluate("() => window.__bachateca.restoreSnapshot('snap:5000:diaria')") is False
+    assert "Modo seguro" in p.inner_text(".toast")
+    assert p.evaluate("() => JSON.stringify(window.__bachateca.state())") == antes
+    assert "v1" not in p.evaluate("() => window.__bachateca.state().figures")
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def restaurar_sin_copia_previa_no_cambia_nada(browser):
+    seed = {"schema": 6, "guardado": 1000, "figures": {f"r{i}": fig(i, "a", "b", id=f"r{i}") for i in range(3)}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.wait_for_function("async () => (await window.__bachateca.listSnapshots()).length === 1")
+    p.evaluate(_PUT_SNAP, _SNAP_1FIG)
+    p.evaluate("""() => { const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (v, k) {
+        if (typeof k === "string" && k.startsWith("snap:")) throw new DOMException("simulado", "QuotaExceededError");
+        return put.apply(this, arguments); }; }""")
+    p.evaluate("() => { window.__t = window.__bachateca.restoreSnapshot('snap:5000:diaria'); }")
+    p.click('#confirm-root [data-cf="ok"]')
+    assert p.evaluate("() => window.__t") is False
+    assert "No he cambiado nada" in p.inner_text(".toast")
+    assert len(p.evaluate("() => window.__bachateca.state().figures")) == 3
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

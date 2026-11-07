@@ -712,7 +712,8 @@ def migracion_5_marcas_y_errores(browser):
     m = r["m"]["figures"]
     assert r["S"] >= 5 and r["m"]["schema"] == r["S"] and r["same"], r
     assert m["a"]["errores"] == [] and m["a"]["intentos"][0]["marcadores"] == [], m
-    assert m["b"]["errores"] == [{"id": "e", "nota": "n"}], m
+    e = m["b"]["errores"][0]  # la migración 9→10 le añade veces y ultima, sin tocar el resto
+    assert len(m["b"]["errores"]) == 1 and e["id"] == "e" and e["nota"] == "n" and e["veces"] == 1, m
     ctx.close()
 
 
@@ -2269,7 +2270,7 @@ def migracion_7_preguntas(browser):
       const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 6});
       const sinPreg = B.migrate({schema: 6, figures: {}});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), n3: Object.keys(m3.preguntas).length, sinPreg: sinPreg.preguntas, t3: t(-3), S: B.SCHEMA}; }""")
-    assert r["S"] == 9 and r["m"]["schema"] == 9, r
+    assert r["S"] >= 9 and r["m"]["schema"] == r["S"], r
     qs = list(r["m"]["preguntas"].values())
     assert len(qs) == 1 and qs[0]["pos"] == "Sombra" and qs[0]["creada"] == r["t3"] and qs[0]["baile"] == "Bachata" and not qs[0].get("resuelta"), qs
     assert r["same"] and r["n3"] == 1, "repetir la migración no duplica"
@@ -2588,7 +2589,7 @@ def migracion_8_repaso_por_baile(browser):
       const old = {schema: 7, figures: {}, linkRep: {Cerrada: {step: 2, due: t(3)}, "Salsa\u241fSombra": {step: 1, due: t(1)}}};
       const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 7});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2), same3: JSON.stringify(m) === JSON.stringify(m3), S: B.SCHEMA}; }""")
-    assert r["S"] == 9 and r["m"]["schema"] == 9, r
+    assert r["S"] >= 9 and r["m"]["schema"] == r["S"], r
     lr = r["m"]["linkRep"]
     assert sorted(lr) == ["Bachata\u241fCerrada", "Salsa\u241fSombra"] and lr["Bachata\u241fCerrada"]["step"] == 2, lr
     assert r["same"] and r["same3"], "repetir la migración no cambia nada"
@@ -2713,7 +2714,7 @@ def migracion_9_enlaces(browser):
       const m = B.migrate({schema: 8, figures: {}}), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 8});
       const k = B.migrate({schema: 8, figures: {}, enlaces: {"a>b": {a: "a", b: "b", fecha: "2030-01-01", veces: 2}}});
       return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k: k.enlaces, S: B.SCHEMA}; }""")
-    assert r["S"] == 9 and r["m"]["schema"] == 9 and r["m"]["enlaces"] == {}, r
+    assert r["S"] >= 9 and r["m"]["schema"] == r["S"] and r["m"]["enlaces"] == {}, r
     assert r["same"] and r["k"]["a>b"]["veces"] == 2, r
     assert not errors, errors
     ctx.close()
@@ -2800,6 +2801,146 @@ def sin_figuras_con_ruta_no_hay_preguntas(browser):
     p.click('nav.tabs [data-tab="repasar"]')
     assert p.locator('[data-act="start-quiz"]').count() == 0
     assert "Preguntas de memoria" in p.locator("#v-repasar").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+# ---------------------------------------------------------------- errores recurrentes (fase 4)
+@test
+def migracion_10_errores(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const B = window.__bachateca;
+      const old = {schema: 9, figures: {a: {id: "a", nombre: "A", errores: [{id: "e1", nota: "n", fecha: "2030-01-05"}, {id: "e2", nota: "m"}]}, b: {id: "b", nombre: "B"}}};
+      const m = B.migrate(old), m2 = B.migrate(m), m3 = B.migrate({...m, schema: 9});
+      const k = B.migrate({schema: 9, figures: {a: {id: "a", nombre: "A", errores: [{id: "e1", nota: "n", fecha: "2030-01-05", veces: 4, ultima: "2030-02-01"}]}}});
+      return {m, same: JSON.stringify(m) === JSON.stringify(m2) && JSON.stringify(m) === JSON.stringify(m3), k, t: B.todayStr(), S: B.SCHEMA}; }""")
+    assert r["S"] >= 10 and r["m"]["schema"] == r["S"], r
+    e = r["m"]["figures"]["a"]["errores"]
+    assert e[0]["veces"] == 1 and e[0]["ultima"] == "2030-01-05", e
+    assert e[1]["veces"] == 1 and e[1]["ultima"] == r["t"], "sin fecha, hoy"
+    assert r["same"], "repetir la migración no cambia nada"
+    assert r["k"]["figures"]["a"]["errores"][0]["veces"] == 4 and r["k"]["figures"]["a"]["errores"][0]["ultima"] == "2030-02-01", "no pisa lo que ya hay"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def importar_valida_los_campos_de_errores(browser):
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => window.__bachateca.sanitizeImport({figures: {f1: {id: "f1", nombre: "A", errores: [
+      {id: "e1", nota: "x", veces: 3, ultima: "2030-01-01", resuelto: "2030-01-02"},
+      {id: "e2", nota: "y", veces: -2, ultima: "ayer", resuelto: 5},
+      {id: "e3", nota: "z", veces: "2"}]}}}).figures.f1.errores""")
+    assert r[0]["veces"] == 3 and r[0]["ultima"] == "2030-01-01" and r[0]["resuelto"] == "2030-01-02", r
+    assert r[1]["veces"] == 1 and "ultima" not in r[1] and "resuelto" not in r[1], r
+    assert r[2]["veces"] == 2, r
+    assert not errors, errors
+    ctx.close()
+
+
+def err_seed(**kw):
+    errs = [{"id": "e1", "nota": "me adelanto", "b": 4, "desde": "i1", "marca": "m1", "fecha": "2030-01-01", "veces": 1, "ultima": "2030-01-01"},
+            {"id": "e2", "nota": "brazo bajo", "b": 2, "desde": "i1", "marca": "m2", "fecha": "2030-01-02", "veces": 3, "ultima": "2030-01-03"}]
+    return {"figures": {"f1": fig(1, "Cerrada", "Sombra", errores=errs, **kw)}}
+
+
+@test
+def marcar_otra_vez_el_mismo_error(browser):
+    a = att(1, "a1", pulso={"vid": "a1", "modo": "todos", "marcas": [{"b": 1, "s": 0.1}, {"b": 2, "s": 0.4}, {"b": 3, "s": 0.7}, {"b": 4, "s": 1.0}]}, marcadores=[])
+    seed = cmp_seed(); seed["schema"] = 9
+    seed["figures"]["f1"]["errores"] = [{"id": "e1", "nota": "me adelanto", "b": 4, "desde": "i1", "marca": "m1", "fecha": "2030-01-01"}]
+    ctx, p, errors = open_app(browser, seed=seed)
+    put_fixture(p, ["v1", "a1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('[data-act="att-open"][data-att="i1"]'); p.click('[data-act="cmp-open"]')
+    p.wait_for_function("document.querySelector('#cmp-t') && document.querySelector('#cmp-t').readyState >= 1 && document.querySelector('#cmp-m').readyState >= 1")
+    p.click('#cmp-line [data-cb="4"]'); p.click('[data-cmk="error"]')
+    assert "¿Es uno de estos?" in p.locator("#cmp-form").inner_text()
+    p.click('#cmp-form [data-esame="e1"]')
+    assert p.locator('#cmp-form [data-esame="e1"]').get_attribute("aria-pressed") == "true"
+    p.click("#cmp-fsave")
+    f = p.evaluate("() => window.__bachateca.state().figures.f1")
+    t = p.evaluate("() => window.__bachateca.todayStr()")
+    assert len(f["errores"]) == 1, "no se duplica"
+    e = f["errores"][0]
+    assert e["veces"] == 2 and e["ultima"] == t, e
+    m = f["intentos"][0]["marcadores"][0]
+    assert e["marca"] == m["id"] and e["desde"] == "i1", (e, m)
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def error_resuelto_sale_del_repaso(browser):
+    ctx, p, errors = open_app(browser, seed=err_seed())
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    card = p.locator("section:has(#fv-e)")
+    txt = card.inner_text()
+    assert "×3" in txt and "×1" in txt and txt.index("brazo bajo") < txt.index("me adelanto"), "el más repetido primero"
+    assert "Ya no me pasa" in txt and "Resueltos" not in txt, txt
+    p.click('[data-act="err-res"][data-err="e2"]')
+    t = p.evaluate("() => window.__bachateca.todayStr()")
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.errores[1].resuelto") == t
+    # Deshacer lo devuelve a activos.
+    p.click(".toast .undo")
+    assert "resuelto" not in p.evaluate("() => window.__bachateca.state().figures.f1.errores[1]")
+    p.click('[data-act="err-res"][data-err="e2"]')
+    card = p.locator("section:has(#fv-e)")
+    assert "Resueltos (1)" in card.inner_text(), card.inner_text()
+    p.click('[data-act="rev-one"]')
+    ojo = p.locator("#v-repasar .ojo").inner_text()
+    assert "me adelanto" in ojo and "brazo bajo" not in ojo, ojo
+    p.click('[data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click("section:has(#fv-e) details summary")
+    p.click('[data-act="err-reopen"][data-err="e2"]')
+    e = p.evaluate("() => window.__bachateca.state().figures.f1.errores[1]")
+    assert "resuelto" not in e and e["veces"] == 4 and e["ultima"] == t, e
+    p.click('[data-act="rev-one"]')
+    assert "brazo bajo" in p.locator("#v-repasar .ojo").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def errores_activos_limitan_el_intervalo(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    def repasar(p, fid):
+        p.click('nav.tabs [data-tab="repertorio"]'); p.click(f'#v-repertorio [data-view="{fid}"]')
+        p.click('[data-act="rev-one"]'); p.click('[data-act="reveal"]'); p.click('[data-grade="fluida"]')
+    # Con un error activo: varias «Sí» seguidas y el repaso no pasa de 7 días.
+    seed = err_seed(rep={"step": 0, "due": d(0), "aciertos": 0, "fallos": 0})
+    seed["figures"]["f2"] = fig(2, "Sombra", "Cerrada", rep={"step": 0, "due": d(0), "aciertos": 0, "fallos": 0})
+    ctx, p, errors = open_app(browser, seed=seed)
+    for _ in range(5):
+        repasar(p, "f1"); repasar(p, "f2")
+    f1, f2 = p.evaluate("() => { const s = window.__bachateca.state().figures; return [s.f1.rep, s.f2.rep]; }")
+    assert f1["step"] == 2 and f1["due"] <= d(7), f1
+    assert f2["step"] == 5 and f2["due"] == d(60), f2
+    # Resueltos todos, vuelve a espaciarse.
+    p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.errores.forEach(e => e.resuelto = window.__bachateca.todayStr()); }")
+    repasar(p, "f1")
+    assert p.evaluate("() => window.__bachateca.state().figures.f1.rep.step") == 3
+    # La misma regla para las preguntas de memoria y para el social.
+    r = p.evaluate("""() => { const B = window.__bachateca, f = {id: "g", nombre: "G", errores: [{id: "x", nota: "n", veces: 1}], rep: {step: 4, due: B.todayStr(30), aciertos: 4, fallos: 0}};
+      B.capByErrors(f); const a = {...f.rep}; f.errores[0].resuelto = B.todayStr(); f.rep = {step: 4, due: B.todayStr(30)}; B.capByErrors(f); return [a, f.rep]; }""")
+    assert r[0]["step"] == 2 and r[0]["due"] == d(7) and r[1]["step"] == 4 and r[1]["due"] == d(30), r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_con_errores_activos_limita_el_intervalo(browser):
+    hoy = __import__("datetime").date.today()
+    d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
+    seed = err_seed(rep={"step": 3, "due": d(0), "last": d(-1), "aciertos": 3, "fallos": 0})
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="social"]'); p.click('[data-act="log-open"]')
+    p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
+    S = p.evaluate("() => window.__bachateca.state()")
+    rep = S["figures"]["f1"]["rep"]; l = list(S["logs"].values())[0]
+    assert rep["step"] == 2 and rep["due"] == d(7), rep
+    assert l["repDespues"]["f1"] == rep, "el registro guarda el repaso ya limitado"
     assert not errors, errors
     ctx.close()
 

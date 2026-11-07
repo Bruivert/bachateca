@@ -1057,9 +1057,19 @@ function quizItems(){
   return out;
 }
 // Nota de un repaso que no es la tarjeta de Repasar (preguntas de memoria): sube como mucho una vez al día, pero cuenta como actividad.
+// D8: mientras una figura tenga errores activos (sin `resuelto`), su repaso no se espacia más de 7 días (peldaño 2 de LADDER):
+// el paso se limita a 2 y la fecha no pasa de hoy+7. Se llama tras CADA actualización de f.rep (Repasar, preguntas, social).
+// No adelanta fechas que ya sean anteriores ni toca las incompletas (su due=mañana ya es menor).
+function capByErrors(f){
+  if(!f || !f.rep || !erroresOf(f).some(e=>!e.resuelto)) return f;
+  f.rep.step = Math.min(f.rep.step, 2);
+  const tope = todayStr(LADDER[2]); if(!f.rep.due || f.rep.due>tope) f.rep.due = tope;
+  return f;
+}
 function reviewFig(f, g){
   if(!(g==="fluida" && f.rep && f.rep.last===todayStr())) f.rep = nextRep(f.rep, g);
   if(f.estado==="incompleta") f.rep.due = todayStr(1);
+  capByErrors(f);
   S.figures[f.id]=f; persist({t:"fig",id:f.id});
   const hoy=todayStr(); S.actividad = S.actividad || {}; S.actividad[hoy]=(S.actividad[hoy]||0)+1; persist({t:"act"});
 }
@@ -1104,7 +1114,7 @@ function checkMarcas(marcas){
 // Cada cambio en la forma de guardar los datos sube SCHEMA y añade un paso a MIGRATIONS.
 // Los pasos solo añaden o completan campos: nunca borran figuras, registros ni vídeos,
 // y se pueden repetir sin efecto (si la app se cierra a mitad, al abrirla de nuevo se rehacen).
-const SCHEMA = 9;
+const SCHEMA = 10;
 const MIGRATIONS = [
   // 0 → 1: punto de partida. Datos sin versión (hasta la 1.35): se completa lo que el código ya suponía por defecto.
   c => {
@@ -1177,6 +1187,18 @@ const MIGRATIONS = [
   // 8 → 9: enlaces comprobados ({"idA>idB": {a, b, fecha, veces}}): los que has bailado de verdad. Empieza vacío.
   c => {
     if(!(c.enlaces && typeof c.enlaces==="object" && !Array.isArray(c.enlaces))) c.enlaces = {};
+  },
+  // 9 → 10: errores recurrentes. Cada error de «Errores que cometo» gana veces (cuántas te ha pasado) y ultima (la última vez);
+  // resuelto (fecha en que dejó de pasarte) es opcional. Los de antes cuentan una vez, en su fecha (o hoy si no tenían).
+  c => {
+    Object.values(c.figures||{}).forEach(f=>{
+      if(!f || typeof f!=="object" || !Array.isArray(f.errores)) return;
+      f.errores.forEach(e=>{
+        if(!e || typeof e!=="object") return;
+        if(!Number.isInteger(e.veces) || e.veces<1) e.veces = 1;
+        if(typeof e.ultima!=="string" || !e.ultima) e.ultima = (typeof e.fecha==="string" && e.fecha) ? e.fecha : todayStr();
+      });
+    });
   }
 ];
 // Devuelve los datos al día. No toca el original: trabaja sobre una copia.
@@ -1964,7 +1986,7 @@ function renderRepasar(){
       ${ms && ms!=="nueva" ? `<span class="tagx ${MEM[ms][1]} flash-tag">${MEM[ms][0]}</span>` : ""}
       <div class="route"><span>${isMove(f)?`Empiezas en ${esc(f.entrada)}${holdTxt(f.agarreIn)}`:esc(TIPO[tipoOf(f)].t)+(f.entrada?` · en ${esc(f.entrada)}`:"")}</span></div>
       <div class="big">${esc(f.nombre)}</div>
-      ${erroresOf(f).length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${erroresOf(f).map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}
+      ${erroresActivos(f).length ? `<div class="ojo"><p class="small">Ojo con</p><ul>${erroresActivos(f).map(e=>`<li>${esc(e.nota)}</li>`).join("")}</ul></div>` : ""}
       ${!session.revealed ? `
         <p class="muted">${isMove(f)?"Hazla sin mirar. ¿Qué señal das y dónde terminas?":"Hazlo sin mirar, contando los tiempos."}</p>
         <button class="btn pri" data-act="reveal">Ver respuesta</button>
@@ -2007,6 +2029,7 @@ function grade(g){
     f.rep = nextRep(f.rep, g);
     // Incompleta: vuelve cada día hasta que te la terminen de enseñar, te salga como te salga.
     if(f.estado==="incompleta") f.rep.due = todayStr(1);
+    capByErrors(f);
     S.figures[f.id]=f; persist({t:"fig",id:f.id});
     if(g==="fluida" && f.estado==="practica" && f.rep.step>=2) session.promote.push(f.id);
   }
@@ -2351,7 +2374,7 @@ function saveLog(){
     // No cuenta si ya se repasó ese día o después (un social atrasado no mueve `last` hacia atrás ni suma encima).
     if(usable(f) && !(f.rep && f.rep.last && f.rep.last >= l.fecha)){
       (l.repAntes ||= {})[id] = clone(f.rep || null);
-      f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; counted = true;
+      f.rep = nextRep(f.rep, "fluida"); f.rep.last = l.fecha; capByErrors(f); counted = true;
       (l.repDespues ||= {})[id] = clone(f.rep);
     }
     if(f.estado==="practica" && f.usos>=PROMOTE_DISP) logSuggest.push({id, to:"disponible"});
@@ -2947,6 +2970,8 @@ async function pkBack(){
 // Así el 5 de la clase coincide con tu 5 aunque bailes más rápido, más lento o con otra canción: no es un fallo.
 const marcasOf = a => (a && Array.isArray(a.marcadores)) ? a.marcadores : [];
 const erroresOf = f => (f && Array.isArray(f.errores)) ? f.errores : [];
+// Los que aún te pasan, el más repetido primero (a igualdad, el más reciente).
+const erroresActivos = f => erroresOf(f).filter(e=>!e.resuelto).sort((a,b)=>(b.veces||1)-(a.veces||1) || String(b.ultima||"").localeCompare(String(a.ultima||"")));
 const cmpReady = (f, a) => !!(f && a && f.vid && pulsoOk(f.pulso, f.vid) && pulsoOk(a.pulso, a.vid));
 function cmpCardHTML(f, a){
   if(cmpReady(f, a)) return `<div class="fv-actions"><button type="button" class="btn pri" data-act="cmp-open" data-id="${esc(f.id)}" data-att="${esc(a.id)}">Comparar con la clase</button></div>${marcasHTML(a)}`;
@@ -2962,13 +2987,33 @@ function marcasHTML(a){
 }
 function errCardHTML(f){
   const es = erroresOf(f); if(!es.length) return "";
-  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3><ul class="cmp-marks">${es.map(e=>`<li><span>${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}</span><button type="button" class="icon-btn" data-act="err-del" data-id="${esc(f.id)}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
-    <p class="small muted">Salen al repasar la figura. Quítalos cuando ya no te pasen.</p></section>`;
+  const act = erroresActivos(f), res = es.filter(e=>e.resuelto);
+  const nota = e => `${esc(e.nota)}${e.b?` <span class="small muted">· en el ${beatName(e.b)}</span>`:""}`;
+  return `<section class="fv-card" aria-labelledby="fv-e"><h3 id="fv-e">Errores que cometo</h3>
+    ${act.length ? `<ul class="cmp-marks">${act.map(e=>`<li><span>${nota(e)} <span class="small muted">· ×${e.veces||1}${e.fecha?` · desde ${esc(e.fecha)}`:""}</span></span><button type="button" class="btn ghost sm" data-act="err-res" data-id="${esc(f.id)}" data-err="${esc(e.id)}">Ya no me pasa</button><button type="button" class="icon-btn" data-act="err-del" data-id="${esc(f.id)}" data-err="${esc(e.id)}" aria-label="Quitar «${esc(e.nota)}»">✕</button></li>`).join("")}</ul>
+      <p class="small muted">Salen al repasar la figura. Márcalos como resueltos cuando ya no te pasen.</p>` : `<p class="small muted">Ninguno activo. Si vuelve a pasarte alguno, recupéralo abajo.</p>`}
+    ${res.length ? `<details><summary>Resueltos (${res.length})</summary><ul class="cmp-marks">${res.map(e=>`<li><span>${nota(e)} <span class="small muted">· ×${e.veces||1} · resuelto ${esc(e.resuelto)}</span></span><button type="button" class="btn ghost sm" data-act="err-reopen" data-id="${esc(f.id)}" data-err="${esc(e.id)}">Me ha vuelto a pasar</button></li>`).join("")}</ul></details>` : ""}</section>`;
 }
 function errDelete(figId, errId){
   const f = S.figures[figId], es = erroresOf(f), i = es.findIndex(e=>e.id===errId); if(i<0) return;
   const e = es[i]; f.errores = es.filter(x=>x.id!==errId); persist({t:"fig", id:figId}); openView(figId);
   toast("Error quitado", {label:"Deshacer", fn:()=>{ const g=S.figures[figId]; if(!g) return; g.errores=[...erroresOf(g)]; g.errores.splice(i,0,e); persist({t:"fig",id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); }});
+}
+// «Ya no me pasa» / «Me ha vuelto a pasar»: cambian `resuelto` (y al reabrir, veces y ultima); Deshacer devuelve el error tal cual estaba.
+function errSet(figId, errId, antes, despues, msg){
+  const put = v => { const g=S.figures[figId]; if(!g) return false; const k=erroresOf(g).findIndex(e=>e.id===errId); if(k<0) return false;
+    g.errores = erroresOf(g).map((e,j)=>{ if(j!==k) return e; const n={...e}; ["veces","ultima","resuelto"].forEach(c=>{ if(v[c]===undefined) delete n[c]; else n[c]=v[c]; }); return n; });
+    persist({t:"fig", id:figId}); if($(`[data-viewfig="${CSS.escape(figId)}"]`)) openView(figId); return true; };
+  if(!put(despues)) return; announce(msg);
+  toast(msg, {label:"Deshacer", fn:()=>put(antes)});
+}
+function errResolve(figId, errId){
+  const e = erroresOf(S.figures[figId]).find(x=>x.id===errId); if(!e || e.resuelto) return;
+  errSet(figId, errId, {veces:e.veces, ultima:e.ultima, resuelto:undefined}, {veces:e.veces, ultima:e.ultima, resuelto:todayStr()}, "Error resuelto");
+}
+function errReopen(figId, errId){
+  const e = erroresOf(S.figures[figId]).find(x=>x.id===errId); if(!e || !e.resuelto) return;
+  errSet(figId, errId, {veces:e.veces, ultima:e.ultima, resuelto:e.resuelto}, {veces:(e.veces||1)+1, ultima:todayStr(), resuelto:undefined}, "Vuelve a tus errores");
 }
 let cmp = null;
 function cmpStop(){ if(!cmp) return; cancelAnimationFrame(cmp.raf); cmp.playing = false; ["#cmp-t","#cmp-m"].forEach(k=>{ try{ $(k)?.pause(); }catch{} }); }
@@ -3109,25 +3154,35 @@ function cmpPaint(){
 function cmpForm(){
   const el=$("#cmp-form"); if(!el || !cmp) return;
   if(!cmp.form){ el.innerHTML=""; return; }
-  const er = cmp.form.tipo==="error";
+  const er = cmp.form.tipo==="error", activos = er ? erroresActivos(S.figures[cmp.figId]) : [];
   el.innerHTML = `<div class="cmp-fm"><p class="small"><b>${er?"Error":"Bien hecho"} en el ${beatName(cmp.form.b)}</b></p>
     <label class="f" for="cmp-nota">Nota (opcional)<input type="text" id="cmp-nota" placeholder="${er?"Ej.: el brazo izquierdo se queda bajo":"Ej.: buena preparación en el 4"}"></label>
+    ${er && activos.length ? `<div role="group" aria-labelledby="cmp-same-t"><p class="small" id="cmp-same-t">¿Es uno de estos?</p><div class="row" style="flex-wrap:wrap;gap:8px">${activos.map(e=>`<button type="button" class="btn ghost sm" data-esame="${esc(e.id)}" aria-pressed="${cmp.form.same===e.id}">${esc(e.nota)} <span class="small muted">×${e.veces||1}</span></button>`).join("")}</div></div>` : ""}
     ${er?`<label class="small row" for="cmp-toerr" style="gap:10px;min-height:44px"><input type="checkbox" id="cmp-toerr"> Añadir a «Errores que cometo» para verlo al repasarla</label>`:""}
     <div class="row"><button type="button" class="btn pri sm" id="cmp-fsave">Guardar marca</button><button type="button" class="btn ghost sm" id="cmp-fcancel">Cancelar</button></div></div>`;
+  // Elegir «uno de estos» no guarda nada todavía: al guardar la marca, ese error suma una vez en vez de crear otro.
+  el.querySelectorAll("[data-esame]").forEach(b=> b.onclick=()=>{ const nota=$("#cmp-nota").value; cmp.form.same = cmp.form.same===b.dataset.esame ? null : b.dataset.esame; cmpForm(); $("#cmp-nota").value=nota; });
   $("#cmp-fcancel").onclick = ()=>{ cmp.form=null; cmpForm(); };
   $("#cmp-fsave").onclick = ()=>{
     const f=S.figures[cmp.figId], a=intentosOf(f).find(x=>x.id===cmp.attId); if(!a) return;
     const nota=$("#cmp-nota").value.trim(), m={id:uid(), b:cmp.form.b, tipo:cmp.form.tipo, nota};
     a.marcadores = [...marcasOf(a), m];
-    if($("#cmp-toerr")?.checked) addError(f, a, m);
+    const mismo = m.tipo==="error" && cmp.form.same && erroresActivos(f).find(e=>e.id===cmp.form.same);
+    if(mismo) repeatError(f, a, m, mismo);
+    else if($("#cmp-toerr")?.checked) addError(f, a, m);
     persist({t:"fig", id:f.id}); cmp.form=null; cmpForm(); cmpLine(); cmpMarks();
-    toast(m.tipo==="error" ? (S.figures[f.id] && erroresOf(f).some(e=>e.marca===m.id) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
+    toast(m.tipo==="error" ? (mismo ? "Error guardado: ya van ×"+(mismo.veces||1) : S.figures[f.id] && erroresOf(f).some(e=>e.marca===m.id) ? "Error guardado y añadido a tus errores" : "Error guardado") : "Marca guardada");
   };
   setTimeout(()=>$("#cmp-nota")?.focus(), 50);
 }
 function addError(f, a, m){
   if(erroresOf(f).some(e=>e.marca===m.id)) return;
-  f.errores = [...erroresOf(f), {id:uid(), nota: m.nota || `Error en el ${beatName(m.b)}`, b:m.b, desde:a.id, marca:m.id, fecha:todayStr()}];
+  f.errores = [...erroresOf(f), {id:uid(), nota: m.nota || `Error en el ${beatName(m.b)}`, b:m.b, desde:a.id, marca:m.id, fecha:todayStr(), veces:1, ultima:todayStr()}];
+}
+// El mismo error otra vez: suma una vez, anota cuándo y lo enlaza a la marca nueva (y al intento donde acaba de pasar).
+function repeatError(f, a, m, e){
+  f.errores = erroresOf(f).map(x=> x.id===e.id ? {...x, veces:(x.veces||1)+1, ultima:todayStr(), marca:m.id, desde:a.id} : x);
+  e.veces = (e.veces||1)+1;
 }
 function cmpMarks(){
   const el=$("#cmp-marks"); if(!el || !cmp) return;
@@ -4276,7 +4331,13 @@ function sanitizeFig(f0){
   const marcas = a => { const b={...a}; if("marcadores" in b) b.marcadores = lista(a.marcadores, m=>({...m})).filter(m=>{ if(Number.isFinite(m.b)) return true; malas++; return false; }); return b; };
   if("intentos" in f) f.intentos = lista(f.intentos, marcas);
   if("partes" in f) f.partes = lista(f.partes);
-  if("errores" in f) f.errores = lista(f.errores);
+  // Errores recurrentes: veces entero ≥ 1 (si no, 1); ultima y resuelto, fecha ISO o se quitan.
+  const iso = v => typeof v==="string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const err = e => { const o={...e};
+    if("veces" in o){ const n=cuenta(o.veces); o.veces = n!=null && n>=1 ? n : 1; }
+    ["ultima","resuelto"].forEach(k=>{ if(k in o && !iso(o[k])) delete o[k]; });
+    return o; };
+  if("errores" in f) f.errores = lista(f.errores, err);
   if(f.estado!==undefined && !EST[f.estado]) f.estado = "practica";
   if(f.tipo!==undefined && !TIPO[f.tipo]) f.tipo = "figura";
   if("usos" in f){ const n = cuenta(f.usos); if(n==null) delete f.usos; else f.usos = n; }
@@ -4576,6 +4637,8 @@ document.addEventListener("click", async e=>{
   if(a==="rc-open") return openRecCount(d.id);
   if(a==="cmp-back"){ const c=cmp; cmpStop(); cmp=null; return c ? openAttemptView(c.figId, c.attId) : null; }
   if(a==="err-del") return errDelete(d.id, d.err);
+  if(a==="err-res") return errResolve(d.id, d.err);
+  if(a==="err-reopen") return errReopen(d.id, d.err);
   if(a==="pk-back") return pkBack();
   if(a==="att-savevid") return attSaveVid(d.id, d.att);
   if(a==="att-del") return attDelete(d.id, d.att);
@@ -4670,7 +4733,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, 
-  SCHEMA, quizItems, reviewFig, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
+  SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, exportData,
   deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 

@@ -1983,6 +1983,58 @@ def video_de_intento_sin_guardar_sigue_en_el_aviso(browser):
     ctx.close()
 
 
+# ---- fase 3
+@test
+def cadena_no_mezcla_bailes(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"),
+                                 fig(2, "Abierta 2 manos", "Cerrada", baile="Salsa", nombre="Salsera")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    r = p.evaluate("""() => { const B = window.__bachateca, mix = [];
+      for (let k = 0; k < 30; k++) B.makeChain("Cerrada").steps.forEach(s => { if (s.f && s.f.baile === "Salsa") mix.push(s.f.id); });
+      const a = B.exitsFrom("Abierta 2 manos").map(f => f.id);
+      B.setBaile("Salsa");
+      return [mix, a, B.exitsFrom("Abierta 2 manos").map(f => f.id), B.exitsFrom("Cerrada").map(f => f.id)]; }""")
+    assert r == [[], [], ["f2"], []], r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_y_enlazar_por_baile(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos", nombre="Bachatera"),
+                                 fig(2, "Abierta 2 manos", "Cerrada", baile="Salsa", nombre="Salsera")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    assert p.locator("#v-enlazar [data-baile]").count() == 2
+    p.click('nav.tabs [data-tab="social"]')
+    assert p.locator("#v-social [data-baile]").count() == 2
+    p.check("#soc-incl")
+    assert "Bachatera" in p.inner_text("#v-social") and "Salsera" not in p.inner_text("#v-social")
+    p.click('#v-social [data-baile="Salsa"]')
+    t = p.inner_text("#v-social")
+    assert "Salsera" in t and "Bachatera" not in t, t
+    assert p.get_attribute('#v-social [data-baile="Salsa"]', "aria-pressed") == "true"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def un_solo_baile_sin_selector(browser):
+    ctx, p, errors = open_app(browser)
+    figs = {f["id"]: f for f in [fig(1, "Cerrada", "Abierta 2 manos"), fig(2, "Abierta 2 manos", "Cerrada")]}
+    p.evaluate("o => window.__bachateca.setFigs(o)", figs)
+    p.click('nav.tabs [data-tab="enlazar"]')
+    assert p.locator("[data-baile]").count() == 0
+    p.click('nav.tabs [data-tab="social"]')
+    assert p.locator("[data-baile]").count() == 0
+    n = p.evaluate("() => window.__bachateca.makeChain('Cerrada').steps.filter(s => s.f).length")
+    assert n == 2, n
+    assert not errors, errors
+    ctx.close()
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):

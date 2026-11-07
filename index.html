@@ -884,9 +884,21 @@ const active = f => f.estado !== "espera";
 const usable = f => active(f) && f.estado !== "incompleta";
 const ready = f => f.estado==="disponible" || f.estado==="consolidada";
 const holdOk = (a,b) => !a || !b || a===b;
-const canFollow = (p,n) => n.entrada===p.salida && holdOk(p.agarreOut, n.agarreIn);
-const exitsFrom = (pos, hold, excl) => figs().filter(f=> f.id!==excl && usable(f) && placed(f) && f.entrada===pos && holdOk(hold, f.agarreIn));
-const arrivals = pos => figs().filter(f=> usable(f) && placed(f) && f.salida===pos);
+// Un enlace solo vale dentro del mismo baile: una figura de salsa no sigue a una de bachata.
+const baileOf = f => f.baile || "Bachata";
+const LS_BAILE = "bachateca.baile";
+let baileSel = lsGet(LS_BAILE) || "Bachata";
+// Bailes con algo que enlazar o sacar en el social; «Bachata» primero. Con uno solo no hay selector.
+const bailes = () => [...new Set(figs().filter(f=>usable(f) && (placed(f) || !isMove(f))).map(baileOf))].sort((a,b)=> (b==="Bachata")-(a==="Bachata") || a.localeCompare(b));
+// Si el baile elegido ya no existe (borraste sus figuras), vuelve a Bachata o al primero.
+function syncBaile(){ const b=bailes(); if(b.length && !b.includes(baileSel)) baileSel = b.includes("Bachata") ? "Bachata" : b[0]; }
+const canFollow = (p,n) => n.entrada===p.salida && holdOk(p.agarreOut, n.agarreIn) && baileOf(p)===baileOf(n);
+const exitsFrom = (pos, hold, excl) => figs().filter(f=> f.id!==excl && usable(f) && placed(f) && baileOf(f)===baileSel && f.entrada===pos && holdOk(hold, f.agarreIn));
+const arrivals = pos => figs().filter(f=> usable(f) && placed(f) && baileOf(f)===baileSel && f.salida===pos);
+function baileChipsHTML(){
+  const b=bailes(); if(b.length<2) return "";
+  return `<div class="chips" role="group" aria-label="Baile">${b.map(x=>`<button class="chip" data-baile="${esc(x)}" aria-pressed="${x===baileSel}">${esc(x)}</button>`).join("")}</div>`;
+}
 const extraPositions = () => [...new Set(figs().flatMap(f=>[f.entrada,f.salida]).filter(Boolean))].filter(p=>!S.positions.includes(p));
 const allPositions = () => [...S.positions, ...extraPositions()];
 const isDue = f => active(f) && (!f.rep || !f.rep.due || f.rep.due <= todayStr());
@@ -1876,9 +1888,9 @@ function renderEnlazar(){
   const exits = sel ? exitsFrom(sel.p, linkHold) : [];
   const incN = figs().filter(f=>active(f)&&incomplete(f)).length + figs().filter(f=>!active(f)&&incomplete(f)).length;
   const tabs2 = `<div class="seg2" role="group" aria-label="Vista"><button data-lview="aqui" aria-pressed="${linkView==="aqui"}">Desde aquí</button><button data-lview="mapa" aria-pressed="${linkView==="mapa"}">Mapa</button></div>`;
-  if(linkView==="mapa"){ v.innerHTML = `${tabs2}${mapHTML(cov, gaps, incN)}`; return; }
+  if(linkView==="mapa"){ v.innerHTML = `${baileChipsHTML()}${tabs2}${mapHTML(cov, gaps, incN)}`; return; }
   v.innerHTML = `
-    ${tabs2}
+    ${baileChipsHTML()}${tabs2}
     <div class="chips" role="group" aria-label="Posición">
       ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}${c.into.length&&c.ready.length<2?", menos de 2 seguras":""}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
     </div>
@@ -1918,7 +1930,7 @@ function mapHTML(cov, gaps, incN){
     </div>`;
 }
 function makeChain(start){
-  const pool = figs().filter(f=>usable(f)&&placed(f));
+  const pool = figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel);
   const steps=[]; const used=new Set(); let prev=null;
   let pos = start || (pool[Math.floor(Math.random()*pool.length)]||{}).entrada;
   for(let i=0;i<4;i++){
@@ -1950,7 +1962,7 @@ function renderChain(){
 }
 
 // ---------- vista: social ----------
-function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && socOk(f)).sort(socSort); }
+function socialFootwork(){ return figs().filter(f=>usable(f) && !isMove(f) && baileOf(f)===baileSel && socOk(f)).sort(socSort); }
 // Lo que ya marcaste esta noche se ve siempre, aunque esté en práctica o quede fuera de las primeras.
 const socOk = f => ready(f) || socialIncl || logSel.has(f.id);
 const socTop = (list, n) => [...list.slice(0,n), ...list.slice(n).filter(f=>logSel.has(f.id))];
@@ -1968,6 +1980,7 @@ function renderSocial(){
   const pend = [nSel?`${nSel} ${nSel===1?"marcada":"marcadas"}`:"", logBloq?`bloqueo en ${esc(logBloq)}`:""].filter(Boolean).join(" · ");
   v.innerHTML = `
     ${staleHTML()}
+    ${baileChipsHTML()}
     ${Object.keys(S.logs).length?"":`<p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>`}
     <div>
       ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${socTop(fw,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
@@ -2043,7 +2056,7 @@ function showBlock(focus){
   let ov = $("#overlay-root .overlay");
   if(!ov){
     if(bkT0 && performance.now()-bkT0 > 3e5) bkT0 = 0;   // otra canción: el compás vuelve a quedarse quieto
-    const fw = figs().filter(f=>usable(f) && !isMove(f));
+    const fw = figs().filter(f=>usable(f) && !isMove(f) && baileOf(f)===baileSel);
     // Una sola orden arriba; el pulso, debajo y opcional; la primera decisión es «¿Dónde estás?».
     $("#overlay-root").innerHTML = `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="bk-t">
       <div class="bk-head"><h2 id="bk-t" tabindex="-1">Básico o footwork hasta el 1</h2>
@@ -3634,7 +3647,7 @@ function graphHTML(cov){
   const P={};
   nodes.forEach((p,i)=>{ const a = n<=2 ? Math.PI*(1-i) : -Math.PI/2+2*Math.PI*i/n; P[p]={x:cx+rx*Math.cos(a), y:cy+ry*Math.sin(a), w:hw(p), h:16}; });
   const E={};
-  figs().filter(f=>usable(f)&&placed(f)&&P[f.entrada]&&P[f.salida]).forEach(f=>{
+  figs().filter(f=>usable(f)&&placed(f)&&baileOf(f)===baileSel&&P[f.entrada]&&P[f.salida]).forEach(f=>{
     const k=f.entrada+"␟"+f.salida; const e=E[k]||(E[k]={a:f.entrada,b:f.salida,n:0,r:0}); e.n++; if(ready(f)) e.r++;
   });
   const gaps = new Set(cov.filter(c=>c.into.length && c.ready.length<2).map(c=>c.p));
@@ -3990,7 +4003,7 @@ function loadExamples(){
 
 // ---------- render ----------
 // Al repintar una vista, el foco vuelve al mismo control para que VoiceOver no salte al principio.
-const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-view","data-act","data-promote"];
+const FOCUS_ATTRS = ["data-sal","data-pos","data-hold","data-vista","data-lview","data-baile","data-view","data-act","data-promote"];
 function focusKey(el){
   if(!el || el===document.body) return null;
   if(el.id) return "#"+CSS.escape(el.id);
@@ -3999,6 +4012,7 @@ function focusKey(el){
 }
 let focusAfter = null;
 function render(){
+  syncBaile();
   const view = $("#v-"+tab), ae = document.activeElement;
   const fk = focusAfter || (view && view.contains(ae) && focusKey(ae)); focusAfter = null;
   paintNight();   // marcar o desmarcar cambia si el social sigue en curso
@@ -4030,7 +4044,7 @@ document.addEventListener("click", async e=>{
   if(wk){ progWeek=+wk.dataset.week; return render(); }
   const pk = e.target.closest("[data-pick]");
   if(pk){ $("#"+pk.dataset.pick)?.click(); return; }
-  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-mins],[data-tema],[data-fest]");
+  const t = e.target.closest("[data-tab],[data-act],[data-view],[data-edit],[data-grade],[data-pos],[data-hold],[data-vista],[data-promote],[data-dellog],[data-logfig],[data-lren],[data-lsave],[data-lcancel],[data-lmv],[data-ldel],[data-ladd],[data-sal],[data-bpos],[data-bhold],[data-bexit],[data-setv],[data-lview],[data-baile],[data-mins],[data-tema],[data-fest]");
   if(!t) return;
   if(t.closest(".view")) focusAfter = focusKey(t);
   const d=t.dataset;
@@ -4045,6 +4059,7 @@ document.addEventListener("click", async e=>{
   if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
   if(d.grade) return grade(d.grade);
   if(d.lview){ linkView=d.lview; return render(); }
+  if(d.baile){ baileSel=d.baile; lsSet(LS_BAILE, baileSel); chain=null; linkPos=null; return render(); }
   if(d.pos!==undefined && !t.closest("form")){ learn("pos"); linkPos=d.pos; linkHold=""; chain=null;
     if(t.closest(".graph")){ linkView="aqui"; render(); return window.scrollTo(0,0); }   // del mapa a las salidas de esa posición
     return render(); }
@@ -4216,7 +4231,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {
   SCHEMA, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, todayStr, vidsUnsaved, markVidSaved, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, figDiffers, setFigs: o=>{ S.figures=o; render(); }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

@@ -9,7 +9,7 @@ Cada prueba abre la app limpia (sin datos), así que no toca nada de tu iPhone n
 En WebKit: BROWSER=webkit python3 tests/test_bachateca.py (se saltan las pruebas de cámara y micrófono).
 Si tienes Chrome instalado y no quieres descargar Chromium: CHROME=/ruta/a/chrome python3 tests/test_bachateca.py
 """
-import functools, http.server, json, os, socketserver, sys, threading, traceback
+import functools, http.server, json, os, signal, socketserver, sys, threading, traceback
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -3977,32 +3977,79 @@ def practica_guiada_ignora_las_opciones_de_enlazar(browser):
     ctx.close()
 
 
+# Una prueba que se cuelga (por ejemplo, una promesa que en un motor nunca se resuelve) no debe
+# bloquear la batería horas: pasado el límite se mata el navegador, la prueba cuenta como fallida
+# y la batería sigue con un navegador nuevo.
+LIMITE_PRUEBA = int(os.environ.get("LIMITE_PRUEBA", "90"))
+
+
+def matar_navegador():
+    """Mata los procesos del navegador (descendientes del controlador de Playwright, no el controlador)."""
+    hijos = {}
+    for d in os.listdir("/proc"):
+        if d.isdigit():
+            try:
+                with open(f"/proc/{d}/stat") as f:
+                    ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+                hijos.setdefault(ppid, []).append(int(d))
+            except (OSError, ValueError, IndexError):
+                pass
+    for controlador in hijos.get(os.getpid(), []):
+        pendientes = list(hijos.get(controlador, []))
+        while pendientes:
+            pid = pendientes.pop()
+            pendientes += hijos.get(pid, [])
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+
+
 def main():
     nombre = os.environ.get("BROWSER", "chromium")
     if nombre not in ("chromium", "webkit"):
         sys.exit(f"BROWSER debe ser «chromium» o «webkit», no «{nombre}»")
+    sys.stdout.reconfigure(line_buffering=True)   # en CI, cada línea sale al momento
     srv = serve()
     failed = skipped = 0
     with sync_playwright() as pw:
-        if nombre == "chromium":
-            exe = os.environ.get("CHROME")
-            # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
-            args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
-            browser = pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
-        else:
-            browser = pw.webkit.launch()
+        def lanzar():
+            if nombre == "chromium":
+                exe = os.environ.get("CHROME")
+                # Cámara y micrófono de mentira (para la prueba del conteo), sin pedir permiso.
+                args = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+                return pw.chromium.launch(args=args, **({"executable_path": exe} if exe else {}))
+            return pw.webkit.launch()
+        browser = lanzar()
         for fn in results:
             if nombre == "webkit" and fn.solo_chromium:
                 skipped += 1
                 print(f"  salta {fn.__name__} ({fn.solo_chromium})")
                 continue
+            colgada = threading.Event()
+            vigia = threading.Timer(LIMITE_PRUEBA, lambda: (colgada.set(), matar_navegador()))
+            vigia.start()
             try:
                 fn(browser)
                 print(f"  ok   {fn.__name__}")
             except Exception:
                 failed += 1
-                print(f"  FALLA {fn.__name__}")
-                traceback.print_exc(limit=3)
+                if colgada.is_set():
+                    print(f"  FALLA {fn.__name__} (colgada: más de {LIMITE_PRUEBA} s; se reinicia el navegador)")
+                else:
+                    print(f"  FALLA {fn.__name__}")
+                    traceback.print_exc(limit=3)
+            finally:
+                vigia.cancel()
+            if colgada.is_set() or not browser.is_connected():
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+                browser = lanzar()
+            else:
+                for c in list(browser.contexts):   # lo que una prueba fallida dejó abierto
+                    c.close()
         browser.close()
     srv.shutdown()
     total = len(results) - skipped

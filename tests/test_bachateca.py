@@ -251,7 +251,7 @@ def aviso_videos_sin_copia(browser):
     assert dl.value.suggested_filename.startswith("Figura")
     p.wait_for_timeout(300)
     # Figura 2 es la más reciente, va primero; Figura 1 ya tenía copia: no queda ninguno.
-    assert dl.value.suggested_filename == "Figura 2 · v2.mp4", dl.value.suggested_filename
+    assert dl.value.suggested_filename == nombre_descargado("Figura 2 · v2.mp4"), dl.value.suggested_filename
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert "todos tus vídeos" in p.locator(".toast").inner_text()
     p.evaluate("() => window.__bachateca.flush()")
@@ -483,8 +483,9 @@ def intento_grabado(browser):
     with p.expect_download() as dl:
         p.click('[data-act="att-savevid"]')
     p.click('#confirm-root [data-cf="ok"]')
-    assert dl.value.suggested_filename.startswith("Figura 1 · intento"), dl.value.suggested_filename
-    assert dl.value.suggested_filename.endswith(f' · {a["vid"]}.mp4'), "lleva el id del vídeo para poder recuperarlo"
+    assert dl.value.suggested_filename.startswith(nombre_descargado("Figura 1 · intento")), dl.value.suggested_filename
+    assert dl.value.suggested_filename.endswith(nombre_descargado(f' · {a["vid"]}.mp4')), "lleva el id del vídeo para poder recuperarlo"
+    assert p.evaluate("n => window.__bachateca.vidIdFromName(n)", dl.value.suggested_filename) == a["vid"]
     p.wait_for_timeout(200)
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
     assert not errors, errors
@@ -551,6 +552,11 @@ def importar_conserva_intentos_locales(browser):
 
 
 # ---------------------------------------------------------------- pulso de cada vídeo
+def nombre_descargado(nombre):
+    """El nombre con el que se descarga un archivo: WebKit cambia los espacios por «_»."""
+    return nombre.replace(" ", "_") if os.environ.get("BROWSER") == "webkit" else nombre
+
+
 def put_fixture(page, vid_ids):
     """Guarda el vídeo de prueba real con esos ids (para reproducirlo en la app) y recarga."""
     import base64
@@ -3697,8 +3703,10 @@ def nombre_de_video_con_id(browser):
     r = p.evaluate("""() => { const B = window.__bachateca;
       return [B.vidFileName('Figura 1', 'v1', 'video/mp4'), B.vidFileName('a/b:c', 'x_9-Z', 'video/quicktime'),
               B.vidIdFromName('Figura 1 · v1.mp4'), B.vidIdFromName('Ana · intento 3/11 · a-1_b.MOV'),
-              B.vidIdFromName('Figura 1 · v1 (1).mp4'), B.vidIdFromName('IMG_0001.MOV'), B.vidIdFromName('x · a b.mp4')]; }""")
-    assert r == ["Figura 1 · v1.mp4", "abc · x_9-Z.mov", "v1", "a-1_b", "v1", None, None], r
+              B.vidIdFromName('Figura 1 · v1 (1).mp4'), B.vidIdFromName('IMG_0001.MOV'), B.vidIdFromName('x · a b.mp4'),
+              B.vidIdFromName('Figura_1_·_v1.mp4'), B.vidIdFromName('Ana_·_intento_3_11_·_a-1_b_(1).MOV')]; }""")
+    # Las dos últimas: Safari cambia los espacios por «_» al descargar; el id se sigue leyendo.
+    assert r == ["Figura 1 · v1.mp4", "abc · x_9-Z.mov", "v1", "a-1_b", "v1", None, None, "v1", "a-1_b"], r
     # Copia completa: primero el JSON (como siempre) y después todos los vídeos, aunque ya tuvieran copia.
     p.click("#btn-settings")
     with p.expect_download() as dl:
@@ -3710,7 +3718,7 @@ def nombre_de_video_con_id(browser):
     with p.expect_download() as dl:
         p.click('[data-act="save-vids"]')
     p.click('#confirm-root [data-cf="ok"]')
-    assert dl.value.suggested_filename == "Figura 1 · v1.mp4", dl.value.suggested_filename
+    assert dl.value.suggested_filename == nombre_descargado("Figura 1 · v1.mp4"), dl.value.suggested_filename
     assert p.evaluate("() => window.__bachateca.vidIdFromName(%s)" % json.dumps(dl.value.suggested_filename)) == "v1"
     p.wait_for_selector("text=Ahora tus vídeos: 0")
     assert p.evaluate("() => +localStorage.getItem('bachateca.backup.at')") > 0, "cuenta como copia hecha"
@@ -3917,7 +3925,7 @@ def copia_completa_cuenta_solo_los_que_estan(browser):
     with p.expect_download() as dl:
         p.click('[data-act="save-vids"]')
     p.click('#confirm-root [data-cf="ok"]')
-    assert dl.value.suggested_filename == "Figura 1 · v1.mp4"
+    assert dl.value.suggested_filename == nombre_descargado("Figura 1 · v1.mp4")
     p.wait_for_selector("text=Ahora tus vídeos: 0")
     assert "1 no está en este dispositivo" in p.inner_text(".sheet")
     assert p.locator('[data-act="save-vids"]').count() == 0

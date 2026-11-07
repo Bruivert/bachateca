@@ -1439,7 +1439,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.54";
+const APP_VERSION = "1.55";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -4172,9 +4172,10 @@ function markVidSaved(figId, vidId){
 // devolverlo a su figura, parte o intento con «Recuperar vídeos» si un día hay que reinstalar.
 const vidExt = ty => ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
 const vidFileName = (nombre, id, ty) => `${String(nombre||"").replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "vídeo"} · ${id}.${vidExt(ty||"video/mp4")}`;
-// Admite el « (1)» que añaden algunas descargas repetidas. Sin id válido, null.
+// Admite el « (1)» que añaden algunas descargas repetidas y los espacios cambiados por «_»
+// (Safari lo hace al descargar: «Figura_1_·_v1.mp4»). Sin id válido, null.
 function vidIdFromName(name){
-  const m = /· ([^\s·]+?)(?: ?\(\d+\))?\.[A-Za-z0-9]{1,5}$/.exec(String(name||""));
+  const m = /·[ _]([A-Za-z0-9_-]+?)(?:[ _]?\(\d+\))?\.[A-Za-z0-9]{1,5}$/.exec(String(name||""));
   return m && okId(m[1]) ? m[1] : null;
 }
 const attName = (f, a) => `${f.nombre} · intento ${fmtDate(a.fecha)}`;

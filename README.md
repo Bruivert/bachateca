@@ -87,6 +87,7 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
   **Archivos o iCloud Drive**, no en Fotos: Fotos puede cambiar el nombre de los archivos y entonces un vídeo no
   sabría a qué figura volver.
 - **Recuperar vídeos**: elige en Archivos los vídeos de la copia; cada uno vuelve a su figura por el id que lleva en el nombre.
+  Desde la versión 1.55 también reconoce los nombres en los que Safari cambió los espacios por «_».
 - **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
   una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
 

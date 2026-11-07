@@ -247,6 +247,7 @@ def aviso_videos_sin_copia(browser):
     p.wait_for_timeout(300)
     with p.expect_download() as dl:
         p.click('[data-act="save-vids"]')
+    p.click('#confirm-root [data-cf="ok"]')
     assert dl.value.suggested_filename.startswith("Figura")
     p.wait_for_timeout(300)
     # Figura 2 es la más reciente, va primero; Figura 1 ya tenía copia: no queda ninguno.
@@ -480,6 +481,7 @@ def intento_grabado(browser):
     p.wait_for_timeout(300)
     with p.expect_download() as dl:
         p.click('[data-act="att-savevid"]')
+    p.click('#confirm-root [data-cf="ok"]')
     assert dl.value.suggested_filename.startswith("Figura 1 · intento"), dl.value.suggested_filename
     p.wait_for_timeout(200)
     assert p.evaluate("() => window.__bachateca.vidsUnsaved().length") == 0
@@ -1251,6 +1253,27 @@ def _parche_lectura(solo_primera):
       IDBObjectStore.prototype.get = function (k) {{
         if (k === "state" && {cond}) throw new DOMException("simulado", "UnknownError");
         return g.apply(this, arguments); }};"""
+
+
+@test
+def exportar_por_descarga_pregunta(browser):
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": {"f1": fig(1, "a", "b", id="f1")}})
+    p.click("#btn-settings")
+    p.wait_for_selector('[data-act="export"]')
+    with p.expect_download():
+        p.click('[data-act="export"]')
+    p.wait_for_selector('#confirm-root [data-cf="ok"]')
+    assert "¿Se ha guardado la copia?" in p.locator("#confirm-root").inner_text()
+    p.click("#confirm-root .cancel")
+    p.wait_for_timeout(200)
+    assert p.evaluate("() => localStorage.getItem('bachateca.backup.at')") is None
+    with p.expect_download():
+        p.click('[data-act="export"]')
+    p.click('#confirm-root [data-cf="ok"]')
+    p.wait_for_timeout(200)
+    assert p.evaluate("() => +localStorage.getItem('bachateca.backup.at')") > 0
+    assert not errors, errors
+    ctx.close()
 
 
 @test

@@ -931,13 +931,13 @@ const announce = m => { const r=$("#sr-live"); if(!r) return; r.textContent=""; 
 // Para lo que cambia mientras escribes: avisa solo cuando paras.
 let annT; const announceSoon = m => { clearTimeout(annT); annT=setTimeout(()=>announce(m), 700); };
 // Hoja de acción para confirmar (descartar, borrar). Devuelve true si se confirma.
-function askConfirm({title, msg="", ok, cancel="Cancelar"}){
+function askConfirm({title, msg="", ok, cancel="Cancelar", danger=true}){
   if(confirmDone) confirmDone(false);
   return new Promise(res=>{
     const prev=document.activeElement;
     $("#confirm-root").innerHTML = `<div class="confirm-bg" data-cf="no"><div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="cf-t"${msg?' aria-describedby="cf-m"':""}>
       <div class="grp"><div class="msg"><b id="cf-t">${esc(title)}</b>${msg?`<span id="cf-m">${esc(msg)}</span>`:""}</div>
-      <button type="button" class="danger" data-cf="ok">${esc(ok)}</button></div>
+      <button type="button"${danger?' class="danger"':""} data-cf="ok">${esc(ok)}</button></div>
       <button type="button" class="cancel" data-cf="no">${esc(cancel)}</button></div></div>`;
     confirmDone = v=>{ confirmDone=null; $("#confirm-root").innerHTML=""; if(prev && prev.isConnected) prev.focus({preventScroll:true}); res(v); };
     $("#confirm-root .cancel").focus();
@@ -983,8 +983,7 @@ function backupStatus(b){
   return {main:`Última copia: ${when}.`, since: parts.length ? `Desde entonces: ${parts.join(" y ")}.` : (b.ch ? "Desde entonces has hecho cambios." : "Sin cambios desde entonces.")};
 }
 async function exportBackup(){
-  const ok = await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"}));
-  if(!ok) return;
+  if(!(await confirmSaved(await shareOrDownload(new File([exportData()], `bachateca-${todayStr()}.json`, {type:"application/json"})), "la copia"))) return;
   lsSet(BK_AT, Date.now()); lsSet(BK_CH, 0); lsSet(LS_NUDGE, 0); toast("Copia exportada"); render();
   if($('[aria-label="Ajustes"]')) openSettings(); else if($('[data-sheet="log"]')) openLog();
 }
@@ -2414,7 +2413,7 @@ async function attSaveVid(figId, attId){
   if(!attBlob || attBlob.vid!==a.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
   const b = attBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
   const name = attName(f, a).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "intento";
-  const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
+  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo");
   if(ok){ markVidSaved(figId, a.vid); toast("Vídeo guardado"); if($(`[data-viewatt="${CSS.escape(attId)}"]`)) openAttemptView(figId, attId); }
 }
 // ---------- pulso: marcar los tiempos de la música en un vídeo ----------
@@ -2853,7 +2852,7 @@ async function ptSaveVid(figId, ptId){
   if(!ptBlob || ptBlob.vid!==x.vid){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
   const b = ptBlob.b, ty=b.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
   const name = parteName(f, x).replace(/[\\/:*?"<>|]+/g,"").slice(0,60).trim() || "parte";
-  const ok = await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty}));
+  const ok = await confirmSaved(await shareOrDownload(new File([b], `${name}.${ext}`, {type:ty})), "el vídeo");
   if(ok){ markVidSaved(figId, x.vid); toast("Vídeo guardado"); if($(`[data-viewpt="${CSS.escape(ptId)}"]`)) openParteView(figId, ptId); }
 }
 async function ptDelete(figId, ptId){
@@ -3135,7 +3134,7 @@ function renderVidbox(){
       const blob=vstate.curBlob; if(!blob){ toast("Preparando el vídeo… vuelve a pulsar."); return; }
       const ty=blob.type||"video/mp4", ext=ty.includes("webm")?"webm":ty.includes("quicktime")?"mov":"mp4";
       const vidId = vstate.cur, figId = vstate.figId;
-      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
+      shareOrDownload(new File([blob], `bachateca-${uid()}.${ext}`, {type:ty})).then(how=>confirmSaved(how, "el vídeo")).then(ok=>{ if(ok) markVidSaved(figId, vidId); });
     }
     else if(k==="ai"){ prepareCapture(); }
   });
@@ -3248,10 +3247,16 @@ function hydrateVideos(root){
 }
 async function shareOrDownload(file){
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file]}); return true; }catch(e){ if(e && e.name==="AbortError") return false; }
+    try{ await navigator.share({files:[file]}); return "compartido"; }catch(e){ if(e && e.name==="AbortError") return false; }
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click();
-  setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return true;
+  setTimeout(()=>{ try{URL.revokeObjectURL(a.href);}catch{} a.remove(); },4000); return "descargado";
+}
+// Una descarga no prueba que el archivo haya quedado guardado: se pregunta antes de darlo por hecho.
+async function confirmSaved(how, what){
+  if(how==="compartido") return true;
+  if(!how) return false;
+  return askConfirm({title:`¿Se ha guardado ${what}?`, msg:"Compruébalo en Archivos o en Descargas.", ok:"Sí, está guardada", cancel:"No", danger:false});
 }
 // ---------- vídeos sin copia fuera de la app ----------
 // La copia de seguridad (JSON) no lleva vídeos. Se apunta qué vídeo se sacó con «Guardar en Fotos»
@@ -3309,7 +3314,7 @@ async function saveVidBatch(){
   }
   if(!ok){
     // Sin hoja de compartir con varios archivos: de uno en uno, como «Guardar en Fotos» en la ficha.
-    ok = await shareOrDownload(files[0]); ids = ok ? ids.slice(0,1) : [];
+    ok = await confirmSaved(await shareOrDownload(files[0]), "el vídeo"); ids = ok ? ids.slice(0,1) : [];
   }
   if(!ok) return;
   vidBatch = null;

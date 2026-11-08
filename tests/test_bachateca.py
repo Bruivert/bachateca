@@ -2405,6 +2405,37 @@ def conteo_pide_sesion_de_audio(browser):
     ctx.close()
 
 
+@test(solo_chromium="cámara y micrófono simulados")
+def camara_con_microfono_pide_sesion_de_grabar(browser):
+    """Como en el iPhone: con la sesión de audio en «playback», pedir el micrófono falla. La cámara con
+    micrófono tiene que encenderse con la sesión en «play-and-record» (y sin micrófono, en «playback»)."""
+    init = """Object.defineProperty(navigator, 'audioSession', {configurable: true, value: (() => {
+      let t = 'auto'; return {get type(){ return t; }, set type(v){ t = v; }};
+    })()});
+    window.__gum = [];
+    const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = c => {
+      const tipo = navigator.audioSession.type; window.__gum.push({audio: !!c.audio, tipo});
+      if (c.audio && tipo === 'playback') return Promise.reject(new DOMException('sesión de solo reproducir', 'NotAllowedError'));
+      return real(c);
+    };"""
+    ctx, p, errors = open_app(browser, seed=cmp_seed(intentos=[]), init=init)
+    put_fixture(p, ["v1"])
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.locator('[data-act="rc-open"]').click()
+    p.wait_for_function("!document.querySelector('#rc-go').disabled", timeout=10000)
+    assert p.evaluate("() => window.__gum.at(-1)") == {"audio": True, "tipo": "play-and-record"}, p.evaluate("() => window.__gum")
+    p.uncheck("#rc-mic")
+    p.wait_for_function("window.__gum.length >= 2 && !document.querySelector('#rc-go').disabled", timeout=10000)
+    assert p.evaluate("() => window.__gum.at(-1)") == {"audio": False, "tipo": "playback"}, p.evaluate("() => window.__gum")
+    p.check("#rc-mic")
+    p.wait_for_function("window.__gum.length >= 3 && !document.querySelector('#rc-go').disabled", timeout=10000)
+    assert p.evaluate("() => window.__gum.at(-1)") == {"audio": True, "tipo": "play-and-record"}, p.evaluate("() => window.__gum")
+    assert not errors, errors
+    p.click('[data-recc] [data-act="close"]')
+    ctx.close()
+
+
 @test
 def copia_en_memoria_solo_para_ese_video(browser):
     """Si un vídeo necesitó la copia en memoria, solo ese la usa: los demás siguen como blob."""

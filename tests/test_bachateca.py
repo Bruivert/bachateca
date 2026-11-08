@@ -9,12 +9,13 @@ Cada prueba abre la app limpia (sin datos), así que no toca nada de tu iPhone n
 En WebKit: BROWSER=webkit python3 tests/test_bachateca.py (se saltan las pruebas de cámara y micrófono).
 Si tienes Chrome instalado y no quieres descargar Chromium: CHROME=/ruta/a/chrome python3 tests/test_bachateca.py
 """
-import functools, http.server, json, os, shutil, signal, socketserver, sys, tempfile, threading, traceback
+import functools, http.server, json, os, shutil, signal, socketserver, sys, tempfile, threading, time, traceback
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 URL = None
 results = []
+RETRASO = {}   # ruta -> segundos que tarda el servidor en contestar (para simular mala cobertura)
 
 
 def serve():
@@ -24,8 +25,18 @@ def serve():
         extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".md": "text/plain"}
         def log_message(self, *a):
             pass
+        def do_GET(self):
+            espera = RETRASO.get(self.path.split("?")[0])
+            if espera:
+                time.sleep(espera)
+            try:
+                super().do_GET()
+            except (BrokenPipeError, ConnectionResetError):
+                pass   # el navegador ya no esperaba esta respuesta
     handler = functools.partial(Quiet, directory=ROOT)
-    srv = socketserver.TCPServer(("127.0.0.1", 0), handler)
+    # Con hilos: una respuesta lenta no bloquea las demás.
+    srv = socketserver.ThreadingTCPServer(("127.0.0.1", 0), handler)
+    srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     URL = f"http://127.0.0.1:{srv.server_address[1]}/index.html?test"
     return srv
@@ -71,6 +82,13 @@ def open_app(browser, seed=None, videos=None, init=None, ls=None):
     page.goto(URL)
     page.wait_for_function("window.__bachateca && window.__bachateca.ready()")
     return ctx, page, errors
+
+
+def al_mediodia(p):
+    """Fija la hora del navegador a las 12:00 de hoy. Un social registrado de madrugada cuenta como del día
+    anterior (corte a las 6:00), así que las pruebas del social darían otro resultado entre las 0:00 y las 6:00."""
+    import datetime
+    p.clock.set_fixed_time(datetime.datetime.combine(datetime.date.today(), datetime.time(12)))
 
 
 def stored_state(page):
@@ -230,14 +248,14 @@ def reemplazar_con_copia_vacia_no_borra(browser):
 def aviso_videos_sin_copia(browser):
     seed = {"figures": {f["id"]: f for f in [fig(1, "Cerrada", "Sombra", vid="v1"), fig(2, "Sombra", "Cerrada", vid="v2"),
                                               fig(3, "Sombra", "Cerrada")]}, "logs": {}}
-    ctx, p, errors = open_app(browser, seed=seed, videos=["v1", "v2"])
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1", "v2", "v9"])
     p.click("#btn-settings")
     note = p.locator('[data-act="save-vids"]')
     assert note.count() == 1 and "los 2" in note.inner_text(), note.all_inner_texts()
     assert "2 vídeos no tienen copia" in p.locator(".sheet").inner_text()
     p.evaluate("() => window.__bachateca.markVidSaved('f1', 'v1')")
     assert [f["id"] for f in p.evaluate("() => window.__bachateca.vidsUnsaved()")] == ["f2"]
-    # Si cambias el vídeo de la figura, vuelve a contar como sin copia.
+    # Si cambias el vídeo de la figura (por otro guardado en el dispositivo), vuelve a contar como sin copia.
     p.evaluate("() => { const S = window.__bachateca.state(); S.figures.f1.vid = 'v9'; }")
     assert sorted(f["id"] for f in p.evaluate("() => window.__bachateca.vidsUnsaved()")) == ["f1", "f2"]
     # El botón comparte la tanda ya preparada (aquí no hay hoja de compartir: se descarga el primero).
@@ -1080,6 +1098,62 @@ def service_worker_no_confunde_las_paginas(browser):
       return {app: app ? await app.text() : "", lab: lab ? await lab.text() : ""}; }""")
     assert "<title>Bachateca</title>" in r["app"], r["app"][:200]
     assert "<title>Prueba del conteo</title>" in r["lab"], r["lab"][:200]
+    ctx.close()
+
+
+@test
+def sin_cobertura_abre_la_copia_guardada(browser):
+    """Con la red lentísima (sin fallar), la app se abre en unos 3 s con la copia guardada, y lo que llega de la red
+    se guarda para la próxima vez."""
+    ctx = browser.new_context(service_workers="allow", viewport={"width": 390, "height": 844})
+    p = ctx.new_page()
+    try:
+        p.goto(URL)
+        p.evaluate("() => navigator.serviceWorker.ready")
+        if not p.evaluate("!!navigator.serviceWorker.controller"):
+            p.reload(); p.wait_for_function("!!navigator.serviceWorker.controller", timeout=15000)
+        RETRASO["/index.html"] = 12
+        t0 = time.time()
+        p.reload(wait_until="domcontentloaded", timeout=30000)
+        p.wait_for_function("window.__bachateca && window.__bachateca.ready()", timeout=30000)
+        tarda = time.time() - t0
+        assert tarda < 8, f"tardó {tarda:.1f} s en abrir"
+        assert p.title() == "Bachateca"
+    finally:
+        RETRASO.clear()
+    ctx.close()
+
+
+@test
+def preguntar_a_claude_lleva_errores_memoria_y_enlaces(browser):
+    """La consulta a Claude incluye los errores sin resolver (con las veces), cómo va la memoria y los enlaces bailados."""
+    hoy = __import__("datetime").date.today().isoformat()
+    f1 = fig(1, "Cerrada", "Sombra", rep={"step": 0, "due": hoy, "last": hoy, "aciertos": 1, "fallos": 2},
+             errores=[{"id": "e1", "nota": "Pierdo el pulso en el 4", "veces": 3, "ultima": hoy},
+                      {"id": "e2", "nota": "Ya resuelto", "veces": 1, "ultima": hoy, "resuelto": hoy}])
+    f2 = fig(2, "Sombra", "Cerrada", rep={"step": 3, "due": "2099-01-01", "last": hoy, "aciertos": 3, "fallos": 0})
+    ctx, p, errors = open_app(browser, seed={"schema": 11, "figures": {"f1": f1, "f2": f2}, "logs": {}})
+    p.evaluate("() => window.__bachateca.markLink('f1', 'f2')")
+    t = p.evaluate("() => window.__bachateca.coachPrompt()")
+    assert "- Figura 1: Pierdo el pulso en el 4 (×3)" in t, t
+    assert "Ya resuelto" not in t, "los resueltos no van"
+    assert "olvidada: 1" in t and "dominada: 1" in t and "Olvidadas: Figura 1" in t, t
+    assert "- Figura 1 → Figura 2" in t, t
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def aviso_de_copias_solo_cuenta_videos_del_dispositivo(browser):
+    """«N vídeos no tienen copia» no cuenta los vídeos que no están en este dispositivo (no se pueden guardar)."""
+    seed = {"schema": 11, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1"), "f2": fig(2, "Sombra", "Cerrada", vid="v2")}, "logs": {}}
+    ctx, p, errors = open_app(browser, seed=seed, videos=["v1"])
+    p.wait_for_function("window.__bachateca.vidsUnsaved().length === 1")
+    assert [x["vid"] for x in p.evaluate("() => window.__bachateca.vidsUnsaved()")] == ["v1"]
+    p.click("#btn-settings")
+    p.wait_for_selector("text=1 vídeo no tiene copia")
+    assert p.locator("text=2 vídeos no tienen copia").count() == 0
+    assert not errors, errors
     ctx.close()
 
 
@@ -2171,6 +2245,7 @@ def social_cuenta_como_repaso(browser):
     seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", rep={"step": 1, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 0}),
                         "f2": fig(2, "Abierta 2 manos", "Cerrada", estado="incompleta", rep={"step": 1, "due": d(0), "last": d(-1)})}}
     ctx, p, errors = open_app(browser, seed=seed)
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]')
     p.click('[data-act="log-open"]')
     p.click('[data-logfig="f1"]'); p.click('[data-logfig="f2"]')
@@ -2195,6 +2270,7 @@ def borrar_social_deshace_el_repaso(browser):
     d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
     seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", rep={"step": 1, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 0})}}
     ctx, p, errors = open_app(browser, seed=seed)
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]')
     p.click('[data-act="log-open"]')
     p.click('[data-logfig="f1"]')
@@ -2238,6 +2314,7 @@ def borrar_social_tras_repasar_conserva_el_repaso(browser):
     d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
     seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", rep={"step": 1, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 0})}}
     ctx, p, errors = open_app(browser, seed=seed)
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]')
     p.click('[data-act="log-open"]'); p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
     p.evaluate("() => { const f = window.__bachateca.state().figures.f1; f.rep.due = window.__bachateca.todayStr(); }")
@@ -2262,6 +2339,7 @@ def social_de_ayer_no_cuenta_si_ya_repasaste_hoy(browser):
     rep = {"step": 2, "due": d(7), "last": d(0), "aciertos": 2, "fallos": 0}
     seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", rep=dict(rep))}}
     ctx, p, errors = open_app(browser, seed=seed, ls={"bachateca.salieron": {"t": int(time.time() * 1000), "d": d(-1), "ids": ["f1"], "bloq": ""}})
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]')
     p.click('[data-act="log-open"]')
     p.click('[data-act="log-save"]')
@@ -2293,6 +2371,7 @@ def migracion_7_preguntas(browser):
 @test
 def bloqueo_crea_pregunta_y_figura_la_resuelve(browser):
     ctx, p, errors = open_app(browser, seed={"figures": {"f1": fig(1, "Cerrada", "Sombra")}})
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]')
     p.click('[data-act="log-open"]')
     p.select_option("#lg-bloq", "Sombra")
@@ -2737,6 +2816,7 @@ def cadena_muestra_comprobado(browser):
 def social_ofrece_comprobar_el_enlace(browser):
     seed = {"figures": {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada")}}
     ctx, p, errors = open_app(browser, seed=seed)
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]')
     p.click('[data-act="log-open"]')
     p.click('[data-logfig="f1"]'); p.click('[data-logfig="f2"]')
@@ -2976,6 +3056,7 @@ def social_con_errores_activos_limita_el_intervalo(browser):
     d = lambda n: (hoy + __import__("datetime").timedelta(days=n)).isoformat()
     seed = err_seed(rep={"step": 3, "due": d(0), "last": d(-1), "aciertos": 3, "fallos": 0})
     ctx, p, errors = open_app(browser, seed=seed)
+    al_mediodia(p)
     p.click('nav.tabs [data-tab="social"]'); p.click('[data-act="log-open"]')
     p.click('[data-logfig="f1"]'); p.click('[data-act="log-save"]')
     S = p.evaluate("() => window.__bachateca.state()")

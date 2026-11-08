@@ -1270,9 +1270,11 @@ function tx(store, m, fn){
 }
 const kvGet = k => tx("kv","readonly",s=>s.get(k));
 const kvSet = (k,v) => tx("kv","readwrite",s=>s.put(v,k));
-const vidPut = (id,b) => safeMode ? Promise.reject(Object.assign(new Error("modo seguro"),{userMsg:"Modo seguro: no se pueden guardar vídeos."})) : idb ? tx("videos","readwrite",s=>s.put(b,id)) : Promise.reject(new Error("sin almacenamiento"));
+// vidHere: los vídeos que de verdad están en este dispositivo (sin portadas). null hasta leerlos al arrancar.
+let vidHere = null;
+const vidPut = (id,b) => safeMode ? Promise.reject(Object.assign(new Error("modo seguro"),{userMsg:"Modo seguro: no se pueden guardar vídeos."})) : idb ? tx("videos","readwrite",s=>s.put(b,id)).then(r=>{ if(vidHere && !String(id).startsWith("cover:")) vidHere.add(id); return r; }) : Promise.reject(new Error("sin almacenamiento"));
 const vidGet = id => idb ? tx("videos","readonly",s=>s.get(id)) : Promise.resolve(undefined);
-const vidDel = id => idb ? tx("videos","readwrite",s=>s.delete(id)) : Promise.resolve();
+const vidDel = id => idb ? tx("videos","readwrite",s=>s.delete(id)).then(r=>{ if(vidHere) vidHere.delete(id); return r; }) : Promise.resolve();
 const vidCache = new Map(), vidKinds = new Map(); // vidKinds: «mem» o «blob» junto a cada URL de vidCache
 // Portadas: un fotograma grande (hasta 720 px) de cada vídeo, guardado junto a los vídeos con la clave «cover:<id del vídeo>».
 // No viajan en la copia (se rehacen solas a partir del vídeo) y no engordan los datos que se guardan en cada cambio.
@@ -1280,7 +1282,9 @@ const COVER = id => "cover:" + id;
 const coverSet = new Set(), coverCache = new Map();
 async function loadCoverKeys(){
   if(!idb) return;
-  try{ const ks = await tx("videos","readonly",st=>st.getAllKeys()); (ks||[]).forEach(k=>{ if(typeof k==="string" && k.startsWith("cover:")) coverSet.add(k.slice(6)); }); }catch{}
+  try{ const ks = await tx("videos","readonly",st=>st.getAllKeys()), here = new Set();
+    (ks||[]).forEach(k=>{ if(typeof k!=="string") return; if(k.startsWith("cover:")) coverSet.add(k.slice(6)); else here.add(k); });
+    vidHere = here; }catch{}
 }
 async function coverUrl(vid){
   if(!vid || !coverSet.has(vid)) return null;
@@ -1439,7 +1443,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.56";
+const APP_VERSION = "1.57";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -4189,7 +4193,8 @@ const vidsAll = () => figs().filter(f=>!f.ejemplo).flatMap(f=>[
   ...partesOf(f).filter(x=>x.vid).map(x=>({id:f.id, parte:x.id, vid:x.vid, nombre:parteName(f,x), saved:x.vidSaved===x.vid})),
   ...intentosOf(f).filter(a=>a.vid).sort((x,y)=>(y.creado||0)-(x.creado||0)).map(a=>({id:f.id, att:a.id, vid:a.vid, nombre:attName(f,a), saved:a.vidSaved===a.vid}))
 ]);
-const vidsUnsaved = () => vidsAll().filter(x=>!x.saved);
+// Sin copia fuera de la app y guardados en este dispositivo: los que faltan no se pueden guardar ni se pierden al borrar la app.
+const vidsUnsaved = () => vidsAll().filter(x=>!x.saved && (!vidHere || vidHere.has(x.vid)));
 // «Copia completa»: después del JSON se mandan todos los vídeos, también los que ya tenían copia.
 // fullDone guarda los que ya han salido en esta copia completa; null fuera de esa pantalla.
 let fullDone = null;
@@ -4553,10 +4558,19 @@ function coachPrompt(){
   const blocks = {}; Object.values(S.logs).forEach(l=>{ if(l.bloqueo) blocks[l.bloqueo]=(blocks[l.bloqueo]||0)+1; });
   const bl = Object.entries(blocks).sort((a,b)=>b[1]-a[1]).map(([p,n])=>`- ${p}: ${n} veces`).join("\n") || "(sin registros)";
   const act = figs().filter(active).slice(0,120).map(f=>`- ${f.nombre} [${TIPO[tipoOf(f)].t}, ${EST[f.estado]?.t||f.estado}]${placed(f)?`: ${f.entrada}${f.agarreIn?` (${f.agarreIn})`:""} → ${f.salida}${f.agarreOut?` (${f.agarreOut})`:""}`:""}${+f.usos?`, salió ${+f.usos} veces`:""}`).join("\n") || "(ninguna)";
+  // Lo que más ayuda a concretar: los errores que se repiten, cómo va la memoria y qué enlaces ya se han bailado.
+  const errs = figs().filter(active).flatMap(f=>erroresActivos(f).map(e=>({f, e})))
+    .sort((x,y)=>(y.e.veces||1)-(x.e.veces||1)).slice(0,15)
+    .map(({f,e})=>`- ${f.nombre}: ${e.nota}${(e.veces||1)>1?` (×${e.veces})`:""}`).join("\n") || "(ninguno)";
+  const mem = {}; figs().filter(active).forEach(f=>{ const m = memState(f); if(m) mem[m] = (mem[m]||0) + 1; });
+  const memTxt = ["olvidada","atrasada","inestable","nueva","dominada"].filter(k=>mem[k]).map(k=>`${MEM[k][0].toLowerCase()}: ${mem[k]}`).join(", ") || "(sin datos)";
+  const olv = figs().filter(f=>memState(f)==="olvidada").slice(0,10).map(f=>f.nombre).join(", ");
+  const enl = Object.values(S.enlaces||{}).filter(e=>S.figures[e.a] && S.figures[e.b])
+    .sort((x,y)=>(+y.veces||0)-(+x.veces||0)).slice(0,25).map(e=>`- ${S.figures[e.a].nombre} → ${S.figures[e.b].nombre}`).join("\n") || "(ninguno todavía)";
   return `Eres profesor de bachata. Tu alumno baila como leader desde hace unos 6 meses y en los socials se bloquea al enlazar figuras.
-Con sus datos, dale en español y en menos de 140 palabras:
-1. Las 3 preguntas concretas que debería hacer a sus profesores esta semana (sobre las posiciones donde tiene menos salidas o donde más se bloquea).
-2. Una sola prioridad para practicar esta semana, con el motivo en una frase.
+Con sus datos, dale en español y en menos de 160 palabras:
+1. Las 3 preguntas concretas que debería hacer a sus profesores esta semana (sobre las posiciones donde tiene menos salidas, donde más se bloquea o los errores que repite).
+2. Una sola prioridad para practicar esta semana, con el motivo en una frase. Si puede, que use enlaces que ya ha bailado.
 Sin introducción ni despedida. Usa los nombres de posiciones y figuras tal como aparecen.
 
 Clases a las que va: ${S.classes.join(", ") || "(sin indicar)"}
@@ -4568,7 +4582,15 @@ Dónde se bloquea en los socials:
 ${bl}
 
 Figuras activas:
-${act}`;
+${act}
+
+Errores que se le repiten (sin resolver):
+${errs}
+
+Memoria de las figuras: ${memTxt}${olv?`\nOlvidadas: ${olv}`:""}
+
+Enlaces que ya ha bailado (figura → siguiente):
+${enl}`;
 }
 async function runCoach(){
   const text = coachPrompt();
@@ -5293,7 +5315,7 @@ $("#btn-settings").onclick=()=>{ setView=null; confirmKey=null; editKey=null; op
 // Solo para las pruebas automáticas (tests/): abre la app con ?test para usar estas funciones desde fuera.
 if(/[?&]test(&|=|$)/.test(location.search)) window.__bachateca = {memState, socSort, bkSort, bumpEjec, 
   SCHEMA, quizItems, reviewFig, capByErrors, markLink, unmarkLink, renameItem, migrate, sanitizeImport, nextRep, holdOk, canFollow, exitsFrom, makeChain, buildChain, todayStr, vidsUnsaved, markVidSaved, vidFileName, vidIdFromName, exportData,
-  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, videoRefs: async ()=>[...await videoRefs()], orphanVideos, cleanOrphans, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, recoverVideos, deleteLog, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
+  deleteFigure, intentosOf, autoPulso, rcState: ()=>rc && {recording: !!rc.rec, bpm: rc.bpm, mic: rc.mic, facing: rc.facing}, sniffVideo: a=>sniffVideo(Uint8Array.from(a)), vidUrlKind: id=>vidCache.has(id) ? (vidKinds.get(id)||null) : null, dropVidUrl: id=>{ const u=vidCache.get(id); if(u) URL.revokeObjectURL(u); return !!u; }, cmpState: ()=>cmp && {b:cmp.b, A:cmp.A, B:cmp.B, playing:cmp.playing}, beatToSec, secToBeat, pulsoBpm, pulsoOk, checkMarcas, safeMode: ()=>safeMode, state: ()=>S, ready: ()=>loaded, covers: ()=>[...coverSet], genThumbs: ()=>genMissingThumbs(), flush: ()=>saveNow(), failImportOnce: ()=>{ failImport = true; }, takeSnapshot, listSnapshots, restoreSnapshot, videoRefs: async ()=>[...await videoRefs()], orphanVideos, cleanOrphans, figDiffers, setFigs: o=>{ S.figures=o; render(); }, simState: ()=>sim && {fase:sim.fase, i:sim.i, rondas:sim.rondas, pos:sim.cola[sim.i]?.pos ?? null, beats: sim.fase==="decide" ? Math.round(simBeats()*10)/10 : (sim.res[sim.i]?.beats ?? null)}, simForce: l=>{ simForced = l; }, simPositions, guidedPlan, recoverVideos, deleteLog, coachPrompt, guiaState: ()=>guia && {i:guia.i, total:guia.plan.length, fase:guia.fase, rep:guia.rep||0}, guiaForce: o=>{ guiaForced = o; }, setBaile: b=>{ baileSel=b; lsSet(LS_BAILE, b); chain=null; linkPos=null; render(); }
 };
 
 // arranque

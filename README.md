@@ -91,6 +91,14 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
 - **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
   una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
 
+## Versión 1.57
+
+- **Abre sin cobertura**: si la red tarda más de 3 segundos (por ejemplo, en un social con mala cobertura), la app se
+  abre con la copia guardada en el iPhone; lo nuevo, si llega, se guarda para la próxima vez.
+- **Preguntar a Claude qué trabajar** manda también los errores que se te repiten, cómo va tu memoria de las figuras y
+  los enlaces que ya has bailado, para que los consejos sean más concretos.
+- El aviso **«N vídeos no tienen copia»** ya no cuenta vídeos que no están en este iPhone.
+
 ## Arreglo (versión 1.56)
 
 - **Grabarme con conteo** vuelve a encender la cámara con «Grabar también el sonido del micrófono» marcado. Desde la

@@ -603,11 +603,42 @@ details.info summary::after{inset:-10px -4px}
 .hero-seg button{color:#dfe6f5}
 .hero-seg button[aria-pressed="true"]{background:#c4f838;color:#060c1a;font-weight:800}
 .hero .btn.pri{background:#c4f838;color:#060c1a;min-height:50px;font-size:1rem}
-.in-mem{flex-direction:row;align-items:center;gap:16px}
 .ring{position:relative;flex:none;width:92px;height:92px;display:grid;place-items:center}
 .ring svg{position:absolute;inset:0}
 .ring b{font-family:var(--f-display);font-size:1.25rem;font-weight:800}
-.in-mem-t{display:flex;flex-direction:column;gap:6px;min-width:0}
+/* Inicio · Tu repertorio: el anillo (cuántas te salen) y una fila por estado con sus figuras. */
+.rp-donut{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;align-items:center}
+.rp-ring{position:relative;width:132px;height:132px}
+.rp-ring svg{display:block}
+.rp-ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.rp-ring .c b{font-family:var(--f-display);font-size:2.3rem;font-weight:800;line-height:1}
+.rp-ring .c span{font-size:.8rem;color:var(--muted);line-height:1.25}
+.rp-leg{display:flex;flex-direction:column;gap:6px;min-width:0}
+.rp-row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:4px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;row-gap:5px;align-items:center;padding:9px 12px 9px 9px;border-radius:12px;background:var(--surface2)}
+.rp-row:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.rp-row>i{grid-column:1;grid-row:1/3;align-self:stretch;width:4px;border-radius:2px}
+.rp-row .t{grid-column:2;grid-row:1;font-size:.9rem;font-weight:700;line-height:1.1}
+.rp-row>b{grid-column:3;grid-row:1/3;font-family:var(--f-display);font-size:1.7rem;font-weight:800}
+.rp-av{grid-column:2;grid-row:2;display:flex;align-items:center;min-height:24px}
+.rp-av>span{width:24px;height:24px;border-radius:50%;margin-left:-7px;display:grid;place-items:center;overflow:hidden;font-size:.62rem;font-weight:800;background:var(--surface);border:2px solid var(--surface2);color:var(--fg)}
+.rp-av>span:first-child{margin-left:0}
+.rp-av>span img{width:100%;height:100%;object-fit:cover}
+.rp-av>span.more{background:var(--fill);color:var(--muted)}
+.rp-av em{font-style:normal;font-size:.72rem;color:var(--muted);margin-left:6px;white-space:nowrap}
+.rp-av em:first-child{margin-left:0}
+.rp-trend{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin:0}
+.rp-trend b{color:var(--fg)}
+.rp-more{all:unset;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--warn);min-height:32px;display:flex;align-items:center}
+/* Repertorio: las disponibles, plegadas al final. */
+.rp-disp{margin-top:8px;border-top:1px solid var(--line);padding-top:4px}
+.rp-disp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:56px;font-family:var(--f-display);font-size:1.35rem;font-weight:800;color:var(--fg)}
+.rp-disp>summary::-webkit-details-marker{display:none}
+.rp-disp>summary::before,.rp-disp[open]>summary::before{content:none}
+.rp-disp>summary .n{font-size:1rem;color:var(--muted);font-weight:600}
+.rp-disp>summary .dot{width:10px;height:10px;border-radius:50%;background:var(--st-disponible)}
+.rp-disp>summary .chev{margin-left:auto;width:32px;height:32px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;transition:transform .2s}
+.rp-disp[open]>summary .chev{transform:rotate(90deg)}
+.rp-disp>p{margin:-6px 0 8px}
 .in-big{font-family:var(--f-display);font-size:1.6rem;font-weight:800;line-height:1.05}
 .in-big span{font-size:1rem;color:var(--muted);font-weight:600}
 .lime{color:var(--st-disponible)}
@@ -828,7 +859,9 @@ const PROMOTE_CONS = 6;   // usos para proponer «Consolidada»
 // ---------- estado ----------
 let S = { figures:{}, logs:{}, positions:[...DEFAULT_POS], holds:[...DEFAULT_HOLDS], classes:[...DEFAULT_CLASSES], linkRep:{}, enlaces:{} };
 let tab = "repertorio";
-let filt = { q:"", baile:"todos", estado:"todos", vista:"pos" };
+let filt = { q:"", baile:"todos", estado:"todos", vista:"pos", clase:"todas" };
+// Las disponibles van plegadas al final de Repertorio; si la abres a mano, se queda abierta mientras uses la app.
+let dispOpen = false;
 let linkPos = null, linkHold = "";
 // Enlazar se parte en dos: «Desde aquí» (qué hago desde una posición) y «Mapa» (dónde me faltan salidas).
 let linkView = "aqui";
@@ -1439,7 +1472,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.56";
+const APP_VERSION = "1.57";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1841,6 +1874,33 @@ function ringSVG(pct, size, stroke){
   const r=(size-stroke)/2, c=2*Math.PI*r;
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="${stroke}"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--neon)" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${(c*pct).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size/2} ${size/2})"/></svg>`;
 }
+// «Tu repertorio» en Inicio: un anillo con cuántas te salen (disponibles y consolidadas) sobre las que estás aprendiendo,
+// y una fila por estado con su número y sus figuras. Cada fila lleva a Repertorio con ese filtro. La lista de espera no cuenta:
+// aún no la estás aprendiendo. Debajo, cuántas han llegado a disponible en 30 días y lo que se te está olvidando.
+const firstReady = f => { const h = Array.isArray(f.hist) ? f.hist.find(x=>x && (x.e==="disponible" || x.e==="consolidada")) : null; return h ? h.d : null; };
+function repPanelHTML(all, st){
+  const by = k => all.filter(f=>f.estado===k);
+  const I = by("incompleta"), P = by("practica"), C = by("consolidada"), D = [...by("disponible"), ...C];
+  const tot = I.length + P.length + D.length; if(!tot) return "";
+  const mes = D.filter(f=>{ const d = firstReady(f); return d && d >= todayStr(-30); }).length;
+  const R = 60, SW = 18, CIR = 2*Math.PI*R, parts = [[I.length,"incompleta"],[P.length,"practica"],[D.length,"disponible"]].filter(x=>x[0]);
+  const GAP = parts.length>1 ? 3 : 0;
+  let off = 0;
+  const segs = parts.map(([n,k])=>{ const len = CIR*n/tot, c = `<circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--st-${k})" stroke-width="${SW}" stroke-dasharray="${Math.max(len-GAP,1).toFixed(2)} ${CIR.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 75 75)"/>`; off += len; return c; }).join("");
+  const av = (arr, extra) => `<span class="rp-av" aria-hidden="true">${arr.slice(0,4).map(f=>`<span>${f.thumb?`<img src="${esc(f.thumb)}" alt="">`:esc((f.nombre||"?").trim().charAt(0).toUpperCase())}</span>`).join("")}${arr.length>4?`<span class="more">+${arr.length-4}</span>`:""}${extra?`<em>${extra}</em>`:""}</span>`;
+  const row = (k, f, arr, t, extra) => `<button type="button" class="rp-row" data-act="goto-filter" data-f="${f}" aria-label="${arr.length} ${esc(t.toLowerCase())}${extra?`, ${esc(extra)}`:""}: ver en el repertorio"><i style="background:var(--st-${k})"></i><span class="t">${esc(t)}</span><b>${arr.length}</b>${arr.length ? av(arr, extra) : `<span class="rp-av"><em>ninguna</em></span>`}</button>`;
+  const olv = [st.olvidada ? pl(st.olvidada,"olvidada","olvidadas") : "", st.atrasada ? pl(st.atrasada,"atrasada","atrasadas") : ""].filter(Boolean).join(" · ");
+  return `<section class="panel rp" aria-labelledby="in-rp">
+    <div class="in-h"><h2 id="in-rp">Tu repertorio</h2><button class="lnk" data-act="goto-filter" data-f="todos">Ver todo</button></div>
+    <div class="rp-donut">
+      <div class="rp-ring"><svg width="132" height="132" viewBox="0 0 150 150" role="img" aria-label="${D.length} de ${tot} ya te salen: ${pl(I.length,"incompleta","incompletas")}, ${P.length} en práctica, ${pl(D.length,"disponible","disponibles")}"><circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--surface2)" stroke-width="${SW}"/>${segs}</svg>
+        <div class="c" aria-hidden="true"><b>${D.length}</b><span>de ${tot} ya<br>te salen</span></div></div>
+      <div class="rp-leg">${row("incompleta","incompleta",I,I.length===1?"Incompleta":"Incompletas","")}${row("practica","practica",P,"En práctica","")}${row("disponible","disponibles",D,"Disponibles",C.length?`${C.length} consol.`:"")}</div>
+    </div>
+    ${mes ? `<p class="rp-trend"><span style="color:var(--st-disponible)" aria-hidden="true">▲</span><span><b>+${mes}</b> ${mes===1?"ha llegado":"han llegado"} a disponible en los últimos 30 días</span></p>` : ""}
+    ${olv ? `<button type="button" class="rp-more" data-tab="repasar">● ${olv}: repásalas hoy ›</button>` : ""}
+  </section>`;
+}
 function renderInicio(){
   const v=$("#v-inicio"), all=figs();
   if(!all.length){
@@ -1850,7 +1910,6 @@ function renderInicio(){
   }
   const act=all.filter(active), st={nueva:0, olvidada:0, atrasada:0, inestable:0, dominada:0};
   act.forEach(f=>{ st[memState(f)]++; });
-  const rec = act.length ? Math.round((act.length-st.olvidada)/act.length*100) : 0;
   const plan = trainPlan(trainMins), fStep=plan.steps.find(x=>x.kind==="fig"), lStep=plan.steps.find(x=>x.kind==="link"), cStep=plan.steps.find(x=>x.kind==="chain");
   const dF=dueFigs(), dueN=dF.length+dueLinks().length;
   // Portada: un fotograma real del vídeo de la figura que más toca repasar.
@@ -1898,13 +1957,7 @@ function renderInicio(){
         <button class="btn pri wide" data-act="train-start">Empezar entreno</button>` : `<button class="btn pri wide" data-act="start-fig-any">Repasar 3 al azar</button>`}
       </div>
     </section>
-    ${act.length ? `<section class="panel in-mem" aria-labelledby="in-mem">
-      <div class="ring">${ringSVG(rec/100, 92, 10)}<b>${rec}%</b></div>
-      <div class="in-mem-t"><span class="muted small" id="in-mem">Figuras que recuerdas</span>
-        <b class="in-big">${act.length-st.olvidada} <span>de ${act.length}</span></b>
-        <span class="tags">${st.dominada?`<span class="tagx t-lime">${st.dominada} ${st.dominada===1?"dominada":"dominadas"}</span>`:""}${st.inestable+st.nueva?`<span class="tagx t-blue">${st.inestable+st.nueva} en marcha</span>`:""}${st.atrasada?`<span class="tagx t-amber">${st.atrasada} ${st.atrasada===1?"atrasada":"atrasadas"}</span>`:""}${st.olvidada?`<span class="tagx t-red">${st.olvidada} ${st.olvidada===1?"olvidada":"olvidadas"}</span>`:""}</span>
-      </div>
-    </section>` : ""}
+    ${repPanelHTML(all, st)}
     ${carr.length ? `<section aria-labelledby="in-due" class="in-sec">
       <div class="in-h"><h2 id="in-due">Repasar hoy <span class="muted">${dF.length}</span></h2><button class="lnk" data-tab="repasar">Ver todo</button></div>
       <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${esc(f.id)}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
@@ -1940,24 +1993,34 @@ function renderRepertorio(){
   const dueN = dueFigs().length + dueLinks().length;
   const consN = all.filter(f=>f.estado==="consolidada").length;
   const bailes = [...new Set(all.map(f=>f.baile||"Bachata"))];
+  const clases = [...new Set(all.map(f=>f.profesor).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
+  if(filt.clase!=="todas" && !clases.includes(filt.clase)) filt.clase = "todas";
   const q = fold(filt.q.trim());
   const list = all.filter(f =>
     (filt.baile==="todos" || (f.baile||"Bachata")===filt.baile) &&
-    (filt.estado==="todos" || (filt.estado==="incompletas" ? incomplete(f) : f.estado===filt.estado)) &&
+    (filt.estado==="todos" || (filt.estado==="incompletas" ? incomplete(f) : filt.estado==="disponibles" ? ready(f) : f.estado===filt.estado)) &&
+    (filt.clase==="todas" || (f.profesor||"")===filt.clase) &&
     (!q || [f.nombre,f.profesor,f.entrada,f.salida,f.agarreIn,f.agarreOut,f.senal,f.notas,f.video,TIPO[tipoOf(f)].t].map(fold).join(" ").includes(q))
   );
   if(q) announceSoon(list.length ? pl(list.length,"figura encontrada","figuras encontradas") : "Ninguna figura coincide");
-  let body = "";
-  if(filt.vista==="pos"){
+  const groupsHTML = arr => {
+    if(!arr.length) return "";
+    if(filt.vista!=="pos") return `<div class="gal">${arr.map(f=>galCard(f,false)).join("")}</div>`;
     const groups = [];
     // Las incompletas, juntas y arriba: son las que se repasan cada día mientras os las enseñan.
-    const pend = list.filter(f=>f.estado==="incompleta"), rest = list.filter(f=>f.estado!=="incompleta");
+    const pend = arr.filter(f=>f.estado==="incompleta"), rest = arr.filter(f=>f.estado!=="incompleta");
     if(pend.length) groups.push(["Incompletas", pend, "Os las están enseñando por partes: se repasan cada día. Añade el vídeo de cada clase en su ficha."]);
     const inc = rest.filter(incomplete); if(inc.length) groups.push(["Sin entrada/salida", inc, inc.length===1?"Añade dónde empieza y dónde acaba para que salga en Enlazar.":"Añade dónde empiezan y dónde acaban para que salgan en Enlazar."]);
     allPositions().forEach(p=>{ const it=rest.filter(f=>placed(f)&&f.entrada===p); if(it.length) groups.push(["Desde "+p, it]); });
     const fw = rest.filter(f=>!isMove(f)); if(fw.length) groups.push(["Footwork y styling", fw]);
-    body = groups.map(([t,it,hint])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${hint?`<p class="small muted group-hint">${hint}</p>`:""}<div class="gal">${it.map(f=>galCard(f, t.startsWith("Desde "))).join("")}</div></div>`).join("");
-  } else body = `<div class="gal">${list.map(f=>galCard(f,false)).join("")}</div>`;
+    return groups.map(([t,it,hint])=>`<div class="group"><div class="group-h" role="heading" aria-level="3"><b>${esc(t)}</b><span>${it.length}</span></div>${hint?`<p class="small muted group-hint">${hint}</p>`:""}<div class="gal">${it.map(f=>galCard(f, t.startsWith("Desde "))).join("")}</div></div>`).join("");
+  };
+  // Las que ya te salen (disponibles y consolidadas) van plegadas al final para no ocupar la pantalla.
+  // Se abren solas cuando buscas algo: con texto, con una clase elegida o con el filtro «Disponibles».
+  const vis = list.filter(f=>!ready(f)), rdy = list.filter(ready);
+  const autoOpen = !!q || filt.clase!=="todas" || ["disponibles","disponible","consolidada"].includes(filt.estado);
+  const CHEV = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
+  const body = groupsHTML(vis) + (rdy.length ? `<details class="rp-disp" id="rp-disp"${dispOpen||autoOpen?" open":""}><summary><span class="dot" aria-hidden="true"></span>Disponibles <span class="n">${rdy.length}</span><span class="chev" aria-hidden="true">${CHEV}</span></summary><p class="small muted">Las que ya te salen, con las consolidadas. Se abren solas al buscar o filtrar.</p>${groupsHTML(rdy)}</details>` : "");
   const v=$("#v-repertorio");
   v.innerHTML = `
     ${all.length ? `<p class="sum"><span><b>${all.length}</b> ${all.length===1?"figura":"figuras"}</span><span aria-hidden="true">·</span><span><b>${consN}</b> ${consN===1?"consolidada":"consolidadas"}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar"><b>${dueN}</b> ${dueN===1?"repaso hoy":"repasos hoy"}</button>`:""}</p>`:""}
@@ -1968,11 +2031,12 @@ function renderRepertorio(){
     
     <div class="filters">
       <input type="search" class="full" id="f-q" placeholder="Buscar figura, posición, agarre, clase…" value="${esc(filt.q)}" aria-label="Buscar">
+      ${clases.length?`<select id="f-clase" aria-label="Clase"><option value="todas">Clase: todas</option>${clases.map(c=>`<option ${filt.clase===c?"selected":""}>${esc(c)}</option>`).join("")}</select>`:""}
       ${bailes.length>1?`<select id="f-baile" aria-label="Baile"><option value="todos">Baile: todos</option>${bailes.map(b=>`<option ${filt.baile===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
 
       <div class="seg2 ${bailes.length>1?"full":""}" role="group" aria-label="Orden"><button data-vista="pos" aria-pressed="${filt.vista==="pos"}">Posición</button><button data-vista="rec" aria-pressed="${filt.vista==="rec"}">Recientes</button></div>
     </div>
-    <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.map(e=>[e.k, e.t]), ["incompletas","Sin entrada/salida"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
+    <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.filter(e=>e.k!=="disponible" && e.k!=="consolidada").map(e=>[e.k, e.t]), ["disponibles","Disponibles"], ["incompletas","Sin entrada/salida"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
     ${list.length ? body : `<p class="muted">Ninguna figura coincide con la búsqueda o los filtros.</p><button class="btn sm" data-act="clear-filt">Ver todas</button>`}
     ` : `
     <div class="empty">
@@ -1983,6 +2047,8 @@ function renderRepertorio(){
   `;
   const qi=$("#f-q"); if(qi) qi.oninput=e=>{filt.q=e.target.value; renderListOnly();};
   const fb=$("#f-baile"); if(fb) fb.onchange=e=>{filt.baile=e.target.value; render();};
+  const fc=$("#f-clase"); if(fc) fc.onchange=e=>{filt.clase=e.target.value; render();};
+  const dd=$("#rp-disp"); if(dd) dd.addEventListener("toggle", ()=>{ if(!autoOpen) dispOpen = dd.open; });
 
 }
 function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); safeNote($("#v-repertorio")); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
@@ -5113,7 +5179,7 @@ document.addEventListener("click", async e=>{
   if(a==="examples"){ closeSheet(); return loadExamples(); }
   if(a==="clear-examples"){ figs().filter(f=>f.ejemplo).forEach(f=>deleteFigure(f.id)); toast("Ejemplos quitados"); return openSettings(); }
   if(a==="coach"){ learn("coach"); return runCoach(); }
-  if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; return render(); }
+  if(a==="clear-filt"){ filt.q=""; filt.baile="todos"; filt.estado="todos"; filt.clase="todas"; return render(); }
   if(a==="start-fig") return startSession("fig", false);
   if(a==="start-fig-any") return startSession("fig", true);
   if(a==="start-quiz") return startQuiz();
@@ -5148,7 +5214,7 @@ document.addEventListener("click", async e=>{
     if(a==="q-done") resolveQuestion(q.id); else { delete S.preguntas[q.id]; persist({t:"meta"}); render(); }
     return toast(a==="q-done" ? `Resuelta: salida desde ${copy.pos}` : "Pregunta quitada", {label:"Deshacer", fn:()=>{ S.preguntas[copy.id]=copy; persist({t:"meta"}); render(); }});
   }
-  if(a==="goto-filter"){ filt.estado=d.f; filt.q=""; return go("repertorio"); }
+  if(a==="goto-filter"){ filt.estado=d.f; filt.q=""; filt.clase="todas"; return go("repertorio"); }
   if(a==="chain"){ learn("chain"); chain=makeChain(linkPos); return render(); }
   if(a==="block"){ blockPos=null; blockHold=null; blockPick=null; return showBlock(); }
   if(a==="bexit-back"){ const id=blockPick; blockPick=null; blockHold=null; return showBlock(`[data-bexit="${CSS.escape(id||"")}"]`); }

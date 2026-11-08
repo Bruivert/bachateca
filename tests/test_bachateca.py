@@ -312,10 +312,11 @@ def inicio_con_datos(browser):
     txt = v.inner_text()
     assert "Tu entreno" in txt and "Empezar entreno" in txt, txt[:300]
     assert "Salidas desde Sombra" in txt and "te bloqueaste" in txt.lower(), "prioriza el bloqueo del último social"
-    assert "Figuras que recuerdas" in txt
-    ring = v.locator(".in-mem .in-big").inner_text()
-    assert ring.startswith("3") and "de 4" in ring, ring      # 4 activas; olvidada solo la 2 (último repaso fallado); la 3 (6 días pendiente) está atrasada, no olvidada
-    assert "1 atrasada" in v.locator(".in-mem").inner_text()
+    assert "Tu repertorio" in txt and "Figuras que recuerdas" not in txt
+    # 4 que estás aprendiendo (la de la lista de espera no cuenta): 2 te salen (disponible y consolidada) y 2 en práctica.
+    assert v.locator(".rp-ring .c").inner_text().replace("\n", " ") == "2 de 4 ya te salen", v.locator(".rp-ring .c").inner_text()
+    # Olvidada solo la 2 (último repaso fallado); la 3 (6 días pendiente) está atrasada, no olvidada.
+    assert v.locator(".rp-more").inner_text() == "● 1 olvidada · 1 atrasada: repásalas hoy ›", v.locator(".rp-more").inner_text()
     assert "Olvidada" in v.locator(".carr").inner_text()
     assert v.locator("video[data-hvid]").count() == 1, "portada con el vídeo de la figura"
     st = stored_state(p)
@@ -990,6 +991,76 @@ def ya_esta_completa_pide_la_salida(browser):
     assert not errors, errors
     ctx.close()
 
+
+
+# ---------------------------------------------------------------- Tu repertorio (Inicio) y Disponibles plegadas
+def rep_seed():
+    import datetime
+    d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
+    figs = [
+        fig(1, "Cerrada", "", nombre="Aprendiendo", estado="incompleta", profesor="Brotons · Parejas 1"),
+        fig(2, "Cerrada", "Sombra", nombre="Practico A", profesor="Brotons · Parejas 1"),
+        fig(3, "Sombra", "Cerrada", nombre="Practico B", profesor="Cris y Argenis"),
+        fig(4, "Cerrada", "Abierta 2 manos", nombre="Recien lista", estado="disponible", profesor="Brotons · Parejas 1",
+            hist=[{"e": "practica", "d": d(-40)}, {"e": "disponible", "d": d(-5)}]),
+        fig(5, "Abierta 2 manos", "Cerrada", nombre="Veterana", estado="consolidada", profesor="Cris y Argenis",
+            hist=[{"e": "disponible", "d": d(-90)}, {"e": "consolidada", "d": d(-10)}]),
+        fig(6, "Cerrada", "Hammerlock", nombre="Esperando", estado="espera"),
+    ]
+    return {"figures": {f["id"]: f for f in figs}, "logs": {}}
+
+
+@test
+def inicio_tu_repertorio(browser):
+    ctx, p, errors = open_app(browser, seed=rep_seed())
+    v = p.locator("#v-inicio .rp")
+    assert v.locator(".rp-ring .c").inner_text().replace("\n", " ") == "2 de 5 ya te salen", "la lista de espera no cuenta"
+    rows = [r.replace("\n", " ") for r in v.locator(".rp-row").all_inner_texts()]
+    assert rows[0].startswith("Incompleta 1") and rows[1].startswith("En práctica 2") and rows[2].startswith("Disponibles 2"), rows
+    assert "1 consol." in rows[2] and rows[2].endswith("R V 1 consol."), rows                  # iniciales de sus figuras
+    assert v.locator(".rp-ring svg circle").count() == 4, "fondo y un trozo por estado"
+    assert "+1 ha llegado a disponible en los últimos 30 días" in v.inner_text(), "la consolidada llegó hace 90 días: no cuenta"
+    assert v.locator(".rp-more").count() == 0, "sin olvidadas ni atrasadas no hay aviso"
+    # Tocar «Disponibles» lleva a Repertorio con ese filtro y el bloque abierto.
+    v.locator('.rp-row[data-f="disponibles"]').click()
+    assert p.locator("#v-repertorio").is_visible()
+    assert p.locator('[data-fest="disponibles"]').get_attribute("aria-pressed") == "true"
+    assert p.locator("#rp-disp").evaluate("d => d.open")
+    assert p.locator("#v-repertorio .gcard").count() == 2
+    assert p.locator('[data-fest="consolidada"]').count() == 0, "un solo chip para disponibles y consolidadas"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def repertorio_disponibles_plegadas_y_clase(browser):
+    ctx, p, errors = open_app(browser, seed=rep_seed())
+    p.click('nav.tabs [data-tab="repertorio"]')
+    d = p.locator("#rp-disp")
+    assert not d.evaluate("d => d.open"), "las disponibles empiezan plegadas"
+    assert "Disponibles 2" in d.locator("summary").inner_text().replace("\n", " ")
+    visibles = p.locator("#v-repertorio .gcard:visible").count()
+    assert visibles == 4, visibles                                                    # incompleta, 2 en práctica y la de espera
+    # Abrirlo a mano se recuerda al volver a Repertorio.
+    d.locator("summary").click()
+    p.click('nav.tabs [data-tab="inicio"]'); p.click('nav.tabs [data-tab="repertorio"]')
+    assert p.locator("#rp-disp").evaluate("d => d.open"), "se queda abierto"
+    p.locator("#rp-disp summary").click()
+    p.click('nav.tabs [data-tab="inicio"]'); p.click('nav.tabs [data-tab="repertorio"]')
+    assert not p.locator("#rp-disp").evaluate("d => d.open")
+    # Filtro por clase: solo las suyas, y las disponibles se abren solas.
+    opts = p.locator("#f-clase option").all_inner_texts()
+    assert opts == ["Clase: todas", "Brotons · Parejas 1", "Cris y Argenis"], opts
+    p.select_option("#f-clase", "Cris y Argenis")
+    names = p.locator("#v-repertorio .gcard").all_inner_texts()
+    assert len(names) == 2 and all(("Practico B" in n) or ("Veterana" in n) for n in names), names
+    assert p.locator("#rp-disp").evaluate("d => d.open")
+    # Al buscar también se abre.
+    p.select_option("#f-clase", "todas")
+    p.fill("#f-q", "veter")
+    assert p.locator("#rp-disp").evaluate("d => d.open") and p.locator("#v-repertorio .gcard").count() == 1
+    assert not errors, errors
+    ctx.close()
 
 # ---------------------------------------------------------------- prueba del conteo al grabar (conteo.html)
 def open_conteo(browser, seed=None):
@@ -2226,8 +2297,8 @@ def atrasada_no_es_olvidada(browser):
     assert "Olvidada" not in p.locator('#v-repertorio [data-view="f1"]').inner_text()
     assert "Olvidada" in p.locator('#v-repertorio [data-view="f2"]').inner_text()
     p.click('nav.tabs [data-tab="inicio"]')
-    txt = p.locator("#v-inicio .in-mem").inner_text()
-    assert "1 atrasada" in txt and "1 olvidada" in txt and p.locator("#v-inicio .in-mem .in-big").inner_text().startswith("1"), txt
+    txt = p.locator("#v-inicio .rp-more").inner_text()
+    assert "1 olvidada" in txt and "1 atrasada" in txt, txt
     assert not errors, errors
     ctx.close()
 
@@ -3523,7 +3594,8 @@ def ficha_muestra_las_dos_barras(browser):
     seed = {"figures": {"f1": fig(1, "Cerrada", "Abierta 2 manos", estado="disponible", rep={"step": 4, "due": "2999-01-01", "last": "2026-01-01"}, ejec={"nivel": 1, "last": "2026-01-01"}),
                         "f2": fig(2, "Abierta 2 manos", "Cerrada", estado="disponible", rep={"step": 1, "due": "2999-01-01", "last": "2026-01-01"}, ejec={"nivel": 3, "last": "2026-01-01"})}}
     ctx, p, errors = open_app(browser, seed=seed)
-    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click("#rp-disp summary")      # las disponibles van plegadas
+    p.click('#v-repertorio [data-view="f1"]')
     t = p.inner_text(".fv-mem")
     assert "La recuerdo" in t and "Me sale con pareja" in t, t
     assert "Te sale de memoria; ahora pruébala con pareja en el social." in t, t

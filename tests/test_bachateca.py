@@ -4367,6 +4367,49 @@ def practica_guiada_ignora_las_opciones_de_enlazar(browser):
 LIMITE_PRUEBA = int(os.environ.get("LIMITE_PRUEBA", "90"))
 
 
+# ---------------------------------------------------------------- crítica de diseño (1.66)
+def _seed_critica():
+    import datetime
+    d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
+    F = [fig(1, "Cerrada", "Abierta 2 manos", nombre="Paseo con giro", estado="consolidada", rep={"step": 4, "due": d(10), "last": d(-20), "aciertos": 4, "fallos": 0}),
+         fig(2, "Abierta 2 manos", "Sombra", nombre="Entrada a sombra", rep={"step": 0, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 1}),
+         fig(3, "Sombra", "Abierta 1 mano", nombre="Salida de sombra con vuelta", rep={"step": 1, "due": d(-6), "last": d(-9), "aciertos": 1, "fallos": 0}),
+         fig(4, "Abierta 1 mano", "Cerrada", nombre="Cambio de mano y cierre", estado="disponible", rep={"step": 2, "due": d(0), "last": d(-7), "aciertos": 2, "fallos": 0}),
+         fig(6, "Cerrada", "Cerrada", nombre="Básico con dip", estado="consolidada", rep={"step": 5, "due": d(40), "last": d(-10), "aciertos": 5, "fallos": 0}),
+         fig(8, "Cerrada", "Sombra", nombre="Giro a sombra", estado="practica")]
+    return {"figures": {f["id"]: f for f in F},
+            "logs": {"l1": {"id": "l1", "fecha": d(-2), "creado": 1, "figs": ["f1", "f4", "f6"], "bloqueo": "Sombra", "salio": "", "proximo": ""}},
+            "linkRep": {"Bachata\u241fSombra": {"step": 0, "due": d(0), "last": d(-3)}}}
+
+
+TOQUE_ALTO = """e => { e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+  const hits = y => { const t = document.elementFromPoint(cx, y); return t && (t === e || e.contains(t)); };
+  let h = 0; while (h < 30 && hits(cy - h - 1) && hits(cy + h + 1)) h++; return 2*h + 1; }"""
+
+
+@test
+def critica_textos_y_tarjetas(browser):
+    """Lo que encontró la crítica de la 1.65: concordancia, subtítulo del bloqueo, «Exportar copia» sin vídeos,
+    marcador de «Figuras de hoy», etiqueta del tipo que no tapa el nombre y filtros de 44 px."""
+    ctx, p, errors = open_app(browser, seed=_seed_critica())
+    t = p.evaluate("() => document.querySelector('#v-inicio').innerText")
+    assert "y no tienes ninguna salida segura" in t and "y tienes ninguna" not in t, t
+    li = p.evaluate("() => [...document.querySelectorAll('#v-inicio li')].map(l => l.innerText).find(s => s.includes('Salidas desde')) || ''")
+    assert ("Salidas desde Sombra y" not in li) or ("En Sombra te bloqueaste" in li), li
+    assert p.evaluate("() => [...document.querySelectorAll('.carr-ph')].every(x => x.textContent.trim() || x.querySelector('svg'))"), "marcador vacío"
+    p.click('nav.tabs [data-tab="repertorio"]'); p.wait_for_timeout(200)
+    solapes = p.evaluate("""() => [...document.querySelectorAll('#v-repertorio .gcard')].filter(c => { const em = c.querySelector('.gm-ph em'), n = c.querySelector('.gname');
+      if (!em || !n) return false; const a = em.getBoundingClientRect(), b = n.getBoundingClientRect(); return a.bottom > b.top && a.top < b.bottom && a.right > b.left && a.left < b.right; }).map(c => c.dataset.view)""")
+    assert solapes == [], solapes
+    alto = p.locator('.fchips .chip').first.evaluate(TOQUE_ALTO)
+    assert alto >= 44, f"el filtro responde en {alto} px"
+    p.click("#btn-settings")
+    aj = p.evaluate("() => document.querySelector('.sheet').innerText")
+    assert "La copia de seguridad no incluye vídeos" not in aj, "contradice a «Copia completa»"
+    assert not errors, errors
+    ctx.close()
+
+
 class WebkitConDisco:
     """WebKit con un perfil en disco nuevo para cada contexto.
 

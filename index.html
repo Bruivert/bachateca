@@ -517,6 +517,7 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .ib{width:44px;height:44px;flex:none;border:0;border-radius:10px;background:none;color:var(--link);display:grid;place-items:center}
 .ib:disabled{opacity:.3}.ib.danger{color:var(--warn);margin-left:8px}.ib:active{background:var(--fill)}
 .chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips.scroll{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
 .chips.scroll::-webkit-scrollbar{display:none}.chips.scroll .chip{flex:none}
 .sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
 .log{background:var(--surface);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:0.8824rem}
@@ -549,8 +550,8 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .cmp-cap{font-size:0.8236rem;color:var(--muted);margin-top:6px}
 .cmp-row{display:flex;flex-direction:column;gap:8px}
 /* zona táctil de al menos 44 pt en controles pequeños, sin cambiar su aspecto */
-.icon-btn,.chip,.btn.sm,.bar .btn.pri,.toast .undo,.sum .lnk,.pctl button,details summary{position:relative}
-.btn.sm::after,.bar .btn.pri::after,.sum .lnk::after{content:"";position:absolute;inset:-6px -3px}
+.icon-btn,.chip,.btn.sm,.bar .btn.pri,.toast .undo,.sum .lnk,.in-date .lnk,.in-h .lnk,.pctl button,details summary{position:relative}
+.btn.sm::after,.bar .btn.pri::after,.sum .lnk::after,.in-date .lnk::after,.in-h .lnk::after{content:"";position:absolute;inset:-6px -3px}
 .icon-btn::after{content:"";position:absolute;inset:-6px}
 .pctl button::after{content:"";position:absolute;inset:-7px -3px}
 details summary::after{content:"";position:absolute;inset:-8px -4px}
@@ -728,7 +729,7 @@ p,.small,.hint{text-wrap:pretty}
 /* Filtros: buscador grande y chips de estado que se deslizan. */
 .filters input[type=search]{min-height:48px;border-radius:14px;background:var(--surface);border:1px solid var(--edge)}
 .filters select{border-radius:14px}
-.fchips{display:flex;gap:8px;overflow-x:auto;margin:-8px -16px 0;padding:0 16px 2px;scrollbar-width:none;scroll-padding-inline:16px}
+.fchips{display:flex;gap:8px;overflow-x:auto;margin:-8px -16px 0;padding:0 16px 2px;scrollbar-width:none;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
 .fchips::-webkit-scrollbar{display:none}
 .fchips .chip{flex:none;min-height:38px}
 .seg2{border-radius:14px;padding:3px;background:var(--surface);border:1px solid var(--edge)}
@@ -1523,7 +1524,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.64";
+const APP_VERSION = "1.65";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;

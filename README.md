@@ -91,6 +91,15 @@ La próxima vez que abras la app con conexión, se actualizará sola. Tus datos 
 - **Limpieza automática**: un vídeo que ya no pertenece a ninguna figura se borra solo a los 7 días, y nunca si está en
   una instantánea. **Ajustes → Espacio → Liberar ahora** lo hace al momento.
 
+## Versión 1.66
+
+Arreglos de una crítica de diseño medida (con la 1.65 había 21 problemas; con la 1.66, 0):
+- Textos de Inicio: «no tienes ninguna salida segura», y en el entreno se dice en qué posición te bloqueaste.
+- Ajustes y fichas dicen que **«Exportar copia»** no incluye vídeos y **«Copia completa»** sí.
+- En Repertorio, el tipo («Figura», «Transición»…) va arriba a la derecha y nítido: un nombre largo ya no lo tapa.
+- En «Figuras de hoy», una figura sin vídeo ni compás muestra un icono en lugar de un hueco vacío.
+- Los filtros, las posiciones de Enlazar y el aviso de olvidadas responden al toque en 44 px o más.
+
 ## Versión 1.57
 
 - **Abre sin cobertura**: si la red tarda más de 3 segundos (por ejemplo, en un social con mala cobertura), la app se

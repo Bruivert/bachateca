@@ -638,8 +638,12 @@ details.info summary::after{inset:-10px -4px}
 .rv-otras .is-off{opacity:.6}
 .rv-mins{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .in-week-n{margin:0}
+p,.small,.hint{text-wrap:pretty}
 .in-pend{margin-top:-20px}
 .sum .sum-pend{flex-basis:100%;text-align:left}
+.glosario dl{margin:8px 0 0}
+.glosario dt{font-weight:700;color:var(--fg);margin-top:10px}
+.glosario dd{margin:2px 0 0}
 .rp-sub{grid-column:2;grid-row:3;font-size:.72rem;color:var(--muted);line-height:1.2}
 .rp-trend{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin:0}
 .rp-trend b{color:var(--fg)}
@@ -668,10 +672,11 @@ details.info summary::after{inset:-10px -4px}
 .carr-i img,.carr-ph{width:148px;height:96px;border-radius:16px;object-fit:cover;background:var(--surface2);display:grid;place-items:center}
 .carr-i b{font-size:0.9412rem;line-height:1.25;font-weight:700}
 .carr-i .tagx{align-self:flex-start}
-.in-next{border-radius:22px;padding:18px;background:var(--neon);color:var(--neon-ink);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
-.in-next h2{color:var(--neon-ink);font-size:1.3rem;line-height:1.2}
-.in-next p{font-size:0.9412rem}
-.in-next .btn{background:var(--neon-ink);color:#fff;margin-top:4px}
+.in-next{border-radius:22px;padding:18px 18px 18px 16px;background:var(--surface);border:1px solid var(--edge);border-left:4px solid var(--neon);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.in-next .eyebrow{color:var(--link)}
+.in-next h2{font-size:1.2rem;line-height:1.2}
+.in-next p{font-size:0.9412rem;color:var(--muted)}
+.in-next .btn{margin-top:4px}
 .q-row{display:flex;flex-direction:column;gap:8px;padding-top:12px;margin-top:12px;border-top:1px solid var(--line)}
 .in-h + .q-row{border-top:0;margin-top:8px;padding-top:0}
 .eyebrow{display:flex;align-items:center;gap:6px;font-size:0.7059rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
@@ -1496,7 +1501,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.61";
+const APP_VERSION = "1.62";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1960,7 +1965,7 @@ function renderInicio(){
   const gap = coverage().filter(c=>c.into.length && c.ready.length<2).sort((a,b)=>b.into.length-a.into.length)[0];
   const incN = all.filter(incomplete).length, espN = all.filter(f=>f.estado==="espera").length;
   let next = "";
-  if(gap) next = `<h2 id="in-next">Aprende una salida más desde ${esc(gap.p)}</h2><p>Llegas ahí con ${pl(gap.into.length,"figura","figuras")} y tienes ${gap.ready.length ? pl(gap.ready.length,"salida segura","salidas seguras") : "ninguna salida segura"}. Es donde más fácil te quedas en blanco: pide en clase una salida sencilla desde ahí.</p>
+  if(gap) next = `<h2 id="in-next">Aprende una salida más desde ${esc(gap.p)}</h2><p>Llegas ahí con ${pl(gap.into.length,"figura","figuras")} y tienes ${gap.ready.length ? pl(gap.ready.length,"salida segura","salidas seguras") : "ninguna salida segura"} (figuras que ya te salen). Es donde más fácil te quedas en blanco: pide en clase una salida sencilla desde ahí.</p>
       <button class="btn" data-act="goto-pos" data-p="${esc(gap.p)}">Ver salidas desde ${esc(gap.p)}</button>`;
   else if(incN) next = `<h2 id="in-next">Completa ${pl(incN,"figura","figuras")}</h2><p>Les falta dónde empiezan o acaban, así que no salen en Enlazar ni en Social.</p><button class="btn" data-act="goto-filter" data-f="incompletas">Ver cuáles</button>`;
   else if(espN) next = `<h2 id="in-next">${espN===1?"1 figura espera":`${espN} figuras esperan`} en la lista</h2><p>Pasa una a «En práctica» para que entre en los repasos.</p><button class="btn" data-act="goto-filter" data-f="espera">Ver la lista de espera</button>`;
@@ -2017,6 +2022,16 @@ function renderInicio(){
 }
 
 // ---------- vista: repertorio ----------
+// Las palabras de la app, explicadas en un sitio: se abre al final de Repertorio, Repasar y Enlazar.
+function glosarioHTML(){
+  const est = k => `<dt><span class="tagx st-tag st-${k}">${esc(EST[k].t)}</span></dt><dd>${esc(EST[k].d)}.</dd>`;
+  return `<details class="info glosario"><summary>Qué significa cada palabra</summary><dl>
+    <dt>Enlace</dt><dd>Desde una posición, nombrar y marcar con el cuerpo dos salidas. Es justo lo que se bloquea en el social; en Repasar se repasa por posiciones.</dd>
+    <dt>Salida segura</dt><dd>Una figura que ya te sale (disponible o consolidada) desde esa posición. Con dos o más, no te quedas en blanco ahí.</dd>
+    <dt>Posición y agarre</dt><dd>Cómo estáis colocados (cerrada, abierta…) y cómo os cogéis: «Izq–der» es tu izquierda con su derecha.</dd>
+    ${["espera","incompleta","practica","disponible","consolidada"].map(est).join("")}
+  </dl></details>`;
+}
 function renderRepertorio(){
   const all = figs();
   const dueN = dueFigs().length + dueLinks().length;
@@ -2067,6 +2082,7 @@ function renderRepertorio(){
     </div>
     <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.filter(e=>e.k!=="disponible" && e.k!=="consolidada").map(e=>[e.k, e.t]), ["disponibles","Disponibles"], ["incompletas","Sin entrada/salida"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
     ${list.length ? body : `<p class="muted">Ninguna figura coincide con la búsqueda o los filtros.</p><button class="btn sm" data-act="clear-filt">Ver todas</button>`}
+    ${glosarioHTML()}
     ` : `
     <div class="empty">
       <h2>Guarda tu primera figura</h2>
@@ -2117,7 +2133,8 @@ function renderRepasar(){
         <div class="chips sim-n rv-mins" role="group" aria-label="Duración de la práctica guiada"><span class="small muted">Práctica guiada:</span>${[10,20].map(m=>`<button type="button" class="chip sm" data-act="guia-mins" data-m="${m}" aria-pressed="${guiaCfg.mins===m}">${m} min</button>`).join("")}</div>
       </section>
       ${progressHTML()}
-      <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
+      <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>
+      ${figs().length ? glosarioHTML() : ""}`;
     return;
   }
   if(session.i>=session.ids.length){
@@ -2298,7 +2315,7 @@ function renderEnlazar(){
     <div class="chips" role="group" aria-label="Posición">
       ${cov.map(c=>`<button class="chip ${c.into.length&&c.ready.length<2?"warn":""}" aria-pressed="${c.p===linkPos}" data-pos="${esc(c.p)}" aria-label="${esc(c.p)}, ${pl(c.out.length,"salida","salidas")}${c.into.length&&c.ready.length<2?", menos de 2 seguras":""}">${esc(c.p)}<span class="n" aria-hidden="true">${c.out.length}</span></button>`).join("")}
     </div>
-    ${!visto.has("pos") || gaps.length ? `<p class="small muted chip-legend">${visto.has("pos")?"":"El número es cuántas salidas tienes desde esa posición."}${gaps.length?` <span class="ring" aria-hidden="true"></span> Borde rojo: llegas ahí con menos de 2 salidas seguras.`:""}</p>`:""}
+    ${!visto.has("pos") || gaps.length ? `<p class="small muted chip-legend">${visto.has("pos")?"":"El número es cuántas salidas tienes desde esa posición."}${gaps.length?` <span class="ring" aria-hidden="true"></span> Borde rojo: llegas ahí con menos de 2 salidas seguras (figuras que ya te salen).`:""}</p>`:""}
     ${sel ? `
       <div class="panel">
         ${holdsHere.length ? `<div class="f"><span>Llegas con el agarre</span><div class="chips">
@@ -5149,7 +5166,7 @@ function render(){
   if(tab==="inicio") renderInicio();
   else if(tab==="repertorio") renderRepertorio();
   else if(tab==="repasar") renderRepasar();
-  else if(tab==="enlazar") renderEnlazar();
+  else if(tab==="enlazar"){ renderEnlazar(); if(figs().length) $("#v-enlazar").insertAdjacentHTML("beforeend", glosarioHTML()); }
   else if(tab==="social") renderSocial();
   safeNote($("#v-"+tab));
   hydrateVideos($("#v-"+tab)); hydrateCovers($("#v-"+tab));

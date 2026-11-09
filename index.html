@@ -625,6 +625,18 @@ details.info summary::after{inset:-10px -4px}
 .rp-av>span img{width:100%;height:100%;object-fit:cover}
 .rp-av>span.more{background:var(--fill);color:var(--muted)}
 .rp-av em{font-style:normal;font-size:.72rem;color:var(--muted)}
+.rv-big{font-family:var(--f-display);font-size:1.25rem;font-weight:800;margin:0}
+.rv-hoy .row{flex-wrap:nowrap}
+.rv-hoy .row .btn{flex:1;white-space:nowrap;padding-inline:10px}
+.rv-otras{display:flex;flex-direction:column;gap:10px}
+.rv-otras h3{margin:8px 2px 0}
+.rv-otras .mrow{padding-block:10px;justify-content:space-between}
+.rv-otras .mrow>span{display:flex;flex-direction:column;gap:2px;text-align:left}
+.rv-otras .mrow .chev{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;opacity:.5}
+.rv-otras .is-off{opacity:.6}
+.rv-mins{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.in-week-n{margin:0}
+.in-pend{margin-top:-20px}
 .rp-sub{grid-column:2;grid-row:3;font-size:.72rem;color:var(--muted);line-height:1.2}
 .rp-trend{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin:0}
 .rp-trend b{color:var(--fg)}
@@ -661,8 +673,6 @@ details.info summary::after{inset:-10px -4px}
 .in-h + .q-row{border-top:0;margin-top:8px;padding-top:0}
 .eyebrow{display:flex;align-items:center;gap:6px;font-size:0.7059rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .eyebrow .ico{width:16px;height:16px}
-.in-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.in-two .panel{gap:4px}
 .in-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .in-stats>div{background:var(--surface2);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .in-stats b{font-family:var(--f-display);font-size:1.3rem;font-weight:800;overflow-wrap:anywhere}
@@ -1476,7 +1486,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.58";
+const APP_VERSION = "1.59";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1937,7 +1947,7 @@ function renderInicio(){
       <button class="btn" data-act="goto-pos" data-p="${esc(gap.p)}">Ver salidas desde ${esc(gap.p)}</button>`;
   else if(incN) next = `<h2 id="in-next">Completa ${pl(incN,"figura","figuras")}</h2><p>Les falta dónde empiezan o acaban, así que no salen en Enlazar ni en Social.</p><button class="btn" data-act="goto-filter" data-f="incompletas">Ver cuáles</button>`;
   else if(espN) next = `<h2 id="in-next">${espN===1?"1 figura espera":`${espN} figuras esperan`} en la lista</h2><p>Pasa una a «En práctica» para que entre en los repasos.</p><button class="btn" data-act="goto-filter" data-f="espera">Ver la lista de espera</button>`;
-  const lg = lastLog(), readyN = all.filter(ready).length;
+  const lg = lastLog();
   const monday=new Date(); monday.setHours(12,0,0,0); monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
   const days=[...Array(7)].map((_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); const k=d.toISOString().slice(0,10); return {k, n:(S.actividad||{})[k]||0, l:"LMXJVSD"[i], today:k===todayStr()}; });
   const maxN=Math.max(4, ...days.map(d=>d.n)), stk=streak(), weekN=days.filter(d=>d.n).length;
@@ -1951,7 +1961,7 @@ function renderInicio(){
     </section>` : "";
   v.innerHTML = `
     ${staleHTML()}${nudgeHTML()}${installHTML()}
-    <p class="in-date"><span>${esc(new Date().toLocaleDateString("es-ES",{weekday:"long", day:"numeric", month:"long"}))}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar">${pl(dueN,"repaso pendiente","repasos pendientes")}</button>`:""}</p>
+    <p class="in-date"><span>${esc(new Date().toLocaleDateString("es-ES",{weekday:"long", day:"numeric", month:"long"}))}</span></p>${dueN?`<p class="in-date in-pend"><button class="lnk" data-tab="repasar">${pendTxt(dF.length, dueLinks().length)}</button></p>`:""}
     <section class="hero" aria-labelledby="in-hero">
       ${heroMedia}<div class="hero-shade" aria-hidden="true"></div>
       <div class="hero-in">
@@ -1964,15 +1974,11 @@ function renderInicio(){
     </section>
     ${repPanelHTML(all, st)}
     ${carr.length ? `<section aria-labelledby="in-due" class="in-sec">
-      <div class="in-h"><h2 id="in-due">Repasar hoy <span class="muted">${dF.length}</span></h2><button class="lnk" data-tab="repasar">Ver todo</button></div>
+      <div class="in-h"><h2 id="in-due">Figuras de hoy <span class="muted">${dF.length}</span></h2><button class="lnk" data-tab="repasar">Ver todo</button></div>
       <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${esc(f.id)}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
     </section>` : ""}
     ${next ? `<section class="in-next" aria-labelledby="in-next"><span class="eyebrow">${ico("spark")}Tu siguiente paso</span>${next}</section>` : ""}
     ${qsHTML}
-    <div class="in-two">
-      <section class="panel" aria-label="Racha"><span class="muted small">Racha</span><b class="in-big">${stk ? (stk===1?"1 día":`${stk} días`) : "—"}</b><span class="muted small">${weekN} ${weekN===1?"día":"días"} esta semana</span></section>
-      <section class="panel" aria-label="Seguras en el social"><span class="muted small">Seguras en el social</span><b class="in-big lime">${readyN}</b><span class="muted small">disponibles o consolidadas</span></section>
-    </div>
     ${lg ? `<section class="panel" aria-labelledby="in-soc">
       <div class="in-h"><h2 id="in-soc">Último social</h2><span class="muted small">${esc(fmtDate(lg.fecha))}</span></div>
       <div class="in-stats"><div><b class="lime">${lgFigs}</b><span>${lgFigs===1?"figura salió":"figuras salieron"}</span></div>
@@ -1980,8 +1986,9 @@ function renderInicio(){
       ${lg.proximo?`<p class="small muted">Para la próxima: ${esc(lg.proximo)}</p>`:""}
     </section>` : ""}
     <section class="panel" aria-labelledby="in-week">
-      <div class="in-h"><h2 id="in-week">Esta semana</h2>${stk>1?`<span class="tagx t-lime">${stk} días seguidos</span>`:""}</div>
+      <div class="in-h"><h2 id="in-week">Esta semana</h2>${stk?`<span class="tagx t-lime">Racha: ${stk===1?"1 día":`${stk} días seguidos`}</span>`:""}</div>
       <div class="week" role="img" aria-label="${esc(days.filter(d=>d.n).map(d=>`${d.l}: ${d.n} repasos`).join(", ")||"Sin práctica esta semana")}">${days.map(d=>`<div class="${d.today?"today":""}"><i style="height:${d.n?Math.max(18,Math.round(d.n/maxN*100)):8}%" class="${d.n?"on":d.today?"pend":""}"></i><span>${d.l}</span></div>`).join("")}</div>
+      <p class="small muted in-week-n">${weekN ? `${weekN} de 7 días con práctica.` : "Aún no has practicado esta semana: un repaso de 5 minutos ya cuenta."}</p>
     </section>`;
   // iOS no dibuja el fotograma de un <video> sin cargarlo: se carga del almacén y se coloca en el inicio de la figura.
   const hv = v.querySelector("video[data-hvid]");
@@ -2059,6 +2066,9 @@ function renderRepertorio(){
 function renderListOnly(){ const pos=$("#f-q").selectionStart; renderRepertorio(); safeNote($("#v-repertorio")); const qi=$("#f-q"); qi.focus(); try{qi.setSelectionRange(pos,pos);}catch{} }
 
 // ---------- vista: repasar ----------
+// Lo que toca repasar hoy, en una frase: el mismo número en Inicio y en Repasar.
+const pendTxt = (nf, nl) => [nf ? pl(nf,"figura","figuras") : "", nl ? pl(nl,"posición","posiciones") : ""].filter(Boolean).join(" y ") + " por repasar";
+const CHEV_R = `<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>`;
 function renderRepasar(){
   const v=$("#v-repasar");
   if(Object.keys(S.linkRep).length || figs().some(f=>f.rep && (f.rep.aciertos||f.rep.fallos))) learn("rev");   // ya has repasado antes
@@ -2068,37 +2078,27 @@ function renderRepasar(){
     const next = figs().filter(f=>active(f) && !isDue(f)).sort((a,b)=>(a.rep?.due||"").localeCompare(b.rep?.due||""))[0];
     v.innerHTML = `
       ${baileChipsHTML()}
-      <div class="panel">
-        <h3>Enlaces</h3>
-        ${firstHelp("rev", "Ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Es justo lo que se bloquea en el social.")}
-        ${dL.length ? `<p><b>${dL.length}</b> ${dL.length===1?"posición toca":"posiciones tocan"} hoy.</p><button class="btn pri" data-act="start-link">Repasar enlaces</button>`
-          : anyLinks ? `<p class="small muted">Nada pendiente hoy.</p><button class="btn" data-act="start-link-any">Repasar 3 posiciones al azar</button>`
-          : `<p class="small muted">Necesitas al menos una figura fuera de la lista de espera con dónde empieza y dónde acaba.</p><button class="btn" data-tab="repertorio">Ir al repertorio</button>`}
-      </div>
-      <div class="panel">
-        <h3>Figuras</h3>
-        ${firstHelp("rev", "Ves el nombre y dónde empieza. Hazla sin mirar y di cómo acaba. Después compruebas, con el vídeo si lo tiene.")}
-        ${dF.length ? `<p><b>${dF.length}</b> ${dF.length===1?"figura toca":"figuras tocan"} hoy. Sesión de ${Math.min(dF.length,MAX_SESSION)}, unos ${Math.min(dF.length,MAX_SESSION)*2} minutos.</p><button class="btn pri" data-act="start-fig">Repasar figuras</button>`
-          : anyActive ? `<p class="small muted">Nada pendiente hoy.${next?` Próxima: <b>${esc(next.nombre)}</b>, ${fmtDate(next.rep.due)}.`:""}</p><button class="btn" data-act="start-fig-any">Repasar 3 al azar</button>`
-          : figs().length ? `<p class="small muted">Las figuras en lista de espera no entran en el repaso. Cámbialas a «En práctica» cuando quieras trabajarlas.</p>`
-          : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
-      </div>
-      <div class="panel">
-        <h3>Preguntas de memoria</h3>
-        <p class="small muted">Dónde acaba una figura, desde dónde entras o qué puedes hacer después. Salen de tus propias figuras.</p>
-        ${quizItems().length ? `<button class="btn" data-act="start-quiz">Empezar</button>` : `<p class="small muted">Necesitas al menos una figura con dónde empieza y dónde acaba, ya enseñada entera.</p>`}
-      </div>
-      <div class="panel">
-        <h3>Simulacro de social</h3>
-        <p class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</p>
-        <button class="btn" data-act="sim-open">Simulacro</button>
-      </div>
-      <div class="panel">
-        <h3>Práctica guiada</h3>
-        <p class="small muted">Te digo qué bailar y cuántas veces mientras suena el conteo: figuras pendientes, enlaces y una cadena.</p>
-        <div class="chips sim-n" role="group" aria-label="Duración de la práctica">${[10,20].map(m=>`<button type="button" class="chip" data-act="guia-mins" data-m="${m}" aria-pressed="${guiaCfg.mins===m}">${m} min</button>`).join("")}</div>
-        <button class="btn" data-act="guia-open">Empezar</button>
-      </div>
+      <section class="panel rv-hoy" aria-labelledby="rv-hoy">
+        <h3 id="rv-hoy">Lo de hoy</h3>
+        ${dF.length || dL.length ? `<p class="rv-big">${pendTxt(dF.length, dL.length)}</p>
+          ${firstHelp("rev", "Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo.")}
+          <div class="row">${dF.length ? `<button class="btn pri" data-act="start-fig">Repasar figuras</button>` : ""}${dL.length ? `<button class="btn${dF.length?"":" pri"}" data-act="start-link">Repasar enlaces</button>` : ""}</div>
+          ${dF.length ? `<p class="small muted">${dF.length>MAX_SESSION ? `Van de ${MAX_SESSION} en ${MAX_SESSION}: unos ${MAX_SESSION*2} minutos cada tanda.` : `Unos ${dF.length*2} minutos.`}</p>` : ""}`
+        : anyActive ? `<p class="small muted">Nada pendiente hoy.${next?` La próxima es <b>${esc(next.nombre)}</b>, ${fmtDate(next.rep.due)}.`:""}</p>
+          <div class="row"><button class="btn" data-act="start-fig-any">Repasar 3 al azar</button>${anyLinks?`<button class="btn" data-act="start-link-any">3 posiciones al azar</button>`:""}</div>`
+        : figs().length ? `<p class="small muted">Las figuras en lista de espera no entran en el repaso. Cámbialas a «En práctica» cuando quieras trabajarlas.</p>`
+        : `<p class="small muted">Cuando guardes figuras, aquí las repasarás.</p><button class="btn" data-act="full">Añadir figura</button>`}
+      </section>
+      <section class="rv-otras" aria-labelledby="rv-otras">
+        <h3 id="rv-otras">Otras formas de practicar</h3>
+        <div class="menu">
+          <button type="button" class="mrow" data-act="guia-open"><span><b>Práctica guiada · ${guiaCfg.mins} min</b><span class="small muted">Te digo qué bailar y cuántas veces mientras suena el conteo: figuras pendientes, enlaces y una cadena.</span></span>${CHEV_R}</button>
+          <button type="button" class="mrow" data-act="sim-open"><span><b>Simulacro de social</b><span class="small muted">Te digo dónde estás mientras suena el pulso y decides una salida antes del siguiente 1.</span></span>${CHEV_R}</button>
+          ${quizItems().length ? `<button type="button" class="mrow" data-act="start-quiz"><span><b>Preguntas de memoria</b><span class="small muted">Dónde acaba una figura, desde dónde entras o qué puedes hacer después.</span></span>${CHEV_R}</button>`
+            : `<div class="mrow is-off"><span><b>Preguntas de memoria</b><span class="small muted">Necesitas al menos una figura con dónde empieza y dónde acaba, ya enseñada entera.</span></span></div>`}
+        </div>
+        <div class="chips sim-n rv-mins" role="group" aria-label="Duración de la práctica guiada"><span class="small muted">Práctica guiada:</span>${[10,20].map(m=>`<button type="button" class="chip sm" data-act="guia-mins" data-m="${m}" aria-pressed="${guiaCfg.mins===m}">${m} min</button>`).join("")}</div>
+      </section>
       ${progressHTML()}
       <details class="info"><summary>Cómo funciona el repaso</summary>Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo. Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. «Fluida» alarga el intervalo (1 → 3 → 7 → 14 → 30 → 60 días). «Con dudas» lo trae antes. «No la recordé» la devuelve a mañana.</details>`;
     return;

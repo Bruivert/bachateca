@@ -1,5 +1,5 @@
 // Bachateca: funciona sin conexión. Sube la versión al cambiar archivos para que el iPhone descargue la nueva.
-const VERSION = "bachateca-v58";
+const VERSION = "bachateca-v59";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png",
   ...[1,2,3,4,5,6,7,8].map(n => `./sonidos/conteo/${n}.m4a`)];
 self.addEventListener("install", e => {

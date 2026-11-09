@@ -1068,6 +1068,29 @@ def inicio_caras_no_se_montan(browser):
 
 
 @test
+def inicio_y_repasar_un_solo_numero(browser):
+    """Los pendientes se cuentan igual en Inicio y en Repasar; Repasar tiene una sola acción principal y el resto debajo."""
+    ctx, p, errors = open_app(browser, seed=repertorio_inicio())
+    v = p.locator("#v-inicio")
+    pend = v.locator(".in-pend").inner_text()
+    assert pend.endswith("por repasar") and "figura" in pend, pend
+    txt = v.inner_text()
+    assert "Seguras en el social" not in txt and "repasos pendientes" not in txt, "sin datos repetidos"
+    assert "Figuras de hoy" in txt and "Esta semana" in txt
+    assert "días con práctica" in v.locator(".in-week-n").inner_text() or "Aún no has practicado" in v.locator(".in-week-n").inner_text()
+    p.click('nav.tabs [data-tab="repasar"]')
+    r = p.locator("#v-repasar")
+    assert r.locator(".rv-big").inner_text() == pend, "el mismo número"
+    assert r.locator(".rv-hoy .btn.pri").count() == 1, "una sola acción principal"
+    otras = r.locator(".rv-otras .mrow").all_inner_texts()
+    assert [o.split("\n")[0] for o in otras] == ["Práctica guiada · 10 min", "Simulacro de social", "Preguntas de memoria"], otras
+    p.click('.rv-mins [data-m="20"]')
+    assert "Práctica guiada · 20 min" in p.locator("#v-repasar .rv-otras").inner_text(), "la duración se ve en la fila"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def repertorio_disponibles_plegadas_y_clase(browser):
     ctx, p, errors = open_app(browser, seed=rep_seed())
     p.click('nav.tabs [data-tab="repertorio"]')
@@ -2218,9 +2241,9 @@ def repasar_elige_baile(browser):
     p.evaluate("o => window.__bachateca.setFigs(o)", figs)
     p.click('nav.tabs [data-tab="repasar"]')
     assert p.locator("#v-repasar [data-baile]").count() == 2
-    assert "<b>1</b>" in p.inner_html("#v-repasar").split("Figuras</h3>")[0]
+    assert "1 posición por repasar" in p.inner_text("#v-repasar .rv-big"), p.inner_text("#v-repasar .rv-big")
     p.click('#v-repasar [data-baile="Salsa"]')
-    assert "<b>2</b>" in p.inner_html("#v-repasar").split("Figuras</h3>")[0]
+    assert "2 posiciones por repasar" in p.inner_text("#v-repasar .rv-big"), p.inner_text("#v-repasar .rv-big")
     assert not errors, errors
     ctx.close()
 
@@ -2821,7 +2844,7 @@ def repaso_de_enlaces_separado_por_baile(browser):
     p.evaluate("() => window.__bachateca.setBaile('Salsa')")
     p.click('nav.tabs [data-tab="repasar"]')
     assert p.locator('#v-repasar [data-act="start-link"]').count() == 1, "en salsa siguen pendientes"
-    assert "2 posiciones tocan" in p.inner_text("#v-repasar"), p.inner_text("#v-repasar")
+    assert "2 posiciones por repasar" in p.inner_text("#v-repasar .rv-big"), p.inner_text("#v-repasar .rv-big")
     assert not errors, errors
     ctx.close()
 

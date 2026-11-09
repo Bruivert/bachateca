@@ -960,7 +960,7 @@ def incompleta_fuera_de_social_y_enlazar(browser):
     ids = p.evaluate("() => window.__bachateca.exitsFrom('Cerrada').map(f => f.id)")
     assert ids == ["f2"], ids
     p.click('nav.tabs [data-tab="social"]')
-    p.check("#soc-incl")                                                        # ni con «Incluir las que están en práctica»
+    p.click("#soc-incl")                                                        # ni con «Incluir las que están en práctica»
     txt = p.locator("#v-social").inner_text()
     assert "Figura 2" in txt and "Figura 3" in txt and "Figura 1" not in txt, txt
     assert not errors, errors
@@ -1114,6 +1114,32 @@ def ficha_en_palabras(browser):
     p.click('[data-act="close"]'); p.click('#v-repertorio [data-view="f3"]')
     assert "Cerrada" in p.locator(".route-big").inner_text() and "Sombra" in p.locator(".route-big").inner_text() and "Empieza y acaba" not in p.locator(".route-big").inner_text()
     assert p.locator(".fv-mem .ring b").inner_text().replace("\n", " ") == "1 día"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def social_para_la_pista_y_ficha_en_espera(browser):
+    """Social: arriba «Incluir en práctica» y el menú «⋯»; abajo solo bloqueo y registro. Ficha en espera: empezar a practicarla."""
+    figs = {"f1": fig(1, "Cerrada", "Sombra", estado="disponible"), "f2": fig(2, "Cerrada", "Abierta 2 manos", nombre="Practicando"),
+            "f3": fig(3, "Sombra", "Cerrada", nombre="Esperando", estado="espera")}
+    ctx, p, errors = open_app(browser, seed={"figures": figs, "logs": {}})
+    p.click('nav.tabs [data-tab="social"]')
+    v = p.locator("#v-social")
+    assert "Practicando" not in v.inner_text()
+    p.click("#soc-incl")
+    assert p.locator("#soc-incl").get_attribute("aria-pressed") == "true" and "Practicando" in v.inner_text()
+    assert not v.locator('[data-act="sim-open"]').is_visible(), "Simulacro va en el menú"
+    v.locator(".soc-more summary").click()
+    assert v.locator('[data-act="sim-open"]').is_visible()
+    abajo = [b.inner_text() for b in v.locator(":scope > .btn").all()]
+    assert abajo[0] == "Me he bloqueado" and abajo[1].startswith("Registrar el social") and len(abajo) == 2, abajo
+    # Ficha en lista de espera: la acción principal es empezar a practicarla.
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f3"]')
+    assert p.locator(".fv-actions .btn.pri").inner_text() == "Empezar a practicarla"
+    assert "no entra en el repaso" in p.locator(".fv-espera").inner_text()
+    rc = p.locator('[data-act="rc-open"]')
+    assert rc.count() == 0 or "pri" not in rc.get_attribute("class"), "grabarse no compite con empezar a practicarla"
     assert not errors, errors
     ctx.close()
 
@@ -1327,6 +1353,8 @@ def video_roto_lo_dice(browser):
     ctx, p, errors = open_app(browser, seed={"schema": 5, "figures": {"f1": fig(1, "Cerrada", "Sombra", vid="v1")}, "logs": {}}, videos=["v1"])
     p.click('nav.tabs [data-tab="repertorio"]'); p.click('#v-repertorio [data-view="f1"]')
     p.wait_for_selector(".vid-err", timeout=10000)
+    assert "Prueba a elegirlo otra vez desde Fotos" in p.locator(".vid-err").inner_text(), "dice qué hacer"
+    p.click(".vid-tech summary")                                                  # los datos técnicos van plegados
     d = p.locator(".vid-diag").inner_text()
     # Ni directo ni como copia en memoria: dice el error y los datos del archivo para poder averiguarlo.
     assert "error 4" in d and "tipo video/mp4" in d and "formato desconocido" in d and "Safari dice" in d, d
@@ -2235,7 +2263,7 @@ def social_y_enlazar_por_baile(browser):
     assert p.locator("#v-enlazar [data-baile]").count() == 2
     p.click('nav.tabs [data-tab="social"]')
     assert p.locator("#v-social [data-baile]").count() == 2
-    p.check("#soc-incl")
+    p.click("#soc-incl")
     assert "Bachatera" in p.inner_text("#v-social") and "Salsera" not in p.inner_text("#v-social")
     p.click('#v-social [data-baile="Salsa"]')
     t = p.inner_text("#v-social")
@@ -2685,7 +2713,7 @@ def simulacro_completo(browser):
     st = lambda: p.evaluate("() => window.__bachateca.simState()")
     p.evaluate("() => window.__bachateca.simForce(['Cerrada', 'Sombra'])")
     p.click('nav.tabs [data-tab="social"]')
-    p.click('#v-social [data-act="sim-open"]')
+    p.click('#v-social .soc-more summary'); p.click('#v-social [data-act="sim-open"]')
     assert "Decide una salida antes del siguiente 1." in p.inner_text("[data-sim]")
     assert p.locator("[data-simn]").count() == 2
     p.fill("#sim-bpm", "150")
@@ -2745,7 +2773,7 @@ def simulacro_cerrar_para_el_conteo(browser):
     ctx, p, errors = open_app(browser, seed={"figures": sim_figs()}, init=init)
     p.evaluate("() => window.__bachateca.simForce(['Cerrada'])")
     p.click('nav.tabs [data-tab="social"]')
-    p.click('#v-social [data-act="sim-open"]')
+    p.click('#v-social .soc-more summary'); p.click('#v-social [data-act="sim-open"]')
     p.click("#sim-go")
     p.wait_for_function("window.__bachateca.simState() && window.__bachateca.simState().beats > 1", timeout=5000)
     antes = p.evaluate("() => window.__stops")
@@ -2761,7 +2789,7 @@ def simulacro_cerrar_para_el_conteo(browser):
 def simulacro_sin_posiciones(browser):
     ctx, p, errors = open_app(browser, seed={"figures": {"f1": fig(1, "", "")}})
     p.click('nav.tabs [data-tab="social"]')
-    p.click('#v-social [data-act="sim-open"]')
+    p.click('#v-social .soc-more summary'); p.click('#v-social [data-act="sim-open"]')
     assert "Aún no tienes posiciones con salidas. Añade dónde empiezan y acaban tus figuras." in p.inner_text("[data-sim]")
     assert p.locator("#sim-go").count() == 0
     assert not errors, errors
@@ -2776,7 +2804,7 @@ def simulacro_solo_falta_el_agarre(browser):
     ctx, p, errors = open_app(browser, seed={"figures": figs})
     p.evaluate("() => window.__bachateca.simForce([{pos: 'Sombra', hold: 'Dos manos'}])")
     p.click('nav.tabs [data-tab="social"]')
-    p.click('#v-social [data-act="sim-open"]')
+    p.click('#v-social .soc-more summary'); p.click('#v-social [data-act="sim-open"]')
     p.click("#sim-go")
     p.click("#sim-ok")
     t = p.inner_text("[data-sim]")
@@ -2797,7 +2825,7 @@ def simulacro_una_subida_por_dia(browser):
     ctx, p, errors = open_app(browser, seed={"figures": sim_figs()})
     p.evaluate("() => window.__bachateca.simForce(['Cerrada', 'Sombra', 'Cerrada'])")
     p.click('nav.tabs [data-tab="social"]')
-    p.click('#v-social [data-act="sim-open"]')
+    p.click('#v-social .soc-more summary'); p.click('#v-social [data-act="sim-open"]')
     p.click("#sim-go")
     for _ in range(3):
         p.click("#sim-ok"); p.click('[data-simg="fluida"]')

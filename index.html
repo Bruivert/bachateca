@@ -778,6 +778,13 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .social-pos+.social-pos::before{display:none}
 .social-pos .p{font-size:1.2rem}
 .block-btn{border-radius:20px}
+.soc-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.soc-more{position:relative}
+.soc-more>summary{list-style:none;cursor:pointer;font-size:1.3rem;line-height:1}
+.soc-more>summary::-webkit-details-marker{display:none}
+.soc-more>summary::before,.soc-more[open]>summary::before{content:none}
+.soc-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:250px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.soc-menu .mrow{border-radius:10px}
 .empty{border:1px solid var(--edge);border-radius:20px}
 .menu{border:1px solid var(--edge)}
 
@@ -1489,7 +1496,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.60";
+const APP_VERSION = "1.61";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -2449,18 +2456,23 @@ function renderSocial(){
   v.innerHTML = `
     ${staleHTML()}
     ${baileChipsHTML()}
+    <div class="soc-bar">
+      <button type="button" class="chip" id="soc-incl" aria-pressed="${socialIncl}">${socialIncl?"✓ ":""}Incluir en práctica</button>
+      <details class="soc-more"><summary class="icon-btn" aria-label="Más opciones del social">⋯</summary>
+        <div class="soc-menu" role="group" aria-label="Más opciones del social">
+          <button type="button" class="mrow" data-act="sim-open">Simulacro: practicar decidir a tiempo</button>
+          ${socialLive()?`<button type="button" class="mrow" data-act="night-off">Terminar el social</button>`:""}
+        </div></details>
+    </div>
     ${Object.keys(S.logs).length?"":`<p class="small muted">Entra en cada figura al empezar una frase de 8. Toca la que te salga y quedará marcada para el registro.</p>`}
     <div>
       ${fw.length?`<div class="social-pos"><h3 class="p">Para ganar tiempo</h3><ul>${socTop(fw,4).map(f=>socLi(f, `${esc(TIPO[tipoOf(f)].t.toLowerCase())}${f.entrada?` · en ${esc(f.entrada)}`:""}`)).join("")}</ul></div>`:""}
       ${rows.length ? rows.map(r=>`<div class="social-pos"><h3 class="p">${esc(r.p)}</h3><ul>${r.items.map(f=>socLi(f, `${routeTxt(f)}${(f.tiempos||f.tiempo)?` · ${compas(f)}`:""}`)).join("")}</ul></div>`).join("")
-       : `<div class="empty"><p>Aún no tienes figuras disponibles. Cuando una te salga cómoda en el social, márcala como «Disponible» y aparecerá aquí.</p>${figs().some(active)?`<p class="small muted">Marca «Incluir las que están en práctica» para verlas ya.</p>`:""}</div>`}
+       : `<div class="empty"><p>Aún no tienes figuras disponibles. Cuando una te salga cómoda en el social, márcala como «Disponible» y aparecerá aquí.</p>${figs().some(active)?`<p class="small muted">Toca «Incluir en práctica» para verlas ya.</p>`:""}</div>`}
     </div>
-    <label class="small muted row" style="gap:10px;min-height:44px" for="soc-incl"><input type="checkbox" id="soc-incl" ${socialIncl?"checked":""}> Incluir las que están en práctica</label>
     <button class="btn pri block-btn" data-act="block">Me he bloqueado</button>
-    <button class="btn wide" data-act="sim-open">Simulacro</button>
-    <button class="btn wide" data-act="log-open">Registrar el social${pend?` · ${pend}`:(last?` · último ${fmtDate(last.fecha)}`:"")}</button>
-    ${socialLive()?`<button class="btn ghost wide" data-act="night-off">Terminar el social</button>`:""}`;
-  $("#soc-incl").onchange=e=>{socialIncl=e.target.checked; render();};
+    <button class="btn wide" data-act="log-open">Registrar el social${pend?` · ${pend}`:(last?` · último ${fmtDate(last.fecha)}`:"")}</button>`;
+  $("#soc-incl").onclick=()=>{socialIncl=!socialIncl; render();};
 }
 // Bloqueo: footwork o básico, el compás para recuperar el pulso, dónde estás y dos salidas desde ahí.
 // Primero las seguras; si falta alguna, una en práctica. Mejor las que te llevan a otra posición.
@@ -2711,8 +2723,9 @@ function openView(id){
     <div class="fv-actions">
       ${active(f) ? `<button type="button" class="btn pri" data-act="rev-one" data-id="${esc(f.id)}">Repasarla ahora</button>` : ""}
       ${f.estado==="incompleta" ? `<button type="button" class="btn" data-act="inc-done" data-id="${esc(f.id)}">Ya está completa</button>` : ""}
-      ${up ? `<button type="button" class="btn" data-promote="${esc(f.id)}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
+      ${up ? `<button type="button" class="btn${f.estado==="espera"?" pri":""}" data-promote="${esc(f.id)}" data-to="${up.k}">${up.k==="practica"?"Empezar a practicarla":`Pasar a ${esc(up.t.toLowerCase())}`}</button>` : ""}
     </div>
+    ${f.estado==="espera" ? `<p class="small muted fv-espera">Está en la lista de espera: no entra en el repaso ni en el social. Cuando quieras trabajarla, empieza a practicarla.</p>` : ""}
     ${f.estado==="incompleta" ? parteCardHTML(f, CHEV) : ""}
     ${keys.length ? `<section class="fv-card" aria-labelledby="fv-k"><h3 id="fv-k">Señal clave</h3><ul class="fv-keys">${keys.map(k=>`<li>${esc(k)}</li>`).join("")}</ul></section>` : ""}
     ${(f.tiempo||f.tiempos) ? `<section class="fv-card" aria-labelledby="fv-c"><h3 id="fv-c">Compás</h3>${compas(f, true)}</section>` : ""}
@@ -2744,7 +2757,7 @@ function attCardHTML(f, chev){
   return `<section class="fv-card" aria-labelledby="fv-i"><h3 id="fv-i">Mis intentos${list.length?` · ${list.length}`:""}</h3>
     ${list.length ? `<div class="menu">${list.map(row).join("")}</div>` : `<p class="small muted">Grábate haciendo la figura y guárdalo aquí para compararte con el vídeo de la clase.</p>`}
     <input type="file" id="att-cam" accept="video/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="att-lib" accept="video/*" class="sr" tabindex="-1" aria-hidden="true">
-    ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder!=="undefined" ? `<button type="button" class="btn pri" data-act="rc-open" data-id="${esc(f.id)}">Grabarme con conteo${pulsoOk(f.pulso, f.vid) ? ` · ${pulsoBpm(f.pulso)} bpm` : ""}</button>` : ""}
+    ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder!=="undefined" ? `<button type="button" class="btn${f.estado==="espera"?"":" pri"}" data-act="rc-open" data-id="${esc(f.id)}">Grabarme con conteo${pulsoOk(f.pulso, f.vid) ? ` · ${pulsoBpm(f.pulso)} bpm` : ""}</button>` : ""}
     <div class="fv-actions"><button type="button" class="btn" data-pick="att-cam">Cámara del iPhone</button><button type="button" class="btn" data-pick="att-lib">Elegir de Fotos</button></div>
   </section>`;
 }
@@ -4222,8 +4235,8 @@ function hydrateVideos(root){
         if(r.url && v.isConnected){ v.src = r.url; return; }
       }
       const diag = [vidDiag(v._diag||{}, code), `probado: ${v._fails.join(", ")}`].join(" · "), lost = v._diag && /no se puede leer|no está/.test(v._diag.err||"");
-      const p=v.closest(".player"); if(p) p.innerHTML=`<div class="note vid-err"><p class="small">${lost ? "El archivo de este vídeo se ha perdido en este dispositivo. Vuelve a añadirlo desde Fotos con «Editar»." : "No se puede reproducir este vídeo en este dispositivo."}</p>
-        <p class="small muted vid-diag">${esc(diag)}</p><div class="row"><button type="button" class="btn sm" data-copydiag>Copiar estos datos</button></div></div>`;
+      const p=v.closest(".player"); if(p) p.innerHTML=`<div class="note vid-err"><p class="small">${lost ? "El archivo de este vídeo se ha perdido en este dispositivo. Vuelve a añadirlo desde Fotos con «Editar»." : "Este vídeo no se puede ver en este iPhone. Prueba a elegirlo otra vez desde Fotos con «Editar»; si tampoco va, copia los datos técnicos y pégamelos en el chat."}</p>
+        <details class="info vid-tech"><summary>Datos técnicos</summary><p class="small muted vid-diag">${esc(diag)}</p><div class="row"><button type="button" class="btn sm" data-copydiag>Copiar estos datos</button></div></details></div>`;
       p?.querySelector("[data-copydiag]")?.addEventListener("click", async e=>{ try{ await navigator.clipboard.writeText(`Bachateca ${APP_VERSION} · ${navigator.userAgent} · ${diag}`); toast("Copiado: pégamelo en el chat"); }catch{ toast(diag); } });
     });
     v.src = srcOf(url);

@@ -1091,6 +1091,34 @@ def inicio_y_repasar_un_solo_numero(browser):
 
 
 @test
+def ficha_en_palabras(browser):
+    """La ruta no se repite si empieza y acaba en el mismo sitio, el intervalo va en días y Repertorio usa la frase de pendientes."""
+    import datetime
+    d = lambda n: (datetime.date.today() + datetime.timedelta(days=n)).isoformat()
+    seed = {"figures": {
+        "f1": fig(1, "Abierta 2 manos", "Abierta 2 manos", agarreIn="Dos manos", agarreOut="Dos manos", rep={"step": 2, "due": d(7), "last": d(0), "aciertos": 2, "fallos": 0}),
+        "f2": fig(2, "Abierta 1 mano", "Abierta 1 mano", agarreIn="Der–der", agarreOut="Izq–der"),
+        "f3": fig(3, "Cerrada", "Sombra", agarreIn="Abrazo", rep={"step": 0, "due": d(0), "last": d(-1), "aciertos": 1, "fallos": 0})}}
+    ctx, p, errors = open_app(browser, seed=seed)
+    p.click('nav.tabs [data-tab="repertorio"]')
+    assert p.locator("#v-repertorio .sum .lnk").inner_text().endswith("por repasar"), p.locator("#v-repertorio .sum").inner_text()
+    p.click('#v-repertorio [data-view="f1"]')
+    assert p.locator(".route-big").inner_text() == "Empieza y acaba en Abierta 2 manos (Dos manos)", p.locator(".route-big").inner_text()
+    mem = p.locator(".fv-mem")
+    assert mem.locator(".ring b").inner_text().replace("\n", " ") == "7 días", mem.locator(".ring b").inner_text()
+    assert "Lo repasas cada 7 días · Próximo repaso" in mem.inner_text(), mem.inner_text()
+    p.click('[data-act="close"]'); p.click('#v-repertorio [data-view="f2"]')
+    visible = p.locator(".route-big").evaluate("e => { const c = e.cloneNode(true); c.querySelectorAll('.sr').forEach(x => x.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); }")
+    assert visible == "Empieza y acaba en Abierta 1 mano (Der–der → Izq–der)", visible
+    assert "tu derecha con su derecha" in p.locator(".route-big").inner_text(), "VoiceOver sigue oyendo el agarre entero"
+    p.click('[data-act="close"]'); p.click('#v-repertorio [data-view="f3"]')
+    assert "Cerrada" in p.locator(".route-big").inner_text() and "Sombra" in p.locator(".route-big").inner_text() and "Empieza y acaba" not in p.locator(".route-big").inner_text()
+    assert p.locator(".fv-mem .ring b").inner_text().replace("\n", " ") == "1 día"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def repertorio_disponibles_plegadas_y_clase(browser):
     ctx, p, errors = open_app(browser, seed=rep_seed())
     p.click('nav.tabs [data-tab="repertorio"]')

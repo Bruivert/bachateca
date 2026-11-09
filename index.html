@@ -606,6 +606,8 @@ details.info summary::after{inset:-10px -4px}
 .ring{position:relative;flex:none;width:92px;height:92px;display:grid;place-items:center}
 .ring svg{position:absolute;inset:0}
 .ring b{font-family:var(--f-display);font-size:1.25rem;font-weight:800}
+.ring b small{display:block;font-family:var(--f-body,inherit);font-size:.62rem;font-weight:600;color:var(--muted);text-align:center;line-height:1;margin-top:1px}
+.ring.sm b{display:flex;flex-direction:column;align-items:center;line-height:1}
 /* Inicio · Tu repertorio: el anillo (cuántas te salen) y una fila por estado con sus figuras. */
 .rp-donut{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;align-items:center}
 .rp-ring{position:relative;width:132px;height:132px}
@@ -637,6 +639,7 @@ details.info summary::after{inset:-10px -4px}
 .rv-mins{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .in-week-n{margin:0}
 .in-pend{margin-top:-20px}
+.sum .sum-pend{flex-basis:100%;text-align:left}
 .rp-sub{grid-column:2;grid-row:3;font-size:.72rem;color:var(--muted);line-height:1.2}
 .rp-trend{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin:0}
 .rp-trend b{color:var(--fg)}
@@ -1486,7 +1489,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.59";
+const APP_VERSION = "1.60";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1747,7 +1750,14 @@ const holdSay = h => { const m=h.trim().match(/^(izq|der)\.?\s*[–—-]\s*(izq|
 const holdName = h => holdSay(h)===h ? esc(h) : `<span aria-hidden="true">${esc(h)}</span><span class="sr">${esc(holdSay(h))}</span>`;
 const holdTxt = h => h ? ` <span class="hold">(${holdName(h)})</span>` : "";
 // Ruta con una sola flecha: «Cerrada (Abrazo) → Sombra (Dos manos)». Sin el inicio cuando ya lo dice el contexto.
-const routeTxt = (f, from) => `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${holdName(f.agarreIn)} ` : "")}<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
+const routeTxt = (f, from) => {
+  // Empieza y acaba en el mismo sitio: «Empieza y acaba en Abierta 2 manos (Dos manos)», sin repetirlo a los dos lados de la flecha.
+  if(from && f.entrada && f.entrada===f.salida){
+    const a = f.agarreIn||"", b = f.agarreOut||"";
+    return `Empieza y acaba en ${esc(f.entrada)}${a===b || !a || !b ? holdTxt(a||b) : ` (${holdName(a)} <span class="arrow" aria-hidden="true">→</span><span class="sr">a</span> ${holdName(b)})`}`;
+  }
+  return `${from ? esc(f.entrada)+holdTxt(f.agarreIn)+" " : (f.agarreIn ? `con ${holdName(f.agarreIn)} ` : "")}<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}${holdTxt(f.agarreOut)}`;
+};
 function pill(k){ return `<span class="pill st-${esc(k)}">${esc(EST[k]?.t||k)}</span>`; }
 // Compás de 8 de una figura: qué tiempos de la frase ocupa y en cuál empieza.
 function compasTxt(f){
@@ -2035,7 +2045,7 @@ function renderRepertorio(){
   const body = groupsHTML(vis) + (rdy.length ? `<details class="rp-disp" id="rp-disp"${dispOpen||autoOpen?" open":""}><summary><span class="dot" aria-hidden="true"></span>Disponibles <span class="n">${rdy.length}</span><span class="chev" aria-hidden="true">${CHEV}</span></summary><p class="small muted">Las que ya te salen, con las consolidadas. Se abren solas al buscar o filtrar.</p>${groupsHTML(rdy)}</details>` : "");
   const v=$("#v-repertorio");
   v.innerHTML = `
-    ${all.length ? `<p class="sum"><span><b>${all.length}</b> ${all.length===1?"figura":"figuras"}</span><span aria-hidden="true">·</span><span><b>${consN}</b> ${consN===1?"consolidada":"consolidadas"}</span>${dueN?`<span aria-hidden="true">·</span><button class="lnk" data-tab="repasar"><b>${dueN}</b> ${dueN===1?"repaso hoy":"repasos hoy"}</button>`:""}</p>`:""}
+    ${all.length ? `<p class="sum"><span><b>${all.length}</b> ${all.length===1?"figura":"figuras"}</span><span aria-hidden="true">·</span><span><b>${consN}</b> ${consN===1?"consolidada":"consolidadas"}</span>${dueN?`<button class="lnk sum-pend" data-tab="repasar">${pendTxt(dueFigs().length, dueLinks().length)}</button>`:""}</p>`:""}
     ${staleHTML()}
     ${nudgeHTML()}
     ${installHTML()}
@@ -2683,9 +2693,9 @@ function openView(id){
   const eN = ejecN(f), rN = step/(LADDER.length-1);
   const barra = (lbl, v, max) => `<div class="fv-bar"><span class="small">${lbl}</span><div class="progress" role="meter" aria-label="${lbl}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${v}"><i style="width:${Math.round(v/max*100)}%"></i></div></div>`;
   const mem = active(f) ? `<section class="fv-card fv-mem" aria-labelledby="fv-mem">
-      <div class="ring sm">${ringSVG((step+1)/LADDER.length, 70, 8)}<b>${LADDER[step]} d</b></div>
+      <div class="ring sm" role="img" aria-label="Intervalo de repaso: ${pl(LADDER[step],"día","días")}">${ringSVG((step+1)/LADDER.length, 70, 8)}<b aria-hidden="true">${LADDER[step]}<small>${LADDER[step]===1?"día":"días"}</small></b></div>
       <div class="fv-mem-t"><div class="in-h"><h3 id="fv-mem">Memoria</h3><span class="tagx ${(MEM[ms]||MEM.nueva)[1]}">${(MEM[ms]||MEM.nueva)[0]}</span></div>
-        <p class="small muted">${r.due ? `Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p>
+        <p class="small muted">${r.due ? `${r.last ? `Lo repasas cada ${pl(LADDER[step],"día","días")} · ` : ""}Próximo repaso <b class="fg">${when(r.due)}</b>` : "Aún sin repasar"}${+r.aciertos||+r.fallos ? ` · ${pl(+r.aciertos||0,"acierto","aciertos")}, ${pl(+r.fallos||0,"fallo","fallos")}` : ""}${+f.usos?` · salió ${+f.usos}× en el social`:""}</p>
         ${barra("La recuerdo", step, LADDER.length-1)}${barra("Me sale con pareja", eN, 3)}
         ${eN/3 < rN ? `<p class="small muted">Te sale de memoria; ahora pruébala con pareja en el social.</p>` : ""}</div>
     </section>` : "";

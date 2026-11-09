@@ -1035,7 +1035,7 @@ def inicio_tu_repertorio(browser):
     assert v.locator(".rp-ring .c").inner_text().replace("\n", " ") == "2 de 5 ya te salen", "la lista de espera no cuenta"
     rows = [r.replace("\n", " ") for r in v.locator(".rp-row").all_inner_texts()]
     assert rows[0].startswith("Incompleta 1") and rows[1].startswith("En práctica 2") and rows[2].startswith("Disponibles 2"), rows
-    assert "1 consol." in rows[2] and rows[2].endswith("R V 1 consol."), rows                  # iniciales de sus figuras
+    assert rows[2].endswith("R V 1 consolidada"), rows                                        # iniciales de sus figuras y, aparte, las consolidadas
     assert v.locator(".rp-ring svg circle").count() == 4, "fondo y un trozo por estado"
     assert "+1 ha llegado a disponible en los últimos 30 días" in v.inner_text(), "la consolidada llegó hace 90 días: no cuenta"
     assert v.locator(".rp-more").count() == 0, "sin olvidadas ni atrasadas no hay aviso"
@@ -1046,6 +1046,23 @@ def inicio_tu_repertorio(browser):
     assert p.locator("#rp-disp").evaluate("d => d.open")
     assert p.locator("#v-repertorio .gcard").count() == 2
     assert p.locator('[data-fest="consolidada"]').count() == 0, "un solo chip para disponibles y consolidadas"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def inicio_caras_no_se_montan(browser):
+    """Con muchas disponibles y consolidadas, las caras no se encogen: 3 caras y «+N», y las consolidadas en su línea."""
+    figs = {f"f{i}": fig(i, "Cerrada", "Sombra", nombre=f"{chr(64+i)} figura", estado="consolidada" if i <= 2 else "disponible") for i in range(1, 7)}
+    figs["f7"] = fig(7, "Sombra", "Cerrada", nombre="Practico")
+    ctx, p, errors = open_app(browser, seed={"figures": figs, "logs": {}})
+    row = p.locator('.rp-row[data-f="disponibles"]')
+    caras = row.locator(".rp-av > span")
+    assert caras.all_inner_texts() == ["F", "E", "D", "+3"], caras.all_inner_texts()        # las más recientes primero
+    anchos = caras.evaluate_all("els => els.map(e => Math.round(e.getBoundingClientRect().width))")
+    assert anchos == [24, 24, 24, 24], anchos                                                 # ninguna se encoge
+    assert row.locator(".rp-sub").inner_text() == "2 consolidadas"
+    assert row.evaluate("r => r.scrollWidth <= r.clientWidth"), "nada se sale de la fila"
     assert not errors, errors
     ctx.close()
 

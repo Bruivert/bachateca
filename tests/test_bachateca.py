@@ -1145,6 +1145,28 @@ def social_para_la_pista_y_ficha_en_espera(browser):
 
 
 @test
+def vocabulario_y_siguiente_paso(browser):
+    """Las palabras de la app se explican al final de Repertorio, Repasar y Enlazar; «Tu siguiente paso» ya no es un bloque lima."""
+    ctx, p, errors = open_app(browser, seed=repertorio_inicio())
+    nx = p.locator("#v-inicio .in-next")
+    if nx.count():
+        bg = nx.evaluate("e => getComputedStyle(e).backgroundColor")
+        lima = p.evaluate("() => { const d = document.createElement('div'); d.style.background = 'var(--neon)'; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; }")
+        assert bg != lima, (bg, lima)
+        if "salida segura" in nx.inner_text() or "salidas seguras" in nx.inner_text():
+            assert "(figuras que ya te salen)" in nx.inner_text()
+    for tab in ["repertorio", "repasar", "enlazar"]:
+        p.click(f'nav.tabs [data-tab="{tab}"]')
+        g = p.locator(f"#v-{tab} .glosario")
+        assert g.count() == 1, tab
+        g.locator("summary").click()
+        t = g.inner_text()
+        assert "Enlace" in t and "Salida segura" in t and "Consolidada" in t and "Incompleta" in t, t
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def repertorio_disponibles_plegadas_y_clase(browser):
     ctx, p, errors = open_app(browser, seed=rep_seed())
     p.click('nav.tabs [data-tab="repertorio"]')

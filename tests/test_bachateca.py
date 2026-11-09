@@ -1223,6 +1223,21 @@ def colores_de_semaforo(browser):
 
 
 @test
+def estados_y_avisos_iguales_en_toda_la_app(browser):
+    """El estado se pinta con la misma etiqueta en Enlazar que en Repertorio, y el aviso de Enlazar no depende del color."""
+    ctx, p, errors = open_app(browser, seed=repertorio_inicio())
+    p.click('nav.tabs [data-tab="enlazar"]')
+    assert p.locator("#v-enlazar .pill").count() == 0 and p.locator("#v-enlazar .st-tag").count() >= 1
+    leyenda = p.locator("#v-enlazar .chip-legend")
+    if leyenda.count():
+        assert "rojo" not in leyenda.inner_text().lower(), leyenda.inner_text()
+    for ch in p.locator("#v-enlazar .chip.warn").all():
+        assert ch.locator(".wbang").inner_text() == "!", "el aviso lleva «!», no solo color"
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def repertorio_disponibles_plegadas_y_clase(browser):
     ctx, p, errors = open_app(browser, seed=rep_seed())
     p.click('nav.tabs [data-tab="repertorio"]')

@@ -30,15 +30,17 @@
   --fg:#0a1a3f; --muted:#596989;
   --accent:#1e5eff; --accent-ink:#ffffff; --accent-fg:#1a4fd8; --accent-soft:rgba(30,94,255,.10);
   --neon:#c4f838; --neon-ink:#0a1a3f; --chip-on:#0a1a3f; --chip-on-ink:#ffffff;
-  --st-espera:#56637f; --st-incompleta:#a35200; --st-practica:#1a4fd8; --st-disponible:#3b7b00; --st-consolidada:#0a1a3f;
-  --warn:#d70015;
+  --st-espera:#56637f; --st-incompleta:#e8bf2a; --st-practica:#e36a3f; --st-disponible:#2a9d8f; --st-consolidada:#2a9d8f;
+  --st-espera-ink:#56637f; --st-incompleta-ink:#7a5a00; --st-practica-ink:#b2461f; --st-disponible-ink:#1d7268; --st-consolidada-ink:#1d7268;
+  --warn:#c92a64; --warn-soft:#a8295a;
   --bar:rgba(243,246,255,.84);
   --toast-act:#c4f838;
   /* acciones secundarias y marcas: azul en claro; en oscuro, azul suave y blanco para que el neón quede solo en lo principal */
   --link:#1a4fd8; --mark:#1a4fd8; --tab-on:#1a4fd8; --toast-bg:#0a1a3f; --toast-fg:#ffffff;
-  /* El verde es siempre «esto ya te sale»: estado Disponible, salidas seguras, la gráfica y su número.
-     En claro va más oscuro que el neón para leerse: texto a 5,2:1 y barras a 3,2:1 sobre blanco. */
-  --c-bar:#57a314; --ready-num:var(--st-disponible);
+  /* Estados como un semáforo: amarillo incompleta, naranja en práctica, verde disponible (y consolidada, con ★);
+     rojo es memoria (olvidada o atrasada). El verde lima es solo de la marca y los botones, nunca un estado.
+     Comprobados con el validador de color (daltonismo incluido). En claro, el texto usa la tinta (--st-*-ink), más oscura. */
+  --c-bar:#2a9d8f; --ready-num:var(--st-disponible-ink);
   --cmp-off:#7d8bab;
   --ok:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --f-display:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
@@ -54,12 +56,13 @@
     --fg:#ffffff; --muted:#8e9ab6;
     --accent:#c4f838; --accent-ink:#060c1a; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.14);
     --neon:#c4f838; --neon-ink:#060c1a; --chip-on:#c4f838; --chip-on-ink:#060c1a;
-    --st-espera:#8e9ab6; --st-incompleta:#ffb35c; --st-practica:#8cc4ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
-    --warn:#ff8f9b;
+    --st-espera:#8e9ab6; --st-incompleta:#e9d66b; --st-practica:#f08a57; --st-disponible:#5ac8a8; --st-consolidada:#5ac8a8;
+    --st-espera-ink:#8e9ab6; --st-incompleta-ink:#e9d66b; --st-practica-ink:#f08a57; --st-disponible-ink:#5ac8a8; --st-consolidada-ink:#5ac8a8;
+    --warn:#e5578a; --warn-soft:#ef93b4;
     --bar:rgba(6,12,26,.86);
     --toast-act:#c4f838;
     --link:#c4f838; --mark:#c4f838; --tab-on:#c4f838; --toast-bg:#1a2846; --toast-fg:#ffffff;
-    --c-bar:color-mix(in srgb,var(--st-disponible) 55%,var(--surface)); --ready-num:var(--neon); --cmp-off:#33446b;
+    --c-bar:color-mix(in srgb,var(--st-disponible) 55%,var(--surface)); --ready-num:var(--st-disponible); --cmp-off:#33446b;
     color-scheme:dark;
   }
 }
@@ -69,12 +72,13 @@
     --fg:#ffffff; --muted:#8e9ab6;
     --accent:#c4f838; --accent-ink:#060c1a; --accent-fg:#c4f838; --accent-soft:rgba(196,248,56,.14);
     --neon:#c4f838; --neon-ink:#060c1a; --chip-on:#c4f838; --chip-on-ink:#060c1a;
-    --st-espera:#8e9ab6; --st-incompleta:#ffb35c; --st-practica:#8cc4ff; --st-disponible:#c4f838; --st-consolidada:#ffffff;
-    --warn:#ff8f9b;
+    --st-espera:#8e9ab6; --st-incompleta:#e9d66b; --st-practica:#f08a57; --st-disponible:#5ac8a8; --st-consolidada:#5ac8a8;
+    --st-espera-ink:#8e9ab6; --st-incompleta-ink:#e9d66b; --st-practica-ink:#f08a57; --st-disponible-ink:#5ac8a8; --st-consolidada-ink:#5ac8a8;
+    --warn:#e5578a; --warn-soft:#ef93b4;
     --bar:rgba(6,12,26,.86);
     --toast-act:#c4f838;
     --link:#c4f838; --mark:#c4f838; --tab-on:#c4f838; --toast-bg:#1a2846; --toast-fg:#ffffff;
-    --c-bar:color-mix(in srgb,var(--st-disponible) 55%,var(--surface)); --ready-num:var(--neon); --cmp-off:#33446b;
+    --c-bar:color-mix(in srgb,var(--st-disponible) 55%,var(--surface)); --ready-num:var(--st-disponible); --cmp-off:#33446b;
     color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -178,7 +182,7 @@ button.card:active{background:var(--surface2)}
 .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:0.8236rem;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:0.8236rem;font-weight:600}
 .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
-.st-espera{color:var(--st-espera)}.st-incompleta{color:var(--st-incompleta)}.st-practica{color:var(--st-practica)}.st-disponible{color:var(--st-disponible)}.st-consolidada{color:var(--st-consolidada)}
+.st-espera{color:var(--st-espera-ink)}.st-incompleta{color:var(--st-incompleta-ink)}.st-practica{color:var(--st-practica-ink)}.st-disponible{color:var(--st-disponible-ink)}.st-consolidada{color:var(--st-consolidada-ink)}
 .tag{font-size:0.7648rem;border-radius:6px;padding:1px 7px;background:var(--fill);color:var(--muted);font-weight:500}
 .tag.warn{color:var(--warn)}
 .empty{background:var(--surface);border-radius:var(--r);padding:24px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
@@ -578,11 +582,11 @@ details.info summary::after{inset:-10px -4px}
 .in-date>span:first-child::first-letter{text-transform:uppercase}
 .in-date .lnk,.in-h .lnk{border:0;background:none;padding:0;font-size:0.8824rem;font-weight:700;color:var(--link);min-height:32px}
 .tagx{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:7px;font-size:0.7059rem;font-weight:700;white-space:nowrap}
-.t-lime{background:color-mix(in srgb,var(--st-disponible) 18%,transparent);color:var(--st-disponible)}
-.t-blue{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
+.t-lime{background:color-mix(in srgb,var(--st-disponible) 18%,transparent);color:var(--st-disponible-ink)}
+.t-blue{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica-ink)}
 .t-red{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
 .t-grey{background:var(--fill);color:var(--muted)}
-.t-amber{background:color-mix(in srgb,var(--st-incompleta) 16%,transparent);color:var(--st-incompleta)}
+.t-amber{background:color-mix(in srgb,var(--warn) 8%,transparent);color:var(--warn-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 35%,transparent)}
 .t-hero{background:rgba(196,248,56,.18);color:#c4f838}
 .hero{position:relative;border-radius:24px;overflow:hidden;background:#0b1428;color:#fff;border:1px solid var(--edge)}
 .hero-media{position:absolute;right:0;top:0;width:62%;height:100%;object-fit:cover;pointer-events:none}
@@ -627,6 +631,12 @@ details.info summary::after{inset:-10px -4px}
 .rp-av>span img{width:100%;height:100%;object-fit:cover}
 .rp-av>span.more{background:var(--fill);color:var(--muted)}
 .rp-av em{font-style:normal;font-size:.72rem;color:var(--muted)}
+.rv-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rv-que{display:contents}
+.rv-que>summary{list-style:none;cursor:pointer;width:28px;height:28px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-weight:800;color:var(--fg)}
+.rv-que>summary::-webkit-details-marker{display:none}
+.rv-que>summary::before,.rv-que[open]>summary::before{content:none}
+.rv-que>p{flex-basis:100%;margin:0;color:var(--muted)}
 .rv-big{font-family:var(--f-display);font-size:1.25rem;font-weight:800;margin:0}
 .rv-hoy .row{flex-wrap:nowrap}
 .rv-hoy .row .btn{flex:1;white-space:nowrap;padding-inline:10px}
@@ -672,7 +682,7 @@ p,.small,.hint{text-wrap:pretty}
 .carr-i img,.carr-ph{width:148px;height:96px;border-radius:16px;object-fit:cover;background:var(--surface2);display:grid;place-items:center}
 .carr-i b{font-size:0.9412rem;line-height:1.25;font-weight:700}
 .carr-i .tagx{align-self:flex-start}
-.in-next{border-radius:22px;padding:18px 18px 18px 16px;background:var(--surface);border:1px solid var(--edge);border-left:4px solid var(--neon);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.in-next{border-radius:22px;padding:18px;background:var(--surface);border:1px solid var(--edge);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .in-next .eyebrow{color:var(--link)}
 .in-next h2{font-size:1.2rem;line-height:1.2}
 .in-next p{font-size:0.9412rem;color:var(--muted)}
@@ -708,11 +718,12 @@ p,.small,.hint{text-wrap:pretty}
 /* Estado: etiqueta de color en lugar de punto. */
 .pill{height:22px;padding:0 8px;border-radius:7px;font-size:0.7059rem;font-weight:800;background:color-mix(in srgb,currentColor 16%,transparent)}
 .pill::before{width:6px;height:6px}
-.st-tag.st-espera{background:var(--fill);color:var(--st-espera)}
-.st-tag.st-incompleta{background:color-mix(in srgb,var(--st-incompleta) 18%,transparent);color:var(--st-incompleta)}
-.st-tag.st-practica{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica)}
-.st-tag.st-disponible{background:color-mix(in srgb,var(--st-disponible) 18%,transparent);color:var(--st-disponible)}
-.st-tag.st-consolidada{background:color-mix(in srgb,var(--st-consolidada) 16%,transparent);color:var(--st-consolidada)}
+.st-tag.st-espera{background:var(--fill);color:var(--st-espera-ink)}
+.st-tag.st-incompleta{background:color-mix(in srgb,var(--st-incompleta) 22%,transparent);color:var(--st-incompleta-ink)}
+.st-tag.st-practica{background:color-mix(in srgb,var(--st-practica) 18%,transparent);color:var(--st-practica-ink)}
+.st-tag.st-disponible{background:color-mix(in srgb,var(--st-disponible) 18%,transparent);color:var(--st-disponible-ink)}
+.st-tag.st-consolidada{background:var(--st-consolidada);color:#08261f}
+.st-tag.st-consolidada::before{content:"★ "}
 /* Filtros: buscador grande y chips de estado que se deslizan. */
 .filters input[type=search]{min-height:48px;border-radius:14px;background:var(--surface);border:1px solid var(--edge)}
 .filters select{border-radius:14px}
@@ -795,6 +806,13 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 
 /* ---------- 1.39: galería con portadas ---------- */
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px}
+.gcard.picked{box-shadow:0 0 0 3px var(--neon)}
+.gpick{position:absolute;right:10px;bottom:10px;z-index:3;width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:rgba(6,12,26,.5);display:grid;place-items:center;color:#060c1a;font-weight:900}
+.gcard.picked .gpick{background:var(--neon);border-color:var(--neon)}
+.selbar{position:sticky;bottom:calc(70px - var(--nav-shift, 0px) + env(safe-area-inset-bottom,0px));z-index:6;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.selbar span{flex-basis:100%;font-size:.9rem;color:var(--muted)}
+.selbar span b{color:var(--fg)}
+.selbar select{min-width:0;flex:1}
 .gcard{position:relative;display:block;aspect-ratio:4/5;border:0;padding:0;border-radius:20px;overflow:hidden;background:var(--surface2);color:#fff;text-align:left;isolation:isolate;box-shadow:0 0 0 1px var(--edge)}
 .gcard:active{transform:scale(.98)}
 .gcard.lit{box-shadow:0 0 0 2px var(--neon)}
@@ -807,12 +825,13 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .gshade{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,12,26,.55) 0%,rgba(6,12,26,0) 28%,rgba(6,12,26,0) 42%,rgba(6,12,26,.92) 100%)}
 .gtop{position:absolute;left:10px;right:10px;top:10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .gtop .tagx{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(6,12,26,.6)}
-.gtop .st-tag.st-disponible,.gtop .st-tag.st-consolidada{background:#c4f838;color:#060c1a}
-.gtop .st-tag.st-practica{color:#8cc4ff}
+.gtop .st-tag.st-disponible{color:#5ac8a8}
+.gtop .st-tag.st-consolidada{background:#5ac8a8;color:#08261f}
+.gtop .st-tag.st-practica{color:#f08a57}
 .gtop .st-tag.st-espera{color:#c3cce0}
-.gtop .st-tag.st-incompleta{color:#ffb35c}
-.gtop .t-red{color:#ff8f9b}
-.gtop .t-amber{color:#ffb35c}
+.gtop .st-tag.st-incompleta{color:#e9d66b}
+.gtop .t-red{color:#e5578a}
+.gtop .t-amber{color:#ef93b4}
 .gplay{margin-left:auto;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .gbody{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px}
 .gname{font-family:var(--f-display);font-size:1.0588rem;font-weight:800;line-height:1.15;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 8px rgba(0,0,0,.35)}
@@ -887,6 +906,8 @@ let tab = "repertorio";
 let filt = { q:"", baile:"todos", estado:"todos", vista:"pos", clase:"todas" };
 // Las disponibles van plegadas al final de Repertorio; si la abres a mano, se queda abierta mientras uses la app.
 let dispOpen = false;
+// Seleccionar varias figuras en Repertorio para cambiarles el estado a la vez (null: sin seleccionar).
+let selMode = null;
 let linkPos = null, linkHold = "";
 // Enlazar se parte en dos: «Desde aquí» (qué hago desde una posición) y «Mapa» (dónde me faltan salidas).
 let linkView = "aqui";
@@ -1501,7 +1522,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.62";
+const APP_VERSION = "1.63";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1737,6 +1758,7 @@ const TABS=["inicio","repertorio","repasar","enlazar","social"];
 const scrollMem = {};
 function go(t){
   if(tab && tab!==t) scrollMem[tab]=window.scrollY;
+  if(t!=="repertorio") selMode = null;
   const same = tab===t;
   tab=t;
   const lt=$("#ltitle"); if(lt) lt.textContent={inicio:"Hoy",repertorio:"Repertorio",repasar:"Repasar",enlazar:"Enlazar",social:"Social"}[t];
@@ -1797,7 +1819,8 @@ function galCard(f, inGroup){
   else if(f.entrada && f.salida) sub = inGroup ? `<span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}` : `${esc(f.entrada)} <span class="arrow" aria-hidden="true">→</span><span class="sr">hasta</span> ${esc(f.salida)}`;
   else if(f.estado==="incompleta") sub = esc(parteTxt(f));
   else sub = `<span class="warnc">${!f.entrada && !f.salida ? "falta dónde empieza y acaba" : !f.entrada ? "falta dónde empieza" : "falta dónde acaba"}</span>`;
-  return `<button class="gcard${f.id===justSaved?" lit":""}" data-view="${esc(f.id)}">${media}<span class="gshade" aria-hidden="true"></span>
+  const pk = selMode && selMode.has(f.id);
+  return `<button class="gcard${f.id===justSaved?" lit":""}${pk?" picked":""}" data-view="${esc(f.id)}"${selMode?` aria-pressed="${pk}"`:""}>${media}<span class="gshade" aria-hidden="true"></span>${selMode?`<span class="gpick" aria-hidden="true">${pk?"✓":""}</span>`:""}
     <span class="gtop"><span class="tagx st-tag st-${esc(f.estado)}">${esc(EST[f.estado]?.t||f.estado)}</span>${ms==="olvidada"||ms==="atrasada"?`<span class="tagx ${MEM[ms][1]}">${MEM[ms][0]}</span>`:""}${f.vid?`<span class="gplay" aria-hidden="true">▶</span>`:""}</span>
     <span class="gbody"><b class="gname">${esc(f.nombre)}</b><span class="groute">${sub}</span>${(f.tiempo||f.tiempos)?compas(f):""}${+f.usos?`<span class="gusos">salió ${+f.usos}×</span>`:""}</span>
   </button>`;
@@ -2078,11 +2101,15 @@ function renderRepertorio(){
       ${clases.length?`<select id="f-clase" aria-label="Clase"><option value="todas">Clase: todas</option>${clases.map(c=>`<option ${filt.clase===c?"selected":""}>${esc(c)}</option>`).join("")}</select>`:""}
       ${bailes.length>1?`<select id="f-baile" aria-label="Baile"><option value="todos">Baile: todos</option>${bailes.map(b=>`<option ${filt.baile===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
 
+      <button type="button" class="btn sm${selMode?" pri":""}" data-act="${selMode?"sel-off":"sel-on"}">${selMode?"Cancelar":"Seleccionar"}</button>
       <div class="seg2 ${bailes.length>1?"full":""}" role="group" aria-label="Orden"><button data-vista="pos" aria-pressed="${filt.vista==="pos"}">Posición</button><button data-vista="rec" aria-pressed="${filt.vista==="rec"}">Recientes</button></div>
     </div>
     <div class="fchips" role="group" aria-label="Estado">${[["todos","Todas"], ...ESTADOS.filter(e=>e.k!=="disponible" && e.k!=="consolidada").map(e=>[e.k, e.t]), ["disponibles","Disponibles"], ["incompletas","Sin entrada/salida"]].map(([k,t])=>`<button type="button" class="chip" data-fest="${k}" aria-pressed="${filt.estado===k}">${esc(t)}</button>`).join("")}</div>
     ${list.length ? body : `<p class="muted">Ninguna figura coincide con la búsqueda o los filtros.</p><button class="btn sm" data-act="clear-filt">Ver todas</button>`}
     ${glosarioHTML()}
+    ${selMode ? `<div class="selbar" role="region" aria-label="Figuras seleccionadas"><span><b>${selMode.size}</b> ${selMode.size===1?"seleccionada":"seleccionadas"} · pasar a:</span>
+      <select id="sel-to" aria-label="Pasar a">${ESTADOS.map(e=>`<option value="${e.k}">${esc(e.t)}</option>`).join("")}</select>
+      <button type="button" class="btn pri sm" data-act="sel-apply"${selMode.size?"":" disabled"}>Cambiar</button></div>` : ""}
     ` : `
     <div class="empty">
       <h2>Guarda tu primera figura</h2>
@@ -2112,9 +2139,8 @@ function renderRepasar(){
     v.innerHTML = `
       ${baileChipsHTML()}
       <section class="panel rv-hoy" aria-labelledby="rv-hoy">
-        <h3 id="rv-hoy">Lo de hoy</h3>
+        <div class="rv-h"><h3 id="rv-hoy">Lo de hoy</h3><details class="rv-que"><summary aria-label="Qué son figuras y enlaces">?</summary><p class="small">Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. Enlaces: ves una posición y nombras dos salidas desde ella (dos figuras que puedes hacer desde ahí), marcándolas con el cuerpo.</p></details></div>
         ${dF.length || dL.length ? `<p class="rv-big">${pendTxt(dF.length, dL.length)}</p>
-          ${firstHelp("rev", "Figuras: ves el nombre y dónde empieza, la haces sin mirar y dices cómo acaba. Enlaces: ves una posición y nombras dos salidas desde ella, marcándolas con el cuerpo.")}
           <div class="row">${dF.length ? `<button class="btn pri" data-act="start-fig">Repasar figuras</button>` : ""}${dL.length ? `<button class="btn${dF.length?"":" pri"}" data-act="start-link">Repasar enlaces</button>` : ""}</div>
           ${dF.length ? `<p class="small muted">${dF.length>MAX_SESSION ? `Van de ${MAX_SESSION} en ${MAX_SESSION}: unos ${MAX_SESSION*2} minutos cada tanda.` : `Unos ${dF.length*2} minutos.`}</p>` : ""}`
         : anyActive ? `<p class="small muted">Nada pendiente hoy.${next?` La próxima es <b>${esc(next.nombre)}</b>, ${fmtDate(next.rep.due)}.`:""}</p>
@@ -3777,6 +3803,24 @@ function promoteFig(id, to, fromView, el){
   f.estado=to; saveFigure(f); qToast(`«${f.nombre}» pasa a ${EST[to].t.toLowerCase()}`);
   if($('[data-sheet="log"]')) openLog(); else if(fromView || $("#sheet-root [data-viewfig]")) openView(f.id); else if(el) el.remove();
 }
+// Cambia el estado de las figuras seleccionadas, con Deshacer. Las que necesitan dónde empieza y acaba para ese
+// estado se quedan como están y se dice cuántas.
+function selApply(to){
+  if(!selMode || !EST[to]) return;
+  const antes = {}, saltadas = [];
+  [...selMode].forEach(id=>{
+    const f = S.figures[id]; if(!f || f.estado===to) return;
+    if(sinRuta(f) && to!=="espera" && to!=="incompleta"){ saltadas.push(f.nombre); return; }
+    antes[id] = clone(f);
+    const g = clone(f); g.estado = to; if(f.estado==="espera" && g.rep) g.rep.due = todayStr();
+    saveFigure(g);
+  });
+  selMode = null; render();
+  const n = Object.keys(antes).length;
+  const msg = `${n ? `${pl(n,"figura pasa","figuras pasan")} a ${EST[to].t.toLowerCase()}` : "Ninguna cambia"}${saltadas.length ? ` · ${pl(saltadas.length,"se queda","se quedan")} igual: le falta dónde empieza o acaba` : ""}`;
+  if(!n){ toast(msg); return; }
+  toast(msg, {label:"Deshacer", fn:()=>{ Object.entries(antes).forEach(([id,f])=>{ S.figures[id]=f; persist({t:"fig",id}); }); render(); toast("Cambio deshecho"); }});
+}
 // ---------- partes: figuras que enseñan en varias clases ----------
 // El vídeo de la figura es siempre el de la última clase (cada uno junta lo anterior con lo nuevo): así el repaso,
 // el pulso, Comparar y los intentos usan ese. Al añadir una parte, el vídeo que había pasa a la lista de partes.
@@ -3883,6 +3927,7 @@ function openIncDone(figId){
   $("#sheet-root").innerHTML = `<div class="${sheetBg()}" data-act="close-bg"><form class="sheet" id="inc-form" novalidate role="dialog" aria-modal="true" aria-labelledby="sheet-t">
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">Ya está completa</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     <p class="small muted">${esc(f.nombre)}: ya os la han enseñado entera. A partir de ahora se repasa como las demás (al día siguiente, a los 3 días, a los 7…).</p>
+    ${partesOf(f).length ? "" : `<p class="small warnc">Aún no has añadido ninguna parte después de la primera. Si os queda alguna clase, mejor esperar: mientras esté incompleta se repasa cada día.</p>`}
     <div class="f"><span>¿Cómo la llevas?</span><div class="seg states" id="inc-to">${["practica","disponible"].map(k=>`<button type="button" class="st-${k}" aria-pressed="${k===to}" data-incto="${k}">${EST[k].t}</button>`).join("")}</div>
       <span class="small" id="inc-d">${esc(EST[to].d)}</span></div>
     ${nv ? `<label class="small row" for="inc-del" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="inc-del"><span>Borrar ${nv===1?"el vídeo de la parte anterior":`los vídeos de las ${nv} partes anteriores`}: el de la última clase ya lo tiene todo. No se puede deshacer.</span></label>` : ""}
@@ -3914,7 +3959,8 @@ function openFigure(id, opts={}){
     <div class="sheet-head"><h2 id="sheet-t" tabindex="-1">${quick?"Captura rápida":(id?"Editar figura":"Nueva figura")}</h2><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     ${quick?`<p class="small muted">Guarda el vídeo y un nombre al salir de clase. Se queda en lista de espera y completas el resto un día libre.</p>
     <div class="vidbox" id="vidbox"></div>`:""}
-    <label class="f" for="ff-nombre">${quick?"Nombre (opcional)":"Nombre fácil de recordar"}<input type="text" id="ff-nombre" value="${esc(f.nombre)}" placeholder="${quick?"Si lo dejas vacío: clase y fecha":"Ej.: vuelta con hammerlock"}"></label>
+    <label class="f" for="ff-nombre">${quick?"Nombre (opcional)":"Nombre fácil de recordar"}<input type="text" id="ff-nombre" value="${esc(f.nombre)}" placeholder="${quick?"Si lo dejas vacío: clase y fecha":"Ej.: vuelta con hammerlock"}" aria-describedby="ff-dup"></label>
+    <p class="small warnc" id="ff-dup" aria-live="polite" hidden></p>
     <div class="f"><span>Tipo</span><div class="seg neutral" id="ff-tipo">${TIPOS.map(t=>`<button type="button" aria-pressed="${tipo===t.k}" data-tipo="${t.k}">${t.t}</button>`).join("")}</div></div>
     ${hasCls?`<div class="f"><span id="ff-cls-l">Clase</span><div class="chips scroll" id="ff-cls" role="group" aria-labelledby="ff-cls-l">${S.classes.map(c=>`<button type="button" class="chip sm" aria-pressed="${prof===c}" data-cls="${esc(c)}">${esc(c)}</button>`).join("")}</div>
       ${quick?"":`<div class="chips"><button type="button" class="chip sm" aria-pressed="${otherCls}" id="ff-cls-other" aria-controls="ff-prof">Otra clase…</button></div>
@@ -4031,6 +4077,11 @@ function openFigure(id, opts={}){
     if(opts.fromView) openView(out.id);
     qToast(quick ? "Captura guardada en lista de espera" : (id ? "Figura actualizada" : "Figura guardada"));
   };
+  // Otra figura con el mismo nombre: se avisa al escribir (sin acentos ni mayúsculas), sin impedir guardar.
+  const dupChk = ()=>{ const el=$("#ff-dup"), v=fold($("#ff-nombre").value.trim()); if(!el) return;
+    const o = v && Object.values(S.figures).find(x=>x.id!==f.id && fold(x.nombre)===v);
+    el.hidden = !o; el.textContent = o ? `Ya tienes una figura llamada «${o.nombre}». Ponle otro nombre para no confundirlas.` : ""; };
+  $("#ff-nombre").addEventListener("input", dupChk); dupChk();
   const cmpUpd = ()=>{ const el=$("#ff-cmp"); if(el) el.innerHTML = compas({tiempo:$("#ff-tiempo").value, tiempos:$("#ff-dur").value}, true); };
   ["ff-tiempo","ff-dur"].forEach(k=>$("#"+k)?.addEventListener("change", cmpUpd));
   $("#fig-form").addEventListener("input", clearFieldError);
@@ -5211,6 +5262,7 @@ document.addEventListener("click", async e=>{
   if(d.bhold!==undefined){ blockHold = blockHold===d.bhold ? null : d.bhold; return showBlock(`[data-bhold="${CSS.escape(d.bhold)}"]`); }
   if(d.bexit){ blockPick=d.bexit; return showBlock("#bk-from"); }
   if(d.tab) return go(d.tab);
+  if(d.view && selMode && t.closest("#v-repertorio")){ selMode.has(d.view) ? selMode.delete(d.view) : selMode.add(d.view); return render(); }
   if(d.view) return openView(d.view);
   if(d.edit) return openFigure(d.edit, {fromView: !!t.closest("[data-viewfig]")});
   if(d.grade) return grade(d.grade);
@@ -5326,6 +5378,9 @@ document.addEventListener("click", async e=>{
   if(a==="pk-back") return pkBack();
   if(a==="att-savevid") return attSaveVid(d.id, d.att);
   if(a==="att-del") return attDelete(d.id, d.att);
+  if(a==="sel-on"){ selMode = new Set(); dispOpen = true; return render(); }
+  if(a==="sel-off"){ selMode = null; return render(); }
+  if(a==="sel-apply") return selApply($("#sel-to").value);
   if(a==="pt-new") return openParteNew(d.id);
   if(a==="pt-open") return openParteView(d.id, d.pt);
   if(a==="pt-savevid") return ptSaveVid(d.id, d.pt);

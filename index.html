@@ -614,18 +614,18 @@ details.info summary::after{inset:-10px -4px}
 .rp-ring .c b{font-family:var(--f-display);font-size:2.3rem;font-weight:800;line-height:1}
 .rp-ring .c span{font-size:.8rem;color:var(--muted);line-height:1.25}
 .rp-leg{display:flex;flex-direction:column;gap:6px;min-width:0}
-.rp-row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:4px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;row-gap:5px;align-items:center;padding:9px 12px 9px 9px;border-radius:12px;background:var(--surface2)}
+.rp-row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:4px minmax(0,1fr) auto;grid-template-rows:auto auto auto;column-gap:10px;row-gap:5px;align-items:center;padding:9px 12px 9px 9px;border-radius:12px;background:var(--surface2)}
 .rp-row:focus-visible{outline:2px solid var(--link);outline-offset:2px}
-.rp-row>i{grid-column:1;grid-row:1/3;align-self:stretch;width:4px;border-radius:2px}
+.rp-row>i{grid-column:1;grid-row:1/4;align-self:stretch;width:4px;border-radius:2px}
 .rp-row .t{grid-column:2;grid-row:1;font-size:.9rem;font-weight:700;line-height:1.1}
-.rp-row>b{grid-column:3;grid-row:1/3;font-family:var(--f-display);font-size:1.7rem;font-weight:800}
+.rp-row>b{grid-column:3;grid-row:1/4;font-family:var(--f-display);font-size:1.7rem;font-weight:800}
 .rp-av{grid-column:2;grid-row:2;display:flex;align-items:center;min-height:24px}
-.rp-av>span{width:24px;height:24px;border-radius:50%;margin-left:-7px;display:grid;place-items:center;overflow:hidden;font-size:.62rem;font-weight:800;background:var(--surface);border:2px solid var(--surface2);color:var(--fg)}
+.rp-av>span{flex:none;width:24px;height:24px;border-radius:50%;margin-left:-7px;display:grid;place-items:center;overflow:hidden;font-size:.62rem;font-weight:800;background:var(--surface);border:2px solid var(--surface2);color:var(--fg)}
 .rp-av>span:first-child{margin-left:0}
 .rp-av>span img{width:100%;height:100%;object-fit:cover}
 .rp-av>span.more{background:var(--fill);color:var(--muted)}
-.rp-av em{font-style:normal;font-size:.72rem;color:var(--muted);margin-left:6px;white-space:nowrap}
-.rp-av em:first-child{margin-left:0}
+.rp-av em{font-style:normal;font-size:.72rem;color:var(--muted)}
+.rp-sub{grid-column:2;grid-row:3;font-size:.72rem;color:var(--muted);line-height:1.2}
 .rp-trend{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin:0}
 .rp-trend b{color:var(--fg)}
 .rp-more{all:unset;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--warn);min-height:32px;display:flex;align-items:center}
@@ -1476,7 +1476,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.57";
+const APP_VERSION = "1.58";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1891,15 +1891,16 @@ function repPanelHTML(all, st){
   const GAP = parts.length>1 ? 3 : 0;
   let off = 0;
   const segs = parts.map(([n,k])=>{ const len = CIR*n/tot, c = `<circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--st-${k})" stroke-width="${SW}" stroke-dasharray="${Math.max(len-GAP,1).toFixed(2)} ${CIR.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 75 75)"/>`; off += len; return c; }).join("");
-  const av = (arr, extra) => `<span class="rp-av" aria-hidden="true">${arr.slice(0,4).map(f=>`<span>${f.thumb?`<img src="${esc(f.thumb)}" alt="">`:esc((f.nombre||"?").trim().charAt(0).toUpperCase())}</span>`).join("")}${arr.length>4?`<span class="more">+${arr.length-4}</span>`:""}${extra?`<em>${extra}</em>`:""}</span>`;
-  const row = (k, f, arr, t, extra) => `<button type="button" class="rp-row" data-act="goto-filter" data-f="${f}" aria-label="${arr.length} ${esc(t.toLowerCase())}${extra?`, ${esc(extra)}`:""}: ver en el repertorio"><i style="background:var(--st-${k})"></i><span class="t">${esc(t)}</span><b>${arr.length}</b>${arr.length ? av(arr, extra) : `<span class="rp-av"><em>ninguna</em></span>`}</button>`;
+  // Caben 4 caras y «+N»: no se encogen nunca (antes, con «2 consol.» al lado, se montaban unas sobre otras).
+  const av = arr => { const n = arr.length>4 ? 3 : 4; return `<span class="rp-av" aria-hidden="true">${arr.slice(0,n).map(f=>`<span>${f.thumb?`<img src="${esc(f.thumb)}" alt="">`:esc((f.nombre||"?").trim().charAt(0).toUpperCase())}</span>`).join("")}${arr.length>n?`<span class="more">+${arr.length-n}</span>`:""}</span>`; };
+  const row = (k, f, arr, t, extra) => `<button type="button" class="rp-row" data-act="goto-filter" data-f="${f}" aria-label="${arr.length} ${esc(t.toLowerCase())}${extra?`, ${esc(extra)}`:""}: ver en el repertorio"><i style="background:var(--st-${k})"></i><span class="t">${esc(t)}</span><b>${arr.length}</b>${arr.length ? av(arr) : `<span class="rp-av"><em>ninguna</em></span>`}${extra?`<span class="rp-sub" aria-hidden="true">${esc(extra)}</span>`:""}</button>`;
   const olv = [st.olvidada ? pl(st.olvidada,"olvidada","olvidadas") : "", st.atrasada ? pl(st.atrasada,"atrasada","atrasadas") : ""].filter(Boolean).join(" · ");
   return `<section class="panel rp" aria-labelledby="in-rp">
     <div class="in-h"><h2 id="in-rp">Tu repertorio</h2><button class="lnk" data-act="goto-filter" data-f="todos">Ver todo</button></div>
     <div class="rp-donut">
       <div class="rp-ring"><svg width="132" height="132" viewBox="0 0 150 150" role="img" aria-label="${D.length} de ${tot} ya te salen: ${pl(I.length,"incompleta","incompletas")}, ${P.length} en práctica, ${pl(D.length,"disponible","disponibles")}"><circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--surface2)" stroke-width="${SW}"/>${segs}</svg>
         <div class="c" aria-hidden="true"><b>${D.length}</b><span>de ${tot} ya<br>te salen</span></div></div>
-      <div class="rp-leg">${row("incompleta","incompleta",I,I.length===1?"Incompleta":"Incompletas","")}${row("practica","practica",P,"En práctica","")}${row("disponible","disponibles",D,"Disponibles",C.length?`${C.length} consol.`:"")}</div>
+      <div class="rp-leg">${row("incompleta","incompleta",I,I.length===1?"Incompleta":"Incompletas","")}${row("practica","practica",P,"En práctica","")}${row("disponible","disponibles",D,"Disponibles",C.length?pl(C.length,"consolidada","consolidadas"):"")}</div>
     </div>
     ${mes ? `<p class="rp-trend"><span style="color:var(--st-disponible)" aria-hidden="true">▲</span><span><b>+${mes}</b> ${mes===1?"ha llegado":"han llegado"} a disponible en los últimos 30 días</span></p>` : ""}
     ${olv ? `<button type="button" class="rp-more" data-tab="repasar">● ${olv}: repásalas hoy ›</button>` : ""}

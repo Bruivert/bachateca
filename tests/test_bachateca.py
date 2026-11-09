@@ -1167,6 +1167,62 @@ def vocabulario_y_siguiente_paso(browser):
 
 
 @test
+def seleccionar_varias_y_cambiar_estado(browser):
+    """Repertorio: seleccionar varias figuras y pasarlas a otro estado de una vez, con Deshacer."""
+    figs = {"f1": fig(1, "Cerrada", "Sombra"), "f2": fig(2, "Sombra", "Cerrada"), "f3": fig(3, "Cerrada", "", nombre="Sin salida", estado="espera")}
+    ctx, p, errors = open_app(browser, seed={"figures": figs, "logs": {}})
+    p.click('nav.tabs [data-tab="repertorio"]')
+    p.click('[data-act="sel-on"]')
+    for fid in ["f1", "f2", "f3"]:
+        p.click(f'#v-repertorio [data-view="{fid}"]')
+    assert p.locator(".sheet").count() == 0, "seleccionando no se abre la ficha"
+    assert "3 seleccionadas" in p.locator(".selbar").inner_text()
+    p.select_option("#sel-to", "disponible")
+    p.click('[data-act="sel-apply"]')
+    est = p.evaluate("() => Object.fromEntries(Object.values(window.__bachateca.state().figures).map(f => [f.id, f.estado]))")
+    assert est == {"f1": "disponible", "f2": "disponible", "f3": "espera"}, est
+    t = p.locator(".toast").inner_text()
+    assert "2 figuras pasan a disponible" in t and "1 se queda igual" in t, t
+    assert p.locator(".selbar").count() == 0, "al cambiar se sale de la selección"
+    p.click(".toast .undo")
+    est = p.evaluate("() => Object.fromEntries(Object.values(window.__bachateca.state().figures).map(f => [f.id, f.estado]))")
+    assert est == {"f1": "practica", "f2": "practica", "f3": "espera"}, est
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def avisos_que_previenen_errores(browser):
+    """Nombre repetido al escribirlo y «Ya está completa» sin ninguna parte añadida."""
+    figs = {"f1": fig(1, "Cerrada", "Sombra", nombre="Vuelta de dama"), "f2": fig(2, "Cerrada", "", nombre="Nueva incompleta", estado="incompleta", partes=[])}
+    ctx, p, errors = open_app(browser, seed={"schema": 6, "figures": figs, "logs": {}})
+    p.click('nav.tabs [data-tab="repertorio"]'); p.click("#btn-new"); p.click('[data-act="to-full"]')
+    assert not p.locator("#ff-dup").is_visible()
+    p.fill("#ff-nombre", "vuelta de DAMA")
+    assert "Ya tienes una figura llamada «Vuelta de dama»" in p.locator("#ff-dup").inner_text()
+    p.fill("#ff-nombre", "Vuelta de dama 2")
+    assert not p.locator("#ff-dup").is_visible()
+    p.click('[data-act="close"]')
+    if p.locator("#confirm-root [data-cf=ok]").count(): p.click("#confirm-root [data-cf=ok]")
+    p.click('#v-repertorio [data-view="f2"]'); p.click('[data-act="inc-done"]')
+    assert "Aún no has añadido ninguna parte" in p.locator("#inc-form").inner_text()
+    assert not errors, errors
+    ctx.close()
+
+
+@test
+def colores_de_semaforo(browser):
+    """Los estados son un semáforo y el lima de los botones ya no es ningún estado."""
+    ctx, p, errors = open_app(browser)
+    r = p.evaluate("""() => { const c = v => { const d = document.createElement('div'); d.style.color = `var(${v})`; document.body.append(d); const x = getComputedStyle(d).color; d.remove(); return x; };
+      return {neon: c('--neon'), disp: c('--st-disponible'), cons: c('--st-consolidada'), prac: c('--st-practica'), inc: c('--st-incompleta')}; }""")
+    assert r["disp"] != r["neon"] and r["disp"] == r["cons"], r
+    assert len({r["disp"], r["prac"], r["inc"]}) == 3, r
+    assert not errors, errors
+    ctx.close()
+
+
+@test
 def repertorio_disponibles_plegadas_y_clase(browser):
     ctx, p, errors = open_app(browser, seed=rep_seed())
     p.click('nav.tabs [data-tab="repertorio"]')

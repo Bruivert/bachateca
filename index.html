@@ -187,7 +187,10 @@ button.card:active{background:var(--surface2)}
 .tag.warn{color:var(--warn)}
 .empty{background:var(--surface);border-radius:var(--r);padding:24px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
+/* 14 px entre filas: la zona táctil ampliada de cada chip (7 px arriba y abajo) no pisa la de la fila vecina. */
+.chips{display:flex;gap:14px 8px;flex-wrap:wrap}
+/* «Solo seguras» y «Agarres exactos»: la zona ampliada de «Opciones de la cadena», justo debajo, pisaba la suya. */
+.practice > .chips{margin-bottom:6px}
 .chip{border:0;background:var(--fill);border-radius:99px;padding:8px 14px;font-size:0.8824rem;font-weight:600;color:var(--fg)}
 .chip.sm{padding:6px 12px;font-size:0.8236rem}
 .chip{transition:background-color .15s ease-out,color .15s ease-out}
@@ -516,7 +519,7 @@ html.night .toast{bottom:auto;top:calc(60px + env(safe-area-inset-top,0px))}
 .poslist span.nm{margin-right:auto;min-width:0;overflow-wrap:break-word}
 .ib{width:44px;height:44px;flex:none;border:0;border-radius:10px;background:none;color:var(--link);display:grid;place-items:center}
 .ib:disabled{opacity:.3}.ib.danger{color:var(--warn);margin-left:8px}.ib:active{background:var(--fill)}
-.chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin:-7px calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:7px max(16px,env(safe-area-inset-left,0px));scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .chips.scroll{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
 .chips.scroll::-webkit-scrollbar{display:none}.chips.scroll .chip{flex:none}
 .sheet-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-24px - env(safe-area-inset-bottom,0px));padding:12px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);flex-wrap:nowrap}
@@ -659,7 +662,7 @@ p,.small,.hint{text-wrap:pretty}
 .rp-sub{grid-column:2;grid-row:3;font-size:.72rem;color:var(--muted);line-height:1.2}
 .rp-trend{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin:0}
 .rp-trend b{color:var(--fg)}
-.rp-more{all:unset;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--warn);min-height:32px;display:flex;align-items:center}
+.rp-more{all:unset;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--warn);min-height:44px;display:flex;align-items:center}
 /* Repertorio: las disponibles, plegadas al final. */
 .rp-disp{margin-top:8px;border-top:1px solid var(--line);padding-top:4px}
 .rp-disp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:56px;font-family:var(--f-display);font-size:1.35rem;font-weight:800;color:var(--fg)}
@@ -729,7 +732,7 @@ p,.small,.hint{text-wrap:pretty}
 /* Filtros: buscador grande y chips de estado que se deslizan. */
 .filters input[type=search]{min-height:48px;border-radius:14px;background:var(--surface);border:1px solid var(--edge)}
 .filters select{border-radius:14px}
-.fchips{display:flex;gap:8px;overflow-x:auto;margin:-8px -16px 0;padding:0 16px 2px;scrollbar-width:none;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
+.fchips{display:flex;gap:8px;overflow-x:auto;margin:-15px -16px -7px;padding:7px 16px 9px;scrollbar-width:none;scroll-padding-inline:16px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
 .fchips::-webkit-scrollbar{display:none}
 .fchips .chip{flex:none;min-height:38px}
 .seg2{border-radius:14px;padding:3px;background:var(--surface);border:1px solid var(--edge)}
@@ -820,10 +823,14 @@ html:not(.theme-dark):not(.night) .flash-bgw img{filter:blur(22px) brightness(1.
 .gcard.lit{box-shadow:0 0 0 2px var(--neon)}
 .gm{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transition:filter .3s}
 .gm:not(.has-cover){filter:blur(1.5px) saturate(1.1)}
+.gm.gm-ph{filter:none}   /* sin portada: el icono y el tipo se leen nítidos (el desenfoque es para la miniatura mientras carga) */
 .gm-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(120% 90% at 70% 10%,#24407e 0%,#0f1a30 60%,#0b1428 100%);color:#c4f838}
 .gm-ph .ico{width:34px;height:34px}
 .gm-ph .cmp{transform:scale(1.8);transform-origin:center}
 .gm-ph em{font-style:normal;font-size:0.7059rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a3b5dc}
+/* El tipo va arriba a la derecha (las etiquetas de estado van a la izquierda): un nombre de tres líneas lo tapaba en el centro. */
+.gm-ph em{position:absolute;top:14px;right:12px}
+.gm-ph{padding-bottom:28%}   /* el icono queda donde estaba, por encima del nombre */
 .gshade{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,12,26,.55) 0%,rgba(6,12,26,0) 28%,rgba(6,12,26,0) 42%,rgba(6,12,26,.92) 100%)}
 .gtop{position:absolute;left:10px;right:10px;top:10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .gtop .tagx{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(6,12,26,.6)}
@@ -1524,7 +1531,7 @@ const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: stan
 // En la app instalada, algunos iPhone dejan el área visible más corta que la pantalla y la barra
 // de pestañas queda flotando por encima del borde. Se mide la diferencia y se baja la barra hasta abajo.
 let screenDiag = "";
-const APP_VERSION = "1.65";
+const APP_VERSION = "1.66";
 let probeB=null, probeI=null, lastGap=0;
 function fixBottom(){
   let shift = 0;
@@ -1983,7 +1990,7 @@ function renderInicio(){
   const names = ids => { const n=ids.map(id=>S.figures[id]?.nombre).filter(Boolean); return n.length>2 ? `${n.slice(0,2).join(", ")} y ${n.length-2} más` : joinY(n); };
   const items = [
     fStep && `<li>${ico("brain")}<span><b>Recuerda ${pl(fStep.ids.length,"figura","figuras")}</b><span>${esc(names(fStep.ids))}</span></span></li>`,
-    lStep && `<li>${ico("link")}<span><b>Salidas desde ${esc(joinY(lStep.ids))}</b><span>${plan.bloq && lStep.ids[0]===plan.bloq ? "Donde te bloqueaste en el último social" : "Nombra dos salidas y márcalas con el cuerpo"}</span></span></li>`,
+    lStep && `<li>${ico("link")}<span><b>Salidas desde ${esc(joinY(lStep.ids))}</b><span>${plan.bloq && lStep.ids[0]===plan.bloq ? (lStep.ids.length>1 ? `En ${esc(plan.bloq)} te bloqueaste en el último social` : "Donde te bloqueaste en el último social") : "Nombra dos salidas y márcalas con el cuerpo"}</span></span></li>`,
     cStep && `<li>${ico("music")}<span><b>Cadena desde ${esc(cStep.pos)}</b><span>Hasta ${chainN} figuras seguidas, con una canción</span></span></li>`
   ].filter(Boolean);
   const carr = dF.slice().sort(byMem).slice(0,8);
@@ -1991,7 +1998,7 @@ function renderInicio(){
   const gap = coverage().filter(c=>c.into.length && c.ready.length<2).sort((a,b)=>b.into.length-a.into.length)[0];
   const incN = all.filter(incomplete).length, espN = all.filter(f=>f.estado==="espera").length;
   let next = "";
-  if(gap) next = `<h2 id="in-next">Aprende una salida más desde ${esc(gap.p)}</h2><p>Llegas ahí con ${pl(gap.into.length,"figura","figuras")} y tienes ${gap.ready.length ? pl(gap.ready.length,"salida segura","salidas seguras") : "ninguna salida segura"} (figuras que ya te salen). Es donde más fácil te quedas en blanco: pide en clase una salida sencilla desde ahí.</p>
+  if(gap) next = `<h2 id="in-next">Aprende una salida más desde ${esc(gap.p)}</h2><p>Llegas ahí con ${pl(gap.into.length,"figura","figuras")} y ${gap.ready.length ? `tienes ${pl(gap.ready.length,"salida segura","salidas seguras")}` : "no tienes ninguna salida segura"} (figuras que ya te salen). Es donde más fácil te quedas en blanco: pide en clase una salida sencilla desde ahí.</p>
       <button class="btn" data-act="goto-pos" data-p="${esc(gap.p)}">Ver salidas desde ${esc(gap.p)}</button>`;
   else if(incN) next = `<h2 id="in-next">Completa ${pl(incN,"figura","figuras")}</h2><p>Les falta dónde empiezan o acaban, así que no salen en Enlazar ni en Social.</p><button class="btn" data-act="goto-filter" data-f="incompletas">Ver cuáles</button>`;
   else if(espN) next = `<h2 id="in-next">${espN===1?"1 figura espera":`${espN} figuras esperan`} en la lista</h2><p>Pasa una a «En práctica» para que entre en los repasos.</p><button class="btn" data-act="goto-filter" data-f="espera">Ver la lista de espera</button>`;
@@ -2023,7 +2030,7 @@ function renderInicio(){
     ${repPanelHTML(all, st)}
     ${carr.length ? `<section aria-labelledby="in-due" class="in-sec">
       <div class="in-h"><h2 id="in-due">Figuras de hoy <span class="muted">${dF.length}</span></h2><button class="lnk" data-tab="repasar">Ver todo</button></div>
-      <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${esc(f.id)}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||""}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
+      <div class="carr">${carr.map(f=>{ const m=MEM[memState(f)]||MEM.nueva; return `<button class="carr-i" data-view="${esc(f.id)}">${f.vid?`<img data-cover="${esc(f.vid)}" ${f.thumb?`src="${esc(f.thumb)}"`:""} alt="">`:f.thumb?`<img src="${esc(f.thumb)}" alt="">`:`<span class="carr-ph" aria-hidden="true">${compas(f)||ico("music")}</span>`}<b>${esc(f.nombre)}</b><span class="tagx ${m[1]}">${m[0]}</span></button>`; }).join("")}</div>
     </section>` : ""}
     ${next ? `<section class="in-next" aria-labelledby="in-next"><span class="eyebrow">${ico("spark")}Tu siguiente paso</span>${next}</section>` : ""}
     ${qsHTML}
@@ -3324,7 +3331,7 @@ function openAttemptView(figId, attId){
     <div class="sheet-head"><button type="button" class="btn ghost sm" data-view="${esc(f.id)}">‹ ${esc(f.nombre)}</button><span class="fv-spacer"></span><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">✕</button></div>
     <div class="fv-media">${playerHTML({vid:a.vid, vidTrim:a.vidTrim, thumb:a.thumb})}</div>
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Intento del ${esc(fmtDate(a.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
-    ${a.vidSaved===a.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
+    ${a.vidSaved===a.vid ? "" : `<p class="small muted">Este vídeo solo está en la app: «Exportar copia» no incluye vídeos; «Copia completa» sí.</p>`}
     ${cmpCardHTML(f, a)}
     ${pkCardHTML(a.pulso, a.vid, f.id, a.id)}
     <div class="fv-actions"><button type="button" class="btn" data-act="att-savevid" data-id="${esc(f.id)}" data-att="${esc(a.id)}">Guardar en Fotos</button></div>
@@ -3891,7 +3898,7 @@ function openParteView(figId, ptId){
     <div class="fv-title"><h2 id="sheet-t" tabindex="-1">Parte ${i+1} · ${esc(fmtDate(x.fecha))}</h2>${info?`<p class="small muted">${esc(info)}</p>`:""}</div>
     ${x.nota ? `<section class="fv-card"><p class="txt">${esc(x.nota)}</p></section>` : ""}
     ${x.vid ? nvCardHTML(x, null) : ""}
-    ${x.vid ? `${x.vidSaved===x.vid ? "" : `<p class="small muted">Este vídeo solo está en la app. La copia de seguridad no incluye vídeos.</p>`}
+    ${x.vid ? `${x.vidSaved===x.vid ? "" : `<p class="small muted">Este vídeo solo está en la app: «Exportar copia» no incluye vídeos; «Copia completa» sí.</p>`}
     <div class="fv-actions"><button type="button" class="btn" data-act="pt-savevid" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Guardar en Fotos</button></div>` : ""}
     <button type="button" class="btn danger wide del-row" data-act="pt-del" data-id="${esc(f.id)}" data-pt="${esc(x.id)}">Borrar parte</button>
   </div></div>`;
@@ -4456,7 +4463,7 @@ async function recoverVideos(list){
 }
 function vidsUnsavedHTML(){
   const n = vidsUnsaved().length; if(!n) return "";
-  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. La copia de seguridad no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}. Guárdalos en Archivos o iCloud Drive para poder recuperarlos con «Recuperar vídeos».
+  return `<div class="note">${n===1?"1 vídeo no tiene":`${n} vídeos no tienen`} copia fuera de la app. «Exportar copia» no incluye vídeos: si borras la app, ${n===1?"se pierde":"se pierden"}. Guárdalos en Archivos o iCloud Drive para poder recuperarlos con «Recuperar vídeos».
     <div class="row" style="margin-top:8px"><button class="btn sm" data-act="save-vids">Guardar ${n>VID_BATCH?`los siguientes ${VID_BATCH}`:(n===1?"el vídeo":`los ${n}`)}</button></div></div>`;
 }
 // Social de otro día sin registrar: registrarlo con su fecha o descartarlo (con Deshacer).
